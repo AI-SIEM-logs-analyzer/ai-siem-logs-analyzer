@@ -1,0 +1,45 @@
+# .github/workflows/ci-backend.yml
+# CI backend (Quarkus). Rulează la PR-uri care ating backend/.
+name: CI · Backend (Quarkus)
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
+  push:
+    branches-ignore: ['main']
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verifică formatarea (Spotless)
+        run: ./mvnw -B spotless:check
+
+      - name: Build + teste (JUnit5 + RestAssured, Testcontainers)
+        run: ./mvnw -B clean verify
+
+      - name: Urcă raportul JaCoCo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: backend/target/site/jacoco/
+          if-no-files-found: ignore

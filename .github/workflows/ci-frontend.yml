@@ -1,0 +1,51 @@
+# .github/workflows/ci-frontend.yml
+# CI frontend (React + Vite + TS). Rulează la PR-uri care ating frontend/.
+# (Nu se declanșează până nu există folderul frontend/ — deci e safe de pus de la început.)
+name: CI · Frontend (React)
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
+  push:
+    branches-ignore: ['main']
+    paths:
+      - 'frontend/**'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (ESLint)
+        run: pnpm lint
+
+      - name: Type check (tsc)
+        run: pnpm exec tsc --noEmit
+
+      - name: Teste (Vitest)
+        run: pnpm test -- --run
+
+      - name: Build (Vite)
+        run: pnpm build
