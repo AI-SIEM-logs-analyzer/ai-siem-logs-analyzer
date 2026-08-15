@@ -41,7 +41,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Necesită extensia quarkus-container-image-jib în pom.xml
       - name: Build & push imagine backend (Quarkus + Jib)
         working-directory: backend
         run: >
@@ -84,7 +83,6 @@ jobs:
             type=raw,value=latest
             type=sha
 
-      # Necesită frontend/Dockerfile (build Vite -> servit cu nginx)
       - name: Build & push imagine frontend
         uses: docker/build-push-action@v6
         with:
@@ -97,9 +95,6 @@ jobs:
     needs: [build-backend, build-frontend]
     runs-on: ubuntu-latest
     steps:
-      # Varianta A — server propriu (Hetzner) prin SSH + docker compose.
-      # Pe server: un docker-compose.prod.yml care referă imaginile din ghcr.io,
-      # iar serverul e logat în ghcr (docker login ghcr.io) sau imaginile sunt publice.
       - name: Deploy (SSH + docker compose)
         uses: appleboy/ssh-action@v1
         with:
@@ -111,10 +106,3 @@ jobs:
             docker compose pull
             docker compose up -d
             docker image prune -f
-
-      # Varianta B — Fly.io (comentează varianta A și decomentează asta):
-      # - uses: actions/checkout@v4
-      # - uses: superfly/flyctl-actions/setup-flyctl@master
-      # - run: flyctl deploy --remote-only
-      #   env:
-      #     FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

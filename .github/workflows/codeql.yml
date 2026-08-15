@@ -1,6 +1,3 @@
-# .github/workflows/codeql.yml
-# Scanare de securitate a codului (SAST) pentru Java și TypeScript.
-# Rezultatele apar în tab-ul Security -> Code scanning. Punct bun pe CV pentru un proiect de securitate.
 name: CodeQL Security Scan
 
 on:
@@ -9,7 +6,7 @@ on:
   pull_request:
     branches: ['main']
   schedule:
-    - cron: '0 6 * * 1'   # luni, 06:00 UTC
+    - cron: '0 6 * * 1'
   workflow_dispatch:
 
 jobs:

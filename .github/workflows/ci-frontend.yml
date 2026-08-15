@@ -1,6 +1,3 @@
-# .github/workflows/ci-frontend.yml
-# CI frontend (React + Vite + TS). Rulează la PR-uri care ating frontend/.
-# (Nu se declanșează până nu există folderul frontend/ — deci e safe de pus de la început.)
 name: CI · Frontend (React)
 
 on:
