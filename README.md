@@ -8,7 +8,7 @@ AI-assisted SIEM log analysis platform.
 |-------------|---------------------------------------------------|
 | `backend/`  | Quarkus (Java 21) REST API — see [backend/README.md](backend/README.md) |
 | `frontend/` | React + Vite + TypeScript UI — see [frontend/README.md](frontend/README.md) |
-| `docker/`   | Compose / infra (placeholder)                     |
+| `docker/`   | Local dev stack (Compose) — see [docker/README.md](docker/README.md) |
 | `docs/`     | Architecture & docs (placeholder)                 |
 
 ## Stack
@@ -18,6 +18,14 @@ AI-assisted SIEM log analysis platform.
 **Frontend:** React + Vite + TypeScript · TanStack Query · shadcn/ui + Tailwind · Apache ECharts · OpenAPI-generated type-safe client · Vitest + Playwright
 
 **Storage:** PostgreSQL · Redis · Kafka (Redpanda) · OpenSearch (decision pending)
+
+## Local development
+
+```bash
+make up     # PostgreSQL + Redis + Redpanda, healthchecked, persistent volumes
+```
+
+Details, ports and connection settings: [docker/README.md](docker/README.md).
 
 ## Workflow
 
