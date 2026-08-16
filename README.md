@@ -22,7 +22,9 @@ AI-assisted SIEM log analysis platform.
 ## Local development
 
 ```bash
-make up     # PostgreSQL + Redis + Redpanda, healthchecked, persistent volumes
+make up      # PostgreSQL + Redis + Redpanda, healthchecked, persistent volumes
+make up-app  # the same, plus the backend API on :8080
+make verify  # run the backend build exactly as CI does (Temurin 21, in a container)
 ```
 
 Details, ports and connection settings: [docker/README.md](docker/README.md).
@@ -33,4 +35,5 @@ Details, ports and connection settings: [docker/README.md](docker/README.md).
 - All changes via Pull Request, **min. 1 review** required.
 - CI runs per-area (`ci-backend`, `ci-frontend`) + CodeQL security scan.
 
-> Backend/frontend are placeholder scaffolding for now; buildable projects land in later PRs.
+> The backend is a buildable Quarkus skeleton (health + OpenAPI); domain features land in
+> later PRs. The frontend is still placeholder scaffolding.

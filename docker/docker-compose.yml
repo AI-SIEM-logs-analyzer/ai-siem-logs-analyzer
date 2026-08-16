@@ -97,6 +97,27 @@ services:
       redpanda:
         condition: service_healthy
 
+  # The backend API. Not started by default — the normal dev loop is
+  # `./mvnw quarkus:dev` with live reload, and rebuilding an image per edit is slower.
+  # Use it for demos, for frontend work, or for an end-to-end smoke test:
+  #   make up-app
+  #
+  # `image`, not `build`: the image comes from Jib (`make image`), the same builder that
+  # cd.yml uses to publish to ghcr.io. There is deliberately no Dockerfile for the app.
+  backend:
+    image: ${BACKEND_IMAGE:-siem/security-log-analyzer-backend}:${BACKEND_TAG:-0.1.0-SNAPSHOT}
+    container_name: siem-backend
+    restart: unless-stopped
+    profiles: ["app"]
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/q/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
 volumes:
   pgdata:
   redisdata:
