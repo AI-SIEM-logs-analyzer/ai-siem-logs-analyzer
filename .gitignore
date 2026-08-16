@@ -1,2 +1,7 @@
 .idea
 .DS_Store
+
+# Local environment files (secrets) — commit only *.env.example
+.env
+*.env
+!*.env.example
