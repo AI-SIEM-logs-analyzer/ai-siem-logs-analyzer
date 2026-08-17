@@ -28,6 +28,7 @@ class HealthEndpointTest {
                 .statusCode(200)
                 .body("status", is("UP"))
                 .body("checks.name", hasItem("app-readiness"))
-                .body("checks.find { it.name == 'app-readiness' }.status", is("UP"));
+                .body("checks.find { it.name == 'app-readiness' }.status", is("UP"))
+                .body("checks.find { it.name == 'app-readiness' }.data.environment", is("test"));
     }
 }

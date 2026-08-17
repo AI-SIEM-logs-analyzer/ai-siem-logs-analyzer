@@ -109,6 +109,13 @@ services:
     container_name: siem-backend
     restart: unless-stopped
     profiles: ["app"]
+    # The image ships application.yaml; everything environment-specific arrives here.
+    # QUARKUS_PROFILE selects the %prod block, which deliberately leaves app.ai.api-key
+    # unset — the application refuses to boot unless APP_AI_API_KEY is supplied below.
+    environment:
+      QUARKUS_PROFILE: prod
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-local-compose}
+      APP_AI_API_KEY: ${APP_AI_API_KEY:?set APP_AI_API_KEY in docker/.env}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     healthcheck:
