@@ -1,6 +1,21 @@
 COMPOSE := docker compose -f docker/docker-compose.yml
 
-.PHONY: up down stop logs ps reset tools help
+# Temurin 21 + Maven + docker CLI. Reproduces the CI toolchain and lets Jib register the
+# application image with the host's Docker daemon.
+BUILDER_IMAGE := siem-builder
+BUILDER_RUN := docker run --rm \
+	-v "$(CURDIR)":/work \
+	-v siem-m2:/root/.m2 \
+	-w /work/backend \
+	$(BUILDER_IMAGE)
+BUILDER_RUN_DOCKER := docker run --rm \
+	-v "$(CURDIR)":/work \
+	-v siem-m2:/root/.m2 \
+	-v /var/run/docker.sock:/var/run/docker.sock \
+	-w /work/backend \
+	$(BUILDER_IMAGE)
+
+.PHONY: up up-app down stop logs ps reset tools help builder image verify
 
 ## Start the dev stack (creates docker/.env from the example on first run)
 up: docker/.env
@@ -10,9 +25,26 @@ up: docker/.env
 tools: docker/.env
 	$(COMPOSE) --profile tools up -d --wait
 
+## Start the dev stack plus the backend API (rebuilds the image first)
+up-app: docker/.env image
+	$(COMPOSE) --profile app up -d --wait
+
+## Build the backend build/tooling image
+builder:
+	docker build -f docker/builder.Dockerfile -t $(BUILDER_IMAGE) docker/
+
+## Build the backend container image with Jib, into the local Docker daemon
+image: builder
+	$(BUILDER_RUN_DOCKER) ./mvnw -B package -DskipTests -Dquarkus.container-image.build=true
+
+## Run the backend exactly as CI does (Temurin 21): Spotless, then build + tests
+verify: builder
+	$(BUILDER_RUN) ./mvnw -B spotless:check
+	$(BUILDER_RUN) ./mvnw -B clean verify
+
 ## Stop and remove containers (volumes are kept)
 down:
-	$(COMPOSE) --profile tools down
+	$(COMPOSE) --profile tools --profile app down
 
 ## Stop containers without removing them
 stop:
@@ -28,7 +60,7 @@ ps:
 
 ## Destroy containers AND volumes — all local data is lost
 reset:
-	$(COMPOSE) --profile tools down -v
+	$(COMPOSE) --profile tools --profile app down -v
 
 docker/.env:
 	cp docker/.env.example docker/.env

@@ -31,6 +31,7 @@ returns once the stack is actually usable.
 |            | `localhost:18082` (HTTP Proxy)          |                                             |
 |            | `localhost:19644` (Admin API)           |                                             |
 | Console    | `http://localhost:8085`                 | optional, `--profile tools` only            |
+| Backend    | `http://localhost:8080`                 | optional, `--profile app` only              |
 
 Redpanda advertises two listeners: `internal` for containers on the compose
 network and `external` for processes on the host (backend started from Maven or
@@ -38,15 +39,46 @@ the IDE, `rpk`, test runners).
 
 ## Commands
 
-| Command      | What it does                                            |
-|--------------|---------------------------------------------------------|
-| `make up`    | Start the stack, wait for healthchecks                  |
-| `make tools` | Same, plus Redpanda Console on `:8085`                  |
-| `make ps`    | Service status                                          |
-| `make logs`  | Tail all logs                                           |
-| `make stop`  | Stop containers, keep them                              |
-| `make down`  | Remove containers, **keep** volumes                     |
-| `make reset` | Remove containers **and volumes** — all local data lost |
+| Command        | What it does                                            |
+|----------------|---------------------------------------------------------|
+| `make up`      | Start the stack, wait for healthchecks                  |
+| `make tools`   | Same, plus Redpanda Console on `:8085`                  |
+| `make up-app`  | Same, plus the backend API on `:8080` (builds it first) |
+| `make image`   | Build the backend image with Jib, nothing else          |
+| `make verify`  | Run the backend build the way CI does (Temurin 21)      |
+| `make ps`      | Service status                                          |
+| `make logs`    | Tail all logs                                           |
+| `make stop`    | Stop containers, keep them                              |
+| `make down`    | Remove containers, **keep** volumes                     |
+| `make reset`   | Remove containers **and volumes** — all local data lost |
+
+## Running the backend in the stack
+
+`make up` starts infrastructure only. The everyday backend loop is
+`./mvnw quarkus:dev` on the host, with live reload — an image rebuild per edit is
+much slower.
+
+`make up-app` is for demos, frontend work and end-to-end smoke tests. It builds the
+image with Jib and starts it under the `app` profile:
+
+```bash
+make up-app
+curl http://localhost:8080/q/health/ready
+```
+
+The container is only reported healthy once `/q/health/ready` answers, so
+`--wait` returns when the API is genuinely serving.
+
+There is no `Dockerfile` for the backend, by design. The image is defined once, by
+the Jib configuration in `backend/src/main/resources/application.properties`, and
+`.github/workflows/cd.yml` publishes that same build to ghcr.io.
+
+`docker/builder.Dockerfile` is a tooling image, not part of the stack: Temurin 21
+(matching CI) plus Maven and the `docker` CLI, so Jib can hand the finished image to
+the host's Docker daemon.
+
+On Apple Silicon the image runs emulated — Jib targets `linux/amd64`, which is what
+production runs. Startup is a little slower; nothing else changes.
 
 ## Configuration
 
