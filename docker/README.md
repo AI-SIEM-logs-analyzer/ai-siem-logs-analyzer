@@ -70,7 +70,7 @@ The container is only reported healthy once `/q/health/ready` answers, so
 `--wait` returns when the API is genuinely serving.
 
 There is no `Dockerfile` for the backend, by design. The image is defined once, by
-the Jib configuration in `backend/src/main/resources/application.properties`, and
+the Jib configuration in `backend/src/main/resources/application.yaml`, and
 `.github/workflows/cd.yml` publishes that same build to ghcr.io.
 
 `docker/builder.Dockerfile` is a tooling image, not part of the stack: Temurin 21
@@ -86,6 +86,11 @@ All settings live in `docker/.env` (git-ignored), created from
 `docker/.env.example`. Ports, credentials and image versions are overridable
 there; the compose file falls back to sane defaults for everything except the
 credentials, which are required.
+
+The backend container runs the `prod` Quarkus profile, which carries no secrets of its
+own: `APP_AI_API_KEY` is passed in from `docker/.env`, and Compose refuses to start the
+service without it. Host-side development is separate — `./mvnw quarkus:dev` reads
+`backend/.env` instead. See [backend/README.md](../backend/README.md#configuration).
 
 ## Persistence
 

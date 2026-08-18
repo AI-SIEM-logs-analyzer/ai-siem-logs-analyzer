@@ -1,0 +1,69 @@
+# Configuration for the backend. YAML is the single source in the repo — there is no
+# application.properties, because Quarkus would silently give this file precedence over it.
+#
+# Precedence, lowest to highest: this file < backend/.env (dev mode only) < environment
+# variables < system properties. Every key below can therefore be overridden without a
+# rebuild: app.ai.api-key becomes APP_AI_API_KEY, quarkus.http.port becomes
+# QUARKUS_HTTP_PORT, and so on (dots and dashes become underscores, all uppercase).
+#
+# Secrets never live in this file. See backend/.env.example.
+
+quarkus:
+  application:
+    name: siem-backend
+
+  # --- HTTP ---
+  http:
+    port: 8080
+
+  # --- OpenAPI / Swagger UI ---
+  # Swagger UI is dev-mode-only unless always-include is set; the packaged app is
+  # expected to serve /q/swagger-ui too.
+  swagger-ui:
+    always-include: true
+
+  # --- Container image (Jib) ---
+  # cd.yml overrides registry, group and tags on the command line; everything else is
+  # defined here so the local image and the published one stay the same build.
+  container-image:
+    group: siem
+    name: security-log-analyzer-backend
+  jib:
+    base-jvm-image: registry.access.redhat.com/ubi9/openjdk-21-runtime
+
+mp:
+  openapi:
+    extensions:
+      smallrye:
+        info:
+          title: SIEM Logs Analyzer API
+          version: 0.1.0
+          description: AI-assisted SIEM log analysis platform — backend API.
+
+# --- Application settings (mapped by com.siem.analyzer.config.AppConfig) ---
+# app.ai.api-key is intentionally absent here: it is a secret, so it has to come from the
+# environment. The dev and test profiles below substitute a placeholder; prod does not,
+# which makes a deployment without APP_AI_API_KEY fail at start-up instead of at runtime.
+app:
+  environment: local
+
+"%dev":
+  app:
+    environment: dev
+    ai:
+      api-key: dev-placeholder
+  quarkus:
+    log:
+      category:
+        "com.siem":
+          level: DEBUG
+
+"%test":
+  app:
+    environment: test
+    ai:
+      api-key: test-placeholder
+
+"%prod":
+  app:
+    environment: prod
