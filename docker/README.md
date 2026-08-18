@@ -88,9 +88,12 @@ there; the compose file falls back to sane defaults for everything except the
 credentials, which are required.
 
 The backend container runs the `prod` Quarkus profile, which carries no secrets of its
-own: `APP_AI_API_KEY` is passed in from `docker/.env`, and Compose refuses to start the
-service without it. Host-side development is separate — `./mvnw quarkus:dev` reads
-`backend/.env` instead. See [backend/README.md](../backend/README.md#configuration).
+own: `APP_AI_API_KEY` and the datasource parameters (`QUARKUS_DATASOURCE_JDBC_URL`,
+`QUARKUS_DATASOURCE_USERNAME`, `QUARKUS_DATASOURCE_PASSWORD`) are passed in from
+`docker/.env` (or derived from the PostgreSQL settings), and Compose refuses to start the
+service without them. The backend service specifies `depends_on: postgres` with `condition: service_healthy`
+so Flyway applies schema migrations only after PostgreSQL is ready. Host-side development is
+separate — `./mvnw quarkus:dev` reads `backend/.env` instead. See [backend/README.md](../backend/README.md#configuration).
 
 ## Persistence
 

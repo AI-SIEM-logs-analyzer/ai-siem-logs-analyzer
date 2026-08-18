@@ -8,6 +8,7 @@ generated OpenAPI documentation, no domain features yet.
 Shipped today:
 
 - **Quarkus 3.38.2** (Java 21) — Quarkus REST + Jackson
+- **Hibernate ORM with Panache & Flyway** — PostgreSQL persistence
 - **MicroProfile Config** (YAML) — `application.yaml`, profiles, typed `@ConfigMapping`
 - **SmallRye Health** — `/q/health`
 - **SmallRye OpenAPI** — `/q/openapi`, `/q/swagger-ui`
@@ -16,9 +17,7 @@ Shipped today:
 - **Spotless** (google-java-format, AOSP) · **JaCoCo** · **JUnit 5** + RestAssured
 - **Maven** build via the wrapper (`./mvnw`)
 
-Planned, landing in later PRs: Hibernate ORM with Panache, Flyway, SmallRye JWT
-(`@RolesAllowed`), SmallRye Reactive Messaging + Kafka, Quarkus Redis, LangChain4j,
-Smile, Testcontainers.
+Planned, landing in later PRs: SmallRye JWT (`@RolesAllowed`), SmallRye Reactive Messaging + Kafka, Quarkus Redis, LangChain4j, Smile.
 
 ## Package layout
 
@@ -26,8 +25,8 @@ Smile, Testcontainers.
 com.siem.analyzer
 ├── rest      REST resources — the HTTP boundary
 ├── service   business logic
-├── domain    entities and value objects
-├── repo      persistence access
+├── domain    JPA entities and domain enums
+├── repo      Panache repositories (all queries live here)
 ├── config    typed configuration mappings
 └── health    custom health checks
 ```
@@ -50,6 +49,15 @@ make verify   # exactly what CI runs: spotless:check, then clean verify
 make image    # build the container image with Jib
 make up-app   # dev stack + backend on :8080
 ```
+
+## Persistence
+
+- **Flyway owns the schema:** `V1__init.sql` creates all initial tables, indexes and constraints. Hibernate ORM runs with `quarkus.hibernate-orm.schema-management.strategy=validate` so it never emits DDL.
+- **Migrations:** SQL scripts live in `src/main/resources/db/migration`, named `V<n>__<description>.sql`. They are immutable once applied (Flyway validates checksums).
+- **Local Dev:** `%dev` connects to the local Compose stack (`jdbc:postgresql://localhost:5432/siem`, user `siem`). Start the database with `make up` and run `./mvnw quarkus:dev`.
+- **Testing:** `%test` uses Dev Services via Testcontainers to start a throwaway PostgreSQL container (`postgres:16-alpine`), requiring only a running Docker daemon.
+- **Production:** `%prod` expects `QUARKUS_DATASOURCE_JDBC_URL`, `QUARKUS_DATASOURCE_USERNAME`, and `QUARKUS_DATASOURCE_PASSWORD` from the environment.
+- **Entities & Repositories:** Domain classes live in `com.siem.analyzer.domain`; every query lives in an `@ApplicationScoped` repository in `com.siem.analyzer.repo` extending `PanacheRepositoryBase<T, Long>`.
 
 ## Configuration
 

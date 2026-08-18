@@ -31,6 +31,22 @@ quarkus:
   jib:
     base-jvm-image: registry.access.redhat.com/ubi9/openjdk-21-runtime
 
+  # --- Persistence ---
+  # Flyway owns the schema outright: it applies db/migration on start-up, and Hibernate is
+  # limited to checking that the entity mappings match what the migrations produced. Drift
+  # between an entity and the schema therefore fails the boot instead of the first query
+  # that happens to touch the wrong column.
+  datasource:
+    db-kind: postgresql
+  hibernate-orm:
+    schema-management:
+      strategy: validate
+    mapping:
+      format:
+        global: ignore
+  flyway:
+    migrate-at-start: true
+
 mp:
   openapi:
     extensions:
@@ -57,13 +73,33 @@ app:
       category:
         "com.siem":
           level: DEBUG
+    datasource:
+      jdbc:
+        url: jdbc:postgresql://localhost:5432/siem
+      username: siem
+      # Mirrors docker/.env.example, so `make up` followed by `./mvnw quarkus:dev` works with
+      # no further setup. Not a secret: it is the throwaway credential of the local Compose
+      # stack, already committed there in plain text, and it applies only under %dev.
+      password: ${POSTGRES_PASSWORD:siem_local_dev}
 
 "%test":
   app:
     environment: test
     ai:
       api-key: test-placeholder
+  quarkus:
+    # Deliberately no JDBC URL: with none configured, Dev Services starts a throwaway
+    # PostgreSQL container through Testcontainers, lets Flyway migrate it, and tears it down
+    # when the suite ends. Pinning the image keeps tests, the Compose stack and production on
+    # the same PostgreSQL version.
+    datasource:
+      devservices:
+        image-name: postgres:16-alpine
 
 "%prod":
   app:
     environment: prod
+  # No datasource keys here on purpose. Production supplies QUARKUS_DATASOURCE_JDBC_URL,
+  # QUARKUS_DATASOURCE_USERNAME and QUARKUS_DATASOURCE_PASSWORD through the environment, and
+  # Dev Services never run under prod, so a deployment without them aborts at start-up rather
+  # than serving requests against no database. Same fail-fast contract as APP_AI_API_KEY.
