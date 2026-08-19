@@ -1,0 +1,29 @@
+# Keeps editors in step with what Spotless and Prettier will do anyway, so a file does not
+# arrive at the commit hook needing a reformat. See README.md#format--lint.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.java]
+# google-java-format AOSP: four spaces, wraps at 100.
+indent_size = 4
+max_line_length = 100
+
+[*.{xml,sql}]
+indent_size = 4
+
+[Makefile]
+indent_style = tab
+
+[*.md]
+# Two trailing spaces are a hard line break in Markdown.
+trim_trailing_whitespace = false
+
+[{*.bat,*.cmd}]
+end_of_line = crlf

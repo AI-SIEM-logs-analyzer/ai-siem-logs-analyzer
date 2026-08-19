@@ -1,0 +1,91 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!--
+  Checkstyle rules for the SIEM backend.
+
+  Spotless (google-java-format, AOSP) already owns layout: indentation, wrapping, import
+  order, whitespace. Repeating those rules here would only produce fights between the two
+  tools, so this file deliberately contains no formatting checks. What is left is what a
+  formatter cannot decide: naming, imports that should not exist, and the small set of
+  constructs that are almost always a bug.
+-->
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+    <property name="fileExtensions" value="java"/>
+    <!-- Anything reported here fails the build; there is no warning tier to ignore. -->
+    <property name="severity" value="error"/>
+
+    <module name="NewlineAtEndOfFile"/>
+    <module name="FileTabCharacter"/>
+
+    <!-- google-java-format AOSP wraps at 100; the slack covers long URLs in Javadoc and
+         string literals it refuses to break. -->
+    <module name="LineLength">
+        <property name="max" value="120"/>
+        <property name="ignorePattern" value="^package .*|^import .*|^\s*//\s*https?://\S+$"/>
+    </module>
+
+    <module name="TreeWalker">
+
+        <!-- Imports -->
+        <module name="UnusedImports">
+            <property name="processJavadoc" value="true"/>
+        </module>
+        <module name="RedundantImport"/>
+        <module name="AvoidStarImport"/>
+        <module name="IllegalImport"/>
+
+        <!-- Naming -->
+        <module name="PackageName">
+            <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
+        </module>
+        <module name="TypeName"/>
+        <module name="MethodName"/>
+        <module name="MemberName"/>
+        <module name="ParameterName"/>
+        <module name="LocalVariableName"/>
+        <module name="LocalFinalVariableName"/>
+        <module name="ConstantName"/>
+        <module name="StaticVariableName"/>
+
+        <!-- Structure -->
+        <module name="OuterTypeFilename"/>
+        <module name="OneTopLevelClass"/>
+        <module name="ModifierOrder"/>
+        <module name="RedundantModifier"/>
+        <module name="FinalClass"/>
+        <module name="ArrayTypeStyle"/>
+        <module name="UpperEll"/>
+        <module name="DefaultComesLast"/>
+        <module name="MissingSwitchDefault"/>
+        <module name="FallThrough"/>
+        <module name="NeedBraces"/>
+
+        <!-- Likely bugs -->
+        <module name="EqualsHashCode"/>
+        <module name="StringLiteralEquality"/>
+        <module name="SimplifyBooleanExpression"/>
+        <module name="SimplifyBooleanReturn"/>
+        <module name="UnusedLocalVariable"/>
+        <!-- An empty catch block silently drops an exception. Either handle it or say in a
+             comment why swallowing it is correct. -->
+        <module name="EmptyCatchBlock">
+            <property name="exceptionVariableName" value="expected|ignored"/>
+        </module>
+        <module name="EmptyBlock">
+            <property name="option" value="text"/>
+            <property name="tokens" value="LITERAL_TRY, LITERAL_FINALLY, LITERAL_IF,
+                LITERAL_ELSE, LITERAL_FOR, LITERAL_WHILE, LITERAL_DO, LITERAL_SWITCH,
+                STATIC_INIT, INSTANCE_INIT"/>
+        </module>
+
+        <!-- Lets a line or a block opt out with // CHECKSTYLE:OFF … // CHECKSTYLE:ON -->
+        <module name="SuppressionCommentFilter">
+            <property name="offCommentFormat" value="CHECKSTYLE:OFF"/>
+            <property name="onCommentFormat" value="CHECKSTYLE:ON"/>
+        </module>
+    </module>
+</module>

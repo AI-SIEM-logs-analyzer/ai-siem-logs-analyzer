@@ -14,6 +14,9 @@ BUILDER_RUN_DOCKER := docker run --rm \
 	-v /var/run/docker.sock:/var/run/docker.sock \
 	-w /work/backend \
 	$(BUILDER_IMAGE)
+# pnpm is frequently reachable only through Node's corepack shim rather than on PATH.
+PNPM := $(shell command -v pnpm >/dev/null 2>&1 && echo pnpm || echo "corepack pnpm")
+
 # Tests reach for a Docker daemon now: Dev Services starts PostgreSQL through
 # Testcontainers. The containers it starts are siblings on the host, not children of this
 # one, so the test JVM has to be told to reach them through the host rather than through its
@@ -28,7 +31,8 @@ BUILDER_RUN_TESTS := docker run --rm \
 	-w /work/backend \
 	$(BUILDER_IMAGE)
 
-.PHONY: up up-app down stop logs ps reset tools help builder image verify
+.PHONY: up up-app down stop logs ps reset tools help builder image verify hooks \
+	format format-backend format-frontend lint lint-backend lint-frontend
 
 ## Start the dev stack (creates docker/.env from the example on first run)
 up: docker/.env
@@ -42,6 +46,11 @@ tools: docker/.env
 up-app: docker/.env image
 	$(COMPOSE) --profile app up -d --wait
 
+## Install the git hooks (format & lint on commit)
+hooks:
+	git config core.hooksPath .githooks
+	@echo "core.hooksPath -> .githooks (bypass a single commit with --no-verify)"
+
 ## Build the backend build/tooling image
 builder:
 	docker build -f docker/builder.Dockerfile -t $(BUILDER_IMAGE) docker/
@@ -50,10 +59,37 @@ builder:
 image: builder
 	$(BUILDER_RUN_DOCKER) ./mvnw -B package -DskipTests -Dquarkus.container-image.build=true
 
-## Run the backend exactly as CI does (Temurin 21): Spotless, then build + tests
+## Run the backend exactly as CI does (Temurin 21): Spotless, Checkstyle, build + tests
 verify: builder
-	$(BUILDER_RUN) ./mvnw -B spotless:check
+	$(BUILDER_RUN) ./mvnw -B spotless:check checkstyle:check
 	$(BUILDER_RUN_TESTS) ./mvnw -B clean verify
+
+## Format every source tree in place (Spotless + Prettier)
+format: format-backend format-frontend
+
+## Check formatting and run the linters — changes nothing, same checks as CI
+lint: lint-backend lint-frontend
+
+## Reformat the backend (Spotless, in the Temurin 21 container)
+format-backend: builder
+	$(BUILDER_RUN) ./mvnw -B spotless:apply
+
+## Check the backend (Spotless + Checkstyle, in the Temurin 21 container)
+lint-backend: builder
+	$(BUILDER_RUN) ./mvnw -B spotless:check checkstyle:check
+
+## Reformat the frontend (Prettier)
+format-frontend: frontend/node_modules
+	cd frontend && $(PNPM) format
+
+## Check the frontend (ESLint + Prettier)
+lint-frontend: frontend/node_modules
+	cd frontend && $(PNPM) lint && $(PNPM) format:check
+
+# Installed on demand, so `make lint` works on a fresh clone.
+frontend/node_modules: frontend/package.json frontend/pnpm-lock.yaml
+	cd frontend && $(PNPM) install
+	@touch frontend/node_modules
 
 ## Stop and remove containers (volumes are kept)
 down:

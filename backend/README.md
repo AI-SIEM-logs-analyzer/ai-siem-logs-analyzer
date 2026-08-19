@@ -14,7 +14,7 @@ Shipped today:
 - **SmallRye OpenAPI** — `/q/openapi`, `/q/swagger-ui`
 - **Hibernate Validator**
 - **Jib** — container image, same build locally and in CD
-- **Spotless** (google-java-format, AOSP) · **JaCoCo** · **JUnit 5** + RestAssured
+- **Spotless** (google-java-format, AOSP) · **Checkstyle** · **JaCoCo** · **JUnit 5** + RestAssured
 - **Maven** build via the wrapper (`./mvnw`)
 
 Planned, landing in later PRs: SmallRye JWT (`@RolesAllowed`), SmallRye Reactive Messaging + Kafka, Quarkus Redis, LangChain4j, Smile.
@@ -36,19 +36,46 @@ Packages without code yet carry a `package-info.java` describing what belongs th
 ## Build and run
 
 ```bash
-./mvnw quarkus:dev      # dev mode, live reload, http://localhost:8080
-./mvnw clean verify     # build + tests + JaCoCo report
-./mvnw spotless:apply   # fix formatting
+./mvnw quarkus:dev        # dev mode, live reload, http://localhost:8080
+./mvnw clean verify       # Checkstyle + build + tests + JaCoCo report
+./mvnw spotless:apply     # fix formatting
+./mvnw checkstyle:check   # lint only
 ```
 
 Requires JDK 21. If you don't have one installed, the Make targets from the repository
 root run the same commands inside a Temurin 21 container:
 
 ```bash
-make verify   # exactly what CI runs: spotless:check, then clean verify
+make verify   # exactly what CI runs: spotless:check, checkstyle:check, clean verify
 make image    # build the container image with Jib
 make up-app   # dev stack + backend on :8080
 ```
+
+## Format & lint
+
+Two tools with disjoint jobs:
+
+- **Spotless** (google-java-format, AOSP style) owns layout — indentation, wrapping, import
+  order, trailing whitespace. Run `./mvnw spotless:apply` and never argue with it.
+- **Checkstyle** owns what layout cannot express — naming, unused and star imports, empty
+  catch blocks, `EqualsHashCode`, missing `default` in a `switch`, and similar. Rules live
+  in [`config/checkstyle/checkstyle.xml`](config/checkstyle/checkstyle.xml) and contain no
+  formatting checks on purpose, so the two never fight. Test sources are checked too.
+
+`checkstyle:check` is bound to the `validate` phase, so any `./mvnw verify` fails on a
+violation before a single test runs. A justified exception can be fenced off:
+
+```java
+// CHECKSTYLE:OFF
+...
+// CHECKSTYLE:ON
+```
+
+The repository-root hook (`make hooks`) runs both on staged Java files at commit time —
+see the [root README](../README.md#format--lint).
+
+Spotless needs a JDK 21: google-java-format does not run on JDK 22+. The commit hook picks
+one up automatically through `/usr/libexec/java_home -v 21` when the host has it.
 
 ## Persistence
 
@@ -136,4 +163,5 @@ to `main`.
 ## CI
 
 [`.github/workflows/ci-backend.yml`](../.github/workflows/ci-backend.yml) — Temurin 21,
-`spotless:check`, then `clean verify`, and it uploads the JaCoCo report.
+`spotless:check`, `checkstyle:check`, then `clean verify`, and it uploads the JaCoCo
+report.

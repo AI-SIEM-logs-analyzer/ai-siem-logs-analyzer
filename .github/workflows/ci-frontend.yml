@@ -21,9 +21,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No `version:` here on purpose — the action reads it from the packageManager field.
+      # Giving both makes it abort with "Multiple versions of pnpm specified".
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          package_json_file: frontend/package.json
 
       - name: Set up Node 22
         uses: actions/setup-node@v4
@@ -38,11 +40,8 @@ jobs:
       - name: Lint (ESLint)
         run: pnpm lint
 
-      - name: Type check (tsc)
-        run: pnpm exec tsc --noEmit
+      - name: Verifică formatarea (Prettier)
+        run: pnpm format:check
 
-      - name: Teste (Vitest)
-        run: pnpm test -- --run
-
-      - name: Build (Vite)
-        run: pnpm build
+      # Type check (tsc), teste (Vitest) și build (Vite) revin odată cu scheletul
+      # aplicației — deocamdată frontend/ conține doar configurația de tooling.

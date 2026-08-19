@@ -1,0 +1,19 @@
+# One line ending everywhere. Prettier is configured with endOfLine: lf and Spotless
+# normalises Java the same way, so a CRLF checkout would show every file as modified.
+* text=auto eol=lf
+
+# The Maven wrapper's Windows launcher has to keep CRLF to run at all.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Generated: not worth reviewing, and it distorts diff statistics.
+pnpm-lock.yaml linguist-generated=true -diff
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text
+*.pdf binary
+*.jar binary

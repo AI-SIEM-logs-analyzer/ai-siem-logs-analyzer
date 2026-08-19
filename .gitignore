@@ -5,3 +5,12 @@
 .env
 *.env
 !*.env.example
+
+# Build output and dependencies, wherever a tool decides to put them. The per-area
+# .gitignore files cover backend/target and frontend/node_modules; these catch anything
+# added later outside them.
+node_modules/
+dist/
+coverage/
+*.log
+*.tsbuildinfo
