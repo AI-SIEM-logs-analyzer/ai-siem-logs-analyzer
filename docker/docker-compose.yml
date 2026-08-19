@@ -116,8 +116,19 @@ services:
       QUARKUS_PROFILE: prod
       APP_ENVIRONMENT: ${APP_ENVIRONMENT:-local-compose}
       APP_AI_API_KEY: ${APP_AI_API_KEY:?set APP_AI_API_KEY in docker/.env}
+      # The prod profile configures no datasource, so these three are mandatory — the
+      # application aborts at start-up without them, the same way it does without
+      # APP_AI_API_KEY. Host name `postgres` is the service on this network, not the
+      # published port on the host.
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      QUARKUS_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      QUARKUS_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
+    # Flyway migrates at start-up, so the database has to be accepting connections first.
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/q/health/ready || exit 1"]
       interval: 10s

@@ -35,5 +35,6 @@ Details, ports and connection settings: [docker/README.md](docker/README.md).
 - All changes via Pull Request, **min. 1 review** required.
 - CI runs per-area (`ci-backend`, `ci-frontend`) + CodeQL security scan.
 
-> The backend is a buildable Quarkus skeleton (health + OpenAPI); domain features land in
-> later PRs. The frontend is still placeholder scaffolding.
+> The backend includes health checks, OpenAPI documentation, and a PostgreSQL persistence
+> layer (Panache entities and repositories over a Flyway-managed schema); REST resources
+> and ingestion land in later PRs. The frontend is still placeholder scaffolding.
