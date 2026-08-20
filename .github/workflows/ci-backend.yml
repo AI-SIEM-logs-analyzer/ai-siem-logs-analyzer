@@ -1,14 +1,15 @@
 name: CI · Backend (Quarkus)
 
+# Rulează pe fiecare PR, indiferent de fișierele atinse: un check filtrat pe `paths` nu
+# pornește deloc pe PR-urile care nu ating backend/, iar branch protection îl așteaptă la
+# nesfârșit. Push-urile pe branch-uri de lucru rămân filtrate.
 on:
   pull_request:
-    paths:
-      - 'backend/**'
-      - '.github/workflows/ci-backend.yml'
   push:
     branches-ignore: ['main']
     paths:
       - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
   workflow_dispatch:
 
 defaults:

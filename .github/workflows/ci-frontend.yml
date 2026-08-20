@@ -1,14 +1,13 @@
 name: CI · Frontend (React)
 
+# Rulează pe fiecare PR, indiferent de fișierele atinse — vezi nota din ci-backend.yml.
 on:
   pull_request:
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/ci-frontend.yml'
   push:
     branches-ignore: ['main']
     paths:
       - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
   workflow_dispatch:
 
 defaults:
@@ -43,5 +42,8 @@ jobs:
       - name: Verifică formatarea (Prettier)
         run: pnpm format:check
 
-      # Type check (tsc), teste (Vitest) și build (Vite) revin odată cu scheletul
-      # aplicației — deocamdată frontend/ conține doar configurația de tooling.
+      - name: Type check (tsc --noEmit)
+        run: pnpm typecheck
+
+      # Testele (Vitest) și build-ul (Vite) revin odată cu scheletul aplicației —
+      # deocamdată frontend/ conține doar configurația de tooling.

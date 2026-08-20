@@ -1,6 +1,7 @@
 // Flat config (ESLint 9). Rules only — no React/Vite plugins yet, those arrive with the
-// application scaffolding. Type-aware linting is deliberately off: there is no tsconfig.json
-// to point a program at until the Vite scaffold lands.
+// application scaffolding. Type-aware linting is deliberately off: tsconfig.json covers
+// src/ only, which is empty until the Vite scaffold lands, so a typed program here would
+// see nothing. `pnpm typecheck` runs tsc directly in the meantime.
 import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
