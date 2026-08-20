@@ -17,6 +17,9 @@
         <skipITs>true</skipITs>
         <surefire-plugin.version>3.5.6</surefire-plugin.version>
         <spotless-plugin.version>2.44.5</spotless-plugin.version>
+        <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
+        <!-- The plugin ships an older Checkstyle; this pins the analyzer itself. -->
+        <checkstyle.version>10.21.4</checkstyle.version>
         <jacoco-plugin.version>0.8.13</jacoco-plugin.version>
     </properties>
 
@@ -132,6 +135,43 @@
                 </configuration>
                 <executions>
                     <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Spotless owns formatting, Checkstyle owns everything a formatter cannot
+                 decide (naming, dead imports, likely bugs). The rules live in
+                 config/checkstyle/checkstyle.xml and deliberately do not overlap.
+                 Bound to validate so a violation stops the build before tests run. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>${checkstyle-plugin.version}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>${checkstyle.version}</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <configLocation>config/checkstyle/checkstyle.xml</configLocation>
+                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                    <!-- Violations print as [ERROR] lines, so they survive mvn -q in the
+                         commit hook. -->
+                    <logViolationsToConsole>true</logViolationsToConsole>
+                    <!-- failsOnError would abort before the violation list is printed;
+                         failOnViolation (default true) fails after it, which is what a
+                         developer needs to see. -->
+                    <failsOnError>false</failsOnError>
+                    <violationSeverity>error</violationSeverity>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>checkstyle-validate</id>
+                        <phase>validate</phase>
                         <goals>
                             <goal>check</goal>
                         </goals>

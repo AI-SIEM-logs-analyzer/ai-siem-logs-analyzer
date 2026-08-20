@@ -31,6 +31,9 @@ jobs:
       - name: Verifică formatarea (Spotless)
         run: ./mvnw -B spotless:check
 
+      - name: Lint (Checkstyle)
+        run: ./mvnw -B checkstyle:check
+
       - name: Build + teste (JUnit5 + RestAssured, Testcontainers)
         run: ./mvnw -B clean verify
 

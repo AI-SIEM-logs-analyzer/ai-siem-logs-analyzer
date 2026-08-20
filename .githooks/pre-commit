@@ -1,0 +1,97 @@
+#!/bin/sh
+#
+# pre-commit — formats and lints what is staged, then re-stages the result.
+#
+#   Java   backend/mvnw spotless:apply (google-java-format, AOSP) + checkstyle:check
+#   Web    pnpm exec prettier --write + eslint --fix, in frontend/
+#
+# Install with `make hooks` from the repository root; it points core.hooksPath here.
+# Bypass once with `git commit --no-verify`.
+#
+# File paths with spaces are not handled; the repository has none.
+
+set -eu
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -n "$staged" ] || exit 0
+
+# Files carrying unstaged edits too. Reformatting one of those would fold work the author
+# deliberately left out into the commit, so they get reported instead of re-staged.
+dirty=$(git diff --name-only)
+conflicts=""
+
+filter() {
+    printf '%s\n' "$staged" | grep -E "$1" || true
+}
+
+restage() {
+    old_ifs=$IFS
+    IFS='
+'
+    for file in $1; do
+        if printf '%s\n' "$dirty" | grep -qxF -- "$file"; then
+            conflicts="$conflicts  $file
+"
+        else
+            git add -- "$file"
+        fi
+    done
+    IFS=$old_ifs
+}
+
+java_files=$(filter '^backend/.*\.java$')
+if [ -n "$java_files" ]; then
+    echo "pre-commit: Java — Spotless + Checkstyle"
+    # google-java-format does not run on JDK 22+. Prefer a JDK 21 when the host has one,
+    # which also matches the version CI builds with.
+    if [ -x /usr/libexec/java_home ]; then
+        jdk21=$(/usr/libexec/java_home -v 21 2>/dev/null || true)
+        if [ -n "$jdk21" ]; then
+            JAVA_HOME=$jdk21
+            export JAVA_HOME
+        fi
+    fi
+    (cd backend && ./mvnw -q -B spotless:apply checkstyle:check)
+    restage "$java_files"
+fi
+
+web_files=$(filter '^frontend/.*\.(ts|tsx|js|jsx|mjs|cjs|json|css|scss|html|md|ya?ml)$')
+if [ -n "$web_files" ] && [ -f frontend/package.json ]; then
+    # pnpm is often reachable only through Node's corepack shim rather than on PATH.
+    if command -v pnpm >/dev/null 2>&1; then
+        pnpm_cmd="pnpm"
+    elif command -v corepack >/dev/null 2>&1; then
+        pnpm_cmd="corepack pnpm"
+    else
+        echo "pre-commit: pnpm not found — install pnpm, or Node 22+ with corepack" >&2
+        exit 1
+    fi
+    if [ ! -d frontend/node_modules ]; then
+        echo "pre-commit: frontend/node_modules is missing — run '$pnpm_cmd install' in frontend/" >&2
+        exit 1
+    fi
+
+    echo "pre-commit: frontend — Prettier + ESLint"
+    rel=$(printf '%s\n' "$web_files" | sed 's|^frontend/||')
+    # $pnpm_cmd is intentionally unquoted: it may be two words ("corepack pnpm").
+    (cd frontend && printf '%s\n' "$rel" | tr '\n' '\0' | xargs -0 $pnpm_cmd exec prettier --write)
+
+    lintable=$(printf '%s\n' "$rel" | grep -E '\.(ts|tsx|js|jsx|mjs|cjs)$' || true)
+    if [ -n "$lintable" ]; then
+        (cd frontend && printf '%s\n' "$lintable" | tr '\n' '\0' \
+            | xargs -0 $pnpm_cmd exec eslint --fix --max-warnings=0)
+    fi
+    restage "$web_files"
+fi
+
+if [ -n "$conflicts" ]; then
+    {
+        echo "pre-commit: reformatted, but these files also hold unstaged changes, so they"
+        echo "were left out of the index. Review the diff and stage them yourself:"
+        printf '%s' "$conflicts"
+    } >&2
+    exit 1
+fi

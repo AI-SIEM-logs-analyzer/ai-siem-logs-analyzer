@@ -29,12 +29,65 @@ make verify  # run the backend build exactly as CI does (Temurin 21, in a contai
 
 Details, ports and connection settings: [docker/README.md](docker/README.md).
 
+## Format & lint
+
+| Area       | Formatter                             | Linter                        |
+|------------|---------------------------------------|-------------------------------|
+| `backend/` | Spotless (google-java-format, AOSP)   | Checkstyle                    |
+| `frontend/`| Prettier                              | ESLint (flat config)          |
+
+The two never overlap: the formatter owns layout, the linter owns everything layout cannot
+express. Checkstyle's rules are in [`backend/config/checkstyle/checkstyle.xml`](backend/config/checkstyle/checkstyle.xml);
+ESLint ends its chain with `eslint-config-prettier`, which switches off every rule that
+would argue with Prettier.
+
+### On commit
+
+```bash
+make hooks   # once per clone: points core.hooksPath at .githooks/
+```
+
+[`.githooks/pre-commit`](.githooks/pre-commit) then formats and lints **only the staged
+files**, and re-stages what it changed — Spotless + Checkstyle for Java, Prettier + ESLint
+for the frontend. A commit fails if a linter still reports a violation afterwards, or if a
+reformatted file also carried unstaged changes (those are left out of the index rather than
+silently swept in). Skip the hook for one commit with `git commit --no-verify`.
+
+The frontend step needs `frontend/node_modules`; run `pnpm install` in `frontend/` first.
+The Java step prefers a JDK 21 via `/usr/libexec/java_home` — google-java-format does not
+run on JDK 22+.
+
+### By hand
+
+```bash
+make format   # rewrite: Spotless + Prettier
+make lint     # read-only: Spotless, Checkstyle, ESLint, Prettier — what CI runs
+```
+
+Per area: `format-backend`, `lint-backend` (both inside the Temurin 21 container, so no JDK
+is needed on the host), `format-frontend`, `lint-frontend` (these install
+`frontend/node_modules` on first use). Or directly:
+
+```bash
+cd backend  && ./mvnw spotless:apply checkstyle:check
+cd frontend && pnpm format && pnpm lint
+```
+
+[`.editorconfig`](.editorconfig) mirrors both formatters, so an editor that honours it
+produces files the hook has nothing to change. [`.gitattributes`](.gitattributes) pins LF
+everywhere (except the Windows Maven launcher), which is what Prettier's `endOfLine: lf`
+and Spotless both assume.
+
+CI enforces the same checks, so nothing depends on the hook being installed.
+
 ## Workflow
 
 - `main` is protected — no direct pushes.
 - All changes via Pull Request, **min. 1 review** required.
 - CI runs per-area (`ci-backend`, `ci-frontend`) + CodeQL security scan.
+- CI re-checks formatting and linting; the commit hook only saves you the round trip.
 
 > The backend includes health checks, OpenAPI documentation, and a PostgreSQL persistence
 > layer (Panache entities and repositories over a Flyway-managed schema); REST resources
-> and ingestion land in later PRs. The frontend is still placeholder scaffolding.
+> and ingestion land in later PRs. The frontend carries only its tooling configuration
+> so far — the Vite application scaffold lands in a later PR.
