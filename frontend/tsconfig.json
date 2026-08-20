@@ -1,0 +1,30 @@
+{
+  // Type checking only — Vite does the transpiling, so nothing here emits JavaScript.
+  // React/Vite specific options (jsx, vite/client types) are already set so the scaffold
+  // can drop its sources into src/ without touching this file.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "useDefineForClassFields": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+
+    // Strict by default: it is far cheaper to start here than to retrofit later.
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+
+    // Third-party .d.ts files are not ours to fix; checking them only adds noise.
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}

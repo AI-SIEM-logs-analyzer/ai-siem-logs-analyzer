@@ -61,7 +61,7 @@ run on JDK 22+.
 
 ```bash
 make format   # rewrite: Spotless + Prettier
-make lint     # read-only: Spotless, Checkstyle, ESLint, Prettier — what CI runs
+make lint     # read-only: Spotless, Checkstyle, ESLint, Prettier, tsc — what CI runs
 ```
 
 Per area: `format-backend`, `lint-backend` (both inside the Temurin 21 container, so no JDK
@@ -70,7 +70,7 @@ is needed on the host), `format-frontend`, `lint-frontend` (these install
 
 ```bash
 cd backend  && ./mvnw spotless:apply checkstyle:check
-cd frontend && pnpm format && pnpm lint
+cd frontend && pnpm format && pnpm lint && pnpm typecheck
 ```
 
 [`.editorconfig`](.editorconfig) mirrors both formatters, so an editor that honours it
@@ -84,7 +84,10 @@ CI enforces the same checks, so nothing depends on the hook being installed.
 
 - `main` is protected — no direct pushes.
 - All changes via Pull Request, **min. 1 review** required.
-- CI runs per-area (`ci-backend`, `ci-frontend`) + CodeQL security scan.
+- Both CI workflows (`ci-backend`, `ci-frontend`) run on **every** PR — no `paths`
+  filter, so a required check never hangs on a PR that skipped it. CodeQL scans as well.
+- `ci-backend`: Spotless, Checkstyle, then `./mvnw verify` (JUnit 5 + Testcontainers).
+- `ci-frontend`: ESLint, Prettier, then `tsc --noEmit`.
 - CI re-checks formatting and linting; the commit hook only saves you the round trip.
 
 > The backend includes health checks, OpenAPI documentation, and a PostgreSQL persistence

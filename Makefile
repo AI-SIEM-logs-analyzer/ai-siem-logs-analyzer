@@ -82,9 +82,9 @@ lint-backend: builder
 format-frontend: frontend/node_modules
 	cd frontend && $(PNPM) format
 
-## Check the frontend (ESLint + Prettier)
+## Check the frontend (ESLint + Prettier + tsc)
 lint-frontend: frontend/node_modules
-	cd frontend && $(PNPM) lint && $(PNPM) format:check
+	cd frontend && $(PNPM) lint && $(PNPM) format:check && $(PNPM) typecheck
 
 # Installed on demand, so `make lint` works on a fresh clone.
 frontend/node_modules: frontend/package.json frontend/pnpm-lock.yaml
