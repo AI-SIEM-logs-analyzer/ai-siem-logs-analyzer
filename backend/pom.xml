@@ -90,6 +90,18 @@
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- @QuarkusTest loads the application classes through QuarkusClassLoader, after
+             Quarkus has rewritten their bytecode (Panache enhances every entity and
+             repository). The plain JaCoCo agent then records execution data against
+             bytecode that no longer matches target/classes, and the report silently drops
+             it: without this extension the repositories and entities show 0% while their
+             tests pass. The extension instruments inside the Quarkus classloader instead,
+             which is the only place that coverage is real. -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jacoco</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -115,6 +127,16 @@
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <maven.home>${maven.home}</maven.home>
+                        <!-- Point the extension at the same .exec the Maven agent writes, so
+                             one report covers both the classes loaded normally and the ones
+                             loaded by Quarkus. reuse-data-file stops the extension from
+                             deleting that file at start-up, which would discard the Maven
+                             agent's data; report=false leaves report generation to the
+                             jacoco:report execution below, so there is a single report in
+                             target/site/jacoco rather than two that disagree. -->
+                        <quarkus.jacoco.data-file>${project.build.directory}/jacoco.exec</quarkus.jacoco.data-file>
+                        <quarkus.jacoco.reuse-data-file>true</quarkus.jacoco.reuse-data-file>
+                        <quarkus.jacoco.report>false</quarkus.jacoco.report>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
@@ -190,6 +212,15 @@
                         <goals>
                             <goal>prepare-agent</goal>
                         </goals>
+                        <configuration>
+                            <!-- Leave everything QuarkusClassLoader loads to the
+                                 quarkus-jacoco extension; instrumenting it twice produces
+                                 duplicate, mismatched execution data for the same classes. -->
+                            <exclClassLoaders>*QuarkusClassLoader</exclClassLoaders>
+                            <!-- Both agents write this one file, so append is mandatory:
+                                 without it whichever dumps last truncates the other. -->
+                            <append>true</append>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>report</id>

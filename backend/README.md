@@ -165,3 +165,24 @@ to `main`.
 [`.github/workflows/ci-backend.yml`](../.github/workflows/ci-backend.yml) — Temurin 21,
 `spotless:check`, `checkstyle:check`, then `clean verify`, and it uploads the JaCoCo
 report.
+
+## Coverage
+
+`clean verify` writes the report to `target/site/jacoco/`. There is no coverage
+threshold: the build never fails on the number, it only publishes it.
+
+Measuring it takes two agents rather than one. `@QuarkusTest` loads the application
+classes through `QuarkusClassLoader`, after Quarkus has rewritten their bytecode — Panache
+enhances every entity and repository. The standard JaCoCo agent records execution data
+against bytecode that no longer matches `target/classes`, and the report drops it without
+warning; measured on this project, that reported 16% line coverage while every repository
+and entity showed 0% with all their tests passing. So:
+
+- the `quarkus-jacoco` extension instruments inside the Quarkus classloader,
+- `exclClassLoaders=*QuarkusClassLoader` keeps the Maven agent off those same classes,
+- both write `target/jacoco.exec` (`append`, plus `quarkus.jacoco.reuse-data-file` so the
+  extension does not delete the file at start-up), and `jacoco:report` turns that one file
+  into one report — `quarkus.jacoco.report=false` suppresses the extension's own.
+
+Dropping any one of those pieces silently under-reports coverage instead of failing, so
+treat a sudden fall in the number as a build problem before treating it as a test problem.
