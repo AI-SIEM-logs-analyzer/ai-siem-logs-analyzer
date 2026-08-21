@@ -65,11 +65,6 @@ Two tools with disjoint jobs:
 `checkstyle:check` is bound to the `validate` phase, so any `./mvnw verify` fails on a
 violation before a single test runs. A justified exception can be fenced off:
 
-```java
-// CHECKSTYLE:OFF
-...
-// CHECKSTYLE:ON
-```
 
 The repository-root hook (`make hooks`) runs both on staged Java files at commit time —
 see the [root README](../README.md#format--lint).
