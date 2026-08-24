@@ -2,6 +2,39 @@
 
 AI-assisted SIEM log analysis platform.
 
+## Quick start
+
+Three commands, from a fresh clone to a running API with live reload:
+
+```bash
+make hooks                          # once per clone: install the format/lint pre-commit hook
+make up                             # PostgreSQL + Redis + Redpanda, healthchecked
+cd backend && ./mvnw quarkus:dev    # API on http://localhost:8080, live reload
+```
+
+`make up` writes `docker/.env` from the example on first run and blocks until every
+healthcheck is green, so the third command finds its database already up. Dev mode needs a
+JDK 21 on the host; without one, `make up-app` runs the backend in a container instead.
+
+Check it: <http://localhost:8080/q/health> · Swagger UI at
+<http://localhost:8080/q/swagger-ui>.
+
+## Architecture
+
+```mermaid
+%% Placeholder — the real diagrams live in docs/ARCHITECTURE.md and grow with the system.
+flowchart LR
+    sources[Log sources] --> kafka[[Kafka / Redpanda]]
+    kafka --> backend[Quarkus backend<br/>ingest · detect · alert]
+    backend --> pg[(PostgreSQL)]
+    backend --> redis[(Redis)]
+    backend --> llm[LLM<br/>LangChain4j]
+    spa[React SPA] -->|REST| backend
+```
+
+Components, data model, runtime flows and the open decisions:
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## Monorepo layout
 
 | Path        | What                                              |
@@ -9,7 +42,7 @@ AI-assisted SIEM log analysis platform.
 | `backend/`  | Quarkus (Java 21) REST API — see [backend/README.md](backend/README.md) |
 | `frontend/` | React + Vite + TypeScript UI — see [frontend/README.md](frontend/README.md) |
 | `docker/`   | Local dev stack (Compose) — see [docker/README.md](docker/README.md) |
-| `docs/`     | Architecture & docs (placeholder)                 |
+| `docs/`     | Architecture & docs — see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 
 ## Stack
 
@@ -23,8 +56,9 @@ AI-assisted SIEM log analysis platform.
 
 ```bash
 make up      # PostgreSQL + Redis + Redpanda, healthchecked, persistent volumes
-make up-app  # the same, plus the backend API on :8080
+make up-app  # the same, plus the backend API on :8080 (no host JDK needed)
 make verify  # run the backend build exactly as CI does (Temurin 21, in a container)
+make down    # remove containers, keep volumes — `make reset` drops the data too
 ```
 
 Details, ports and connection settings: [docker/README.md](docker/README.md).
