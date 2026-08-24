@@ -38,10 +38,15 @@ jobs:
       - name: Build + teste (JUnit5 + RestAssured, Testcontainers)
         run: ./mvnw -B clean verify
 
+      # `warn`, nu `ignore`: raportul lipsește legitim când build-ul pică înainte de teste,
+      # dar lipsește la fel de tăcut și când agentul JaCoCo încetează să mai ruleze (argLine
+      # suprascris, execuția scoasă din pom). `ignore` face cele două cazuri
+      # indistinguibile — un avertisment în log arată care dintre ele s-a întâmplat, fără
+      # să pice build-ul.
       - name: Urcă raportul JaCoCo
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-report
           path: backend/target/site/jacoco/
-          if-no-files-found: ignore
+          if-no-files-found: warn
