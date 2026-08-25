@@ -21,6 +21,7 @@
         <!-- The plugin ships an older Checkstyle; this pins the analyzer itself. -->
         <checkstyle.version>10.21.4</checkstyle.version>
         <jacoco-plugin.version>0.8.13</jacoco-plugin.version>
+        <password4j.version>1.8.4</password4j.version>
     </properties>
 
     <dependencyManagement>
@@ -79,6 +80,15 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-flyway</artifactId>
+        </dependency>
+        <!-- Password hashing. Argon2id is not in the JDK and Quarkus ships no hashing
+             extension of its own, so this is a direct dependency rather than a platform one;
+             it is pure Java, with no native or Bouncy Castle component to carry into the
+             container image. -->
+        <dependency>
+            <groupId>com.password4j</groupId>
+            <artifactId>password4j</artifactId>
+            <version>${password4j.version}</version>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
