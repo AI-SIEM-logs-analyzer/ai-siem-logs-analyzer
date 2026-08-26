@@ -13,6 +13,7 @@ Shipped today:
 - **SmallRye Health** — `/q/health`
 - **SmallRye OpenAPI** — `/q/openapi`, `/q/swagger-ui`
 - **Hibernate Validator**
+- **password4j** — Argon2id password hashing
 - **Jib** — container image, same build locally and in CD
 - **Spotless** (google-java-format, AOSP) · **Checkstyle** · **JaCoCo** · **JUnit 5** + RestAssured
 - **Maven** build via the wrapper (`./mvnw`)
@@ -74,12 +75,36 @@ one up automatically through `/usr/libexec/java_home -v 21` when the host has it
 
 ## Persistence
 
-- **Flyway owns the schema:** `V1__init.sql` creates all initial tables, indexes and constraints. Hibernate ORM runs with `quarkus.hibernate-orm.schema-management.strategy=validate` so it never emits DDL.
+- **Flyway owns the schema:** `V1__init.sql` creates the log, rule and alert tables; `V2__users.sql` adds `app_user` and `user_role`. Hibernate ORM runs with `quarkus.hibernate-orm.schema-management.strategy=validate` so it never emits DDL.
 - **Migrations:** SQL scripts live in `src/main/resources/db/migration`, named `V<n>__<description>.sql`. They are immutable once applied (Flyway validates checksums).
 - **Local Dev:** `%dev` connects to the local Compose stack (`jdbc:postgresql://localhost:5432/siem`, user `siem`). Start the database with `make up` and run `./mvnw quarkus:dev`.
 - **Testing:** `%test` uses Dev Services via Testcontainers to start a throwaway PostgreSQL container (`postgres:16-alpine`), requiring only a running Docker daemon.
 - **Production:** `%prod` expects `QUARKUS_DATASOURCE_JDBC_URL`, `QUARKUS_DATASOURCE_USERNAME`, and `QUARKUS_DATASOURCE_PASSWORD` from the environment.
 - **Entities & Repositories:** Domain classes live in `com.siem.analyzer.domain`; every query lives in an `@ApplicationScoped` repository in `com.siem.analyzer.repo` extending `PanacheRepositoryBase<T, Long>`.
+
+## Accounts and passwords
+
+- **Roles.** `ADMIN`, `ANALYST`, `VIEWER`, stored as rows in `user_role`. An account can hold
+  several at once, so the check is always "does this set contain the role this operation
+  needs" rather than a rank comparison.
+- **Hashing.** Argon2id through password4j, in `PasswordService` — the only class that ever
+  sees a plaintext password. Cost lives under `app.security.argon2`
+  (`memory-kib`, `iterations`, `parallelism`, `hash-length-bytes`, `salt-length-bytes`) and
+  defaults to the OWASP 19 MiB / t=2 / p=1 pair. Raise it until one hash takes roughly half a
+  second on the target hardware; stored hashes carry their own parameters, so old accounts
+  keep verifying. The `%test` profile lowers the cost so the suite can hash on every test.
+- **The seeded administrator.** `V2__users.sql` inserts `admin` with the password hash `!`,
+  which is not valid Argon2 and therefore matches nothing — the account exists and holds
+  `ADMIN`, but cannot be signed into until a password is set:
+
+  ```bash
+  curl -X PUT http://localhost:8080/api/users/1/password \
+    -H 'Content-Type: application/json' \
+    -d '{"password": "<at least 12 characters>"}'
+  ```
+
+  A seeded password would be the same on every deployment that ran the migration, production
+  included, which is why there is none.
 
 ## Configuration
 
@@ -144,6 +169,24 @@ confirm which configuration a running instance picked up.
 | `/q/health/ready` | readiness, including the `app-readiness` check |
 | `/q/openapi`      | OpenAPI document                            |
 | `/q/swagger-ui`   | Swagger UI (enabled outside dev mode too)   |
+
+Application endpoints:
+
+| Endpoint                        | What                                          |
+|---------------------------------|-----------------------------------------------|
+| `GET /api/users`                | list accounts                                 |
+| `POST /api/users`               | create an account with an initial password    |
+| `GET /api/users/{id}`           | one account                                   |
+| `PUT /api/users/{id}`           | replace e-mail, roles and enabled state       |
+| `PUT /api/users/{id}/password`  | set the password                              |
+| `DELETE /api/users/{id}`        | delete the account and its roles              |
+
+They are **unauthenticated**: nothing issues a token yet, so there is no role to check. Open,
+they are a full compromise — anyone who reaches them can mint an `ADMIN` account or reset any
+password — so `UserResource` carries `@UnlessBuildProfile("prod")` and is absent from a
+packaged application: every path above answers 404 there, and `/q/openapi` does not list them.
+They work under dev and test. The sign-in PR removes that annotation and puts
+`@RolesAllowed("ADMIN")` in its place.
 
 ## Container image
 

@@ -62,6 +62,18 @@ mp:
 # which makes a deployment without APP_AI_API_KEY fail at start-up instead of at runtime.
 app:
   environment: local
+  security:
+    # Argon2id cost, applied to every password this application hashes. The defaults live in
+    # AppConfig; they are repeated here so the knobs are discoverable, and each one can be
+    # overridden per environment (APP_SECURITY_ARGON2_MEMORY_KIB, and so on). Raise them until
+    # a single hash costs roughly half a second on the deployment's hardware. Stored hashes
+    # stay verifiable across a change: the parameters are read back from the hash itself.
+    argon2:
+      memory-kib: 19456
+      iterations: 2
+      parallelism: 1
+      hash-length-bytes: 32
+      salt-length-bytes: 16
 
 "%dev":
   app:
@@ -87,6 +99,14 @@ app:
     environment: test
     ai:
       api-key: test-placeholder
+    # A production-cost hash takes hundreds of milliseconds by design, and the suite hashes
+    # on nearly every test. These values keep Argon2id exercised for real — same algorithm,
+    # same encoding, same verification path — at a cost the test run can absorb. They are
+    # test-only and must not be copied into another profile.
+    security:
+      argon2:
+        memory-kib: 512
+        iterations: 1
   quarkus:
     # Deliberately no JDBC URL: with none configured, Dev Services starts a throwaway
     # PostgreSQL container through Testcontainers, lets Flyway migrate it, and tears it down

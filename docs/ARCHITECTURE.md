@@ -15,6 +15,7 @@
 | PostgreSQL schema + Panache repositories  | Shipped     |
 | Ingestion pipeline (Kafka)                | Planned     |
 | Detection (rules + AI)                    | Planned     |
+| Accounts + roles (`app_user`, `user_role`) | Shipped     |
 | REST API surface                          | Planned     |
 | Frontend application                      | Planned     |
 | AuthN/AuthZ (JWT + RBAC)                  | Planned     |
@@ -88,14 +89,15 @@ touches a repository, and a repository never returns a DTO.
 
 ## Data model
 
-Shipped in `V1__init.sql`, Flyway-owned; Hibernate runs in `validate` mode and never emits
-DDL.
+Shipped in `V1__init.sql` and `V2__users.sql`, Flyway-owned; Hibernate runs in `validate`
+mode and never emits DDL.
 
 ```mermaid
 erDiagram
     LOG_SOURCE ||--o{ LOG_EVENT : produces
     ALERT_RULE ||--o{ ALERT : raises
     LOG_EVENT  ||--o{ ALERT : evidences
+    APP_USER   ||--|{ USER_ROLE : holds
 ```
 
 | Table        | Holds                                                                    |
@@ -104,6 +106,8 @@ erDiagram
 | `log_event`  | Normalised events; carries the upstream identifier used to drop replays   |
 | `alert_rule` | Detection rules                                                           |
 | `alert`      | Raised alerts; the rule is nullable — a model-raised alert has none       |
+| `app_user`   | Accounts; stores an Argon2id hash, never a password                       |
+| `user_role`  | Roles per account (`ADMIN`, `ANALYST`, `VIEWER`); an account may hold several |
 
 ## Runtime flows
 
@@ -120,8 +124,18 @@ alert's status, and the transition is audited.
 
 ## Cross-cutting concerns
 
-- **AuthN/AuthZ (Planned).** SmallRye JWT, RBAC via `@RolesAllowed`. Token issuer, role
-  taxonomy and multi-tenancy are **TBD**.
+- **AuthN/AuthZ (Partly shipped).** Accounts, roles and Argon2id password hashing exist;
+  `UserService.authenticate` checks a credential pair. What is missing is the token: there is
+  no sign-in endpoint and no `@RolesAllowed` anywhere. Because unprotected account endpoints
+  are a full compromise, `UserResource` is annotated `@UnlessBuildProfile("prod")` and is not
+  registered in a packaged application — it exists under dev and test only. SmallRye JWT and
+  RBAC land together and replace that annotation; the token issuer and multi-tenancy remain
+  **TBD**.
+- **Credentials.** Argon2id (password4j), cost configured under `app.security.argon2`. The
+  parameters are stored inside each hash, so raising them leaves existing accounts able to
+  sign in. `V2__users.sql` seeds an `admin` account whose hash is the locked marker `!`,
+  which matches no password — a deployment sets one through `PUT /api/users/{id}/password`
+  rather than inheriting a credential that would be identical everywhere.
 - **Configuration.** `application.yaml` with MicroProfile Config profiles and typed
   `@ConfigMapping` interfaces. No configuration is read as loose strings.
 - **Observability.** Health endpoints under `/q/health` today. Metrics and tracing are

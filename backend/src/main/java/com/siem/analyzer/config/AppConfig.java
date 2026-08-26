@@ -1,7 +1,9 @@
 package com.siem.analyzer.config;
 
 import io.smallrye.config.ConfigMapping;
+import io.smallrye.config.WithDefault;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 
 /**
@@ -25,6 +27,9 @@ public interface AppConfig {
     @Valid
     Ai ai();
 
+    @Valid
+    Security security();
+
     /** Settings for the AI provider used to analyse logs. */
     interface Ai {
 
@@ -38,5 +43,58 @@ public interface AppConfig {
          */
         @NotBlank
         String apiKey();
+    }
+
+    /** Settings that govern how credentials are stored. */
+    interface Security {
+
+        @Valid
+        Argon2Settings argon2();
+
+        /**
+         * Cost parameters for the Argon2id hash applied to passwords.
+         *
+         * <p>Defaults follow the OWASP recommendation of 19 MiB of memory, two iterations and one
+         * degree of parallelism, which is the cheapest of the recommended pairs and the one that
+         * suits a request-path hash on a shared server. They are configurable because the right
+         * cost depends on the hardware: it should be raised until a single hash takes on the order
+         * of half a second on the target machine.
+         *
+         * <p>Changing any of these leaves stored hashes valid. Verification reads the parameters
+         * back from the encoded hash itself, so the new settings apply to passwords set from then
+         * on and old rows keep verifying under the settings they were written with.
+         */
+        interface Argon2Settings {
+
+            /** Memory cost in kibibytes. */
+            @WithDefault("19456")
+            @Min(8)
+            int memoryKib();
+
+            /** Number of passes over memory. */
+            @WithDefault("2")
+            @Min(1)
+            int iterations();
+
+            /** Number of lanes computed in parallel. */
+            @WithDefault("1")
+            @Min(1)
+            int parallelism();
+
+            /** Length of the derived hash, in bytes. */
+            @WithDefault("32")
+            @Min(16)
+            int hashLengthBytes();
+
+            /**
+             * Length of the per-password random salt, in bytes.
+             *
+             * <p>16 is the value RFC 9106 recommends for password hashing; the salt is stored
+             * inside the encoded hash, so it costs nothing to keep it there.
+             */
+            @WithDefault("16")
+            @Min(8)
+            int saltLengthBytes();
+        }
     }
 }

@@ -36,6 +36,21 @@ class FlywayMigrationTest {
 
     @Test
     @TestTransaction
+    void usersMigrationIsRecordedAsSuccessful() {
+        Object[] row =
+                (Object[])
+                        entityManager
+                                .createNativeQuery(
+                                        "select version, success from flyway_schema_history"
+                                                + " where version = '2'")
+                                .getSingleResult();
+
+        assertEquals("2", row[0]);
+        assertEquals(Boolean.TRUE, row[1]);
+    }
+
+    @Test
+    @TestTransaction
     void everyCoreTableExists() {
         Long count =
                 (Long)
@@ -44,9 +59,10 @@ class FlywayMigrationTest {
                                         "select count(*) from information_schema.tables"
                                                 + " where table_schema = 'public'"
                                                 + " and table_name in ('log_source', 'log_event',"
-                                                + " 'alert_rule', 'alert')")
+                                                + " 'alert_rule', 'alert', 'app_user',"
+                                                + " 'user_role')")
                                 .getSingleResult();
 
-        assertEquals(4L, count);
+        assertEquals(6L, count);
     }
 }
