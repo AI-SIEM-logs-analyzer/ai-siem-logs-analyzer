@@ -12,6 +12,7 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.Test;
  * its own — so each one uses a username of its own and deletes what it created.
  */
 @QuarkusTest
+@TestSecurity(user = "admin", roles = "ADMIN")
 class UserResourceTest {
 
     private static final String PASSWORD = "an-adequately-long-password";

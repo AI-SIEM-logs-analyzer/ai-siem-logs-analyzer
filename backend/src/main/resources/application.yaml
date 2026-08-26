@@ -47,6 +47,15 @@ quarkus:
   flyway:
     migrate-at-start: true
 
+  # --- Authorisation ---
+  # A JAX-RS endpoint with no security annotation is refused rather than served. The failure
+  # mode of forgetting an annotation should be a 403 someone reports, not an open endpoint
+  # nobody notices. The management endpoints (/q/health, /q/openapi) are not JAX-RS resources
+  # and are unaffected.
+  security:
+    jaxrs:
+      deny-unannotated-endpoints: true
+
 mp:
   openapi:
     extensions:
@@ -55,6 +64,12 @@ mp:
           title: SIEM Logs Analyzer API
           version: 0.1.0
           description: AI-assisted SIEM log analysis platform — backend API.
+  # --- Tokens ---
+  # The verifier is told the same issuer the builder stamps, so a token minted elsewhere is
+  # rejected even when it is signed with a key this deployment happens to trust.
+  jwt:
+    verify:
+      issuer: ${app.auth.issuer}
 
 # --- Application settings (mapped by com.siem.analyzer.config.AppConfig) ---
 # app.ai.api-key is intentionally absent here: it is a secret, so it has to come from the
@@ -74,6 +89,15 @@ app:
       parallelism: 1
       hash-length-bytes: 32
       salt-length-bytes: 16
+  auth:
+    # Identifies this deployment as the minter of a token. Override per environment
+    # (APP_AUTH_ISSUER); mp.jwt.verify.issuer below follows it automatically.
+    issuer: https://siem-analyzer.local/auth
+    access-ttl: PT15M
+    refresh-ttl: P14D
+    rate-limit:
+      attempts: 10
+      window: PT15M
 
 "%dev":
   app:
@@ -93,6 +117,23 @@ app:
       # no further setup. Not a secret: it is the throwaway credential of the local Compose
       # stack, already committed there in plain text, and it applies only under %dev.
       password: ${POSTGRES_PASSWORD:siem_local_dev}
+    # The Compose stack, whose password comes from docker/.env. Mirrors the datasource block
+    # above: `make up` plus `./mvnw quarkus:dev` works with nothing else set.
+    redis:
+      hosts: redis://localhost:6379
+      password: ${REDIS_PASSWORD:siem_local_dev}
+  # Committed throwaway pair; see backend/dev-keys/README.md. Referenced by file path rather
+  # than from the classpath so that it stays out of the jar and the container image.
+  mp:
+    jwt:
+      verify:
+        publickey:
+          location: file:./dev-keys/publicKey.pem
+  smallrye:
+    jwt:
+      sign:
+        key:
+          location: file:./dev-keys/privateKey.pem
 
 "%test":
   app:
@@ -115,6 +156,22 @@ app:
     datasource:
       devservices:
         image-name: postgres:16-alpine
+    # No hosts on purpose: Dev Services starts a throwaway Redis through Testcontainers, the
+    # same arrangement the datasource uses. The image is pinned to the Compose version so the
+    # suite, the local stack and production agree on the server's behaviour.
+    redis:
+      devservices:
+        image-name: redis:7-alpine
+  mp:
+    jwt:
+      verify:
+        publickey:
+          location: classpath:jwt/publicKey.pem
+  smallrye:
+    jwt:
+      sign:
+        key:
+          location: classpath:jwt/privateKey.pem
 
 "%prod":
   app:
@@ -123,3 +180,9 @@ app:
   # QUARKUS_DATASOURCE_USERNAME and QUARKUS_DATASOURCE_PASSWORD through the environment, and
   # Dev Services never run under prod, so a deployment without them aborts at start-up rather
   # than serving requests against no database. Same fail-fast contract as APP_AI_API_KEY.
+  # No key locations here on purpose. Production supplies SMALLRYE_JWT_SIGN_KEY_LOCATION and
+  # MP_JWT_VERIFY_PUBLICKEY_LOCATION through the environment; TokenService proves at start-up
+  # that both load, so a deployment without them aborts instead of failing the first sign-in.
+  # No Redis keys here either. Production supplies QUARKUS_REDIS_HOSTS and
+  # QUARKUS_REDIS_PASSWORD through the environment, and Dev Services never runs under prod, so
+  # a deployment without Redis fails at start-up rather than failing the first refresh.

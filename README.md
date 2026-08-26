@@ -16,6 +16,18 @@ cd backend && ./mvnw quarkus:dev    # API on http://localhost:8080, live reload
 healthcheck is green, so the third command finds its database already up. Dev mode needs a
 JDK 21 on the host; without one, `make up-app` runs the backend in a container instead.
 
+Set the administrator's password on first run and sign in:
+
+```bash
+APP_AUTH_BOOTSTRAP_PASSWORD='choose-something-long' ./mvnw quarkus:dev
+curl -s -X POST localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"choose-something-long"}'
+```
+
+Every other endpoint expects the `accessToken` from that response as
+`Authorization: Bearer <token>`.
+
 Check it: <http://localhost:8080/q/health> · Swagger UI at
 <http://localhost:8080/q/swagger-ui>.
 
