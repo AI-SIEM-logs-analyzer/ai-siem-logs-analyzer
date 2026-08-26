@@ -5,6 +5,8 @@ import io.smallrye.config.WithDefault;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import java.time.Duration;
+import java.util.Optional;
 
 /**
  * Application-owned configuration, rooted at the {@code app} prefix in application.yaml.
@@ -29,6 +31,9 @@ public interface AppConfig {
 
     @Valid
     Security security();
+
+    @Valid
+    Auth auth();
 
     /** Settings for the AI provider used to analyse logs. */
     interface Ai {
@@ -95,6 +100,53 @@ public interface AppConfig {
             @WithDefault("16")
             @Min(8)
             int saltLengthBytes();
+        }
+    }
+
+    /** Settings for the tokens this application issues and accepts. */
+    interface Auth {
+
+        /**
+         * Value of the {@code iss} claim on every access token, and the issuer the verifier
+         * demands. Deployment-specific: a token minted for one deployment must not verify against
+         * another, and this claim is what separates them.
+         */
+        @NotBlank
+        String issuer();
+
+        /**
+         * How long an access token stays valid.
+         *
+         * <p>Short by design. The token is verified without touching Redis, so apart from an
+         * explicit logout this window is how long a change of roles or a disabled account takes to
+         * bite.
+         */
+        @WithDefault("PT15M")
+        Duration accessTtl();
+
+        /** How long a refresh token stays valid, and the TTL of everything Redis stores for it. */
+        @WithDefault("P14D")
+        Duration refreshTtl();
+
+        /**
+         * First password for the seeded administrator, whose stored hash is the locked marker until
+         * someone sets one. Applied at start-up, once; empty on a deployment whose administrator
+         * already has a password.
+         */
+        Optional<String> bootstrapPassword();
+
+        @Valid
+        RateLimit rateLimit();
+
+        /** How many failed sign-ins one username and address may make before being turned away. */
+        interface RateLimit {
+
+            @WithDefault("10")
+            @Min(1)
+            int attempts();
+
+            @WithDefault("PT15M")
+            Duration window();
         }
     }
 }

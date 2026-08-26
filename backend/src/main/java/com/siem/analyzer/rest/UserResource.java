@@ -3,7 +3,7 @@ package com.siem.analyzer.rest;
 import com.siem.analyzer.domain.User;
 import com.siem.analyzer.service.PasswordService;
 import com.siem.analyzer.service.UserService;
-import io.quarkus.arc.profile.UnlessBuildProfile;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
@@ -24,17 +24,13 @@ import java.util.List;
 /**
  * Account management over HTTP.
  *
- * <p>No authorisation is applied: the endpoints are open, because the authentication mechanism that
- * would carry a role claim is not in the application yet. Open, these endpoints are a full
- * compromise — anyone who can reach them can mint an {@code ADMIN} account or reset any password —
- * so the resource is removed from production builds rather than shipped unprotected.
- *
- * <p>{@link UnlessBuildProfile} drops the bean when the build profile is {@code prod}, which leaves
- * it available under dev and test and absent from the packaged application. The annotation goes
- * when sign-in lands and is replaced by {@code @RolesAllowed("ADMIN")}; that, not this, is the
- * lasting protection.
+ * <p>Restricted to administrators. Until sign-in existed these endpoints were open, and open they
+ * are a full compromise — anyone who can reach them can mint an {@code ADMIN} account or reset any
+ * password — so the resource was kept out of production builds with {@code @UnlessBuildProfile}.
+ * The role requirement is the lasting protection that replaced it, and the resource now ships in
+ * every profile.
  */
-@UnlessBuildProfile("prod")
+@RolesAllowed("ADMIN")
 @Path("/api/users")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)

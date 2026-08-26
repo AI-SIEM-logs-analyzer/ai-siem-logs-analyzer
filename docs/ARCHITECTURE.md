@@ -18,7 +18,7 @@
 | Accounts + roles (`app_user`, `user_role`) | Shipped     |
 | REST API surface                          | Planned     |
 | Frontend application                      | Planned     |
-| AuthN/AuthZ (JWT + RBAC)                  | Planned     |
+| AuthN/AuthZ (JWT + RBAC)                  | Shipped     |
 | Log search backend (OpenSearch?)          | TBD         |
 
 ## Context
@@ -124,18 +124,19 @@ alert's status, and the transition is audited.
 
 ## Cross-cutting concerns
 
-- **AuthN/AuthZ (Partly shipped).** Accounts, roles and Argon2id password hashing exist;
-  `UserService.authenticate` checks a credential pair. What is missing is the token: there is
-  no sign-in endpoint and no `@RolesAllowed` anywhere. Because unprotected account endpoints
-  are a full compromise, `UserResource` is annotated `@UnlessBuildProfile("prod")` and is not
-  registered in a packaged application — it exists under dev and test only. SmallRye JWT and
-  RBAC land together and replace that annotation; the token issuer and multi-tenancy remain
-  **TBD**.
+- **AuthN/AuthZ (Shipped).** `POST /api/auth/login` exchanges a username and password for an
+  RS256 access token (15 minutes, carrying `sub`, `upn` and the account's roles as `groups`) and
+  an opaque refresh token held in Redis. `@RolesAllowed` reads the roles straight off the token,
+  and `quarkus.security.jaxrs.deny-unannotated-endpoints` refuses any endpoint that forgot to
+  say who may call it. Refresh rotates: a token is spent once, and one presented twice revokes
+  every session of that account. Logout is immediate — the access token's `jti` goes onto a
+  Redis deny-list for the rest of its life — and every attempt lands in `auth_event`.
+  Multi-tenancy remains **TBD**.
 - **Credentials.** Argon2id (password4j), cost configured under `app.security.argon2`. The
   parameters are stored inside each hash, so raising them leaves existing accounts able to
   sign in. `V2__users.sql` seeds an `admin` account whose hash is the locked marker `!`,
-  which matches no password — a deployment sets one through `PUT /api/users/{id}/password`
-  rather than inheriting a credential that would be identical everywhere.
+  which matches no password — a deployment sets one through `APP_AUTH_BOOTSTRAP_PASSWORD` at
+  start-up rather than inheriting a credential that would be identical everywhere.
 - **Configuration.** `application.yaml` with MicroProfile Config profiles and typed
   `@ConfigMapping` interfaces. No configuration is read as loose strings.
 - **Observability.** Health endpoints under `/q/health` today. Metrics and tracing are
