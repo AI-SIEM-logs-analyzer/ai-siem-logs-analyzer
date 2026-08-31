@@ -24,13 +24,23 @@ import java.util.List;
 /**
  * Account management over HTTP.
  *
- * <p>Restricted to administrators. Until sign-in existed these endpoints were open, and open they
- * are a full compromise — anyone who can reach them can mint an {@code ADMIN} account or reset any
- * password — so the resource was kept out of production builds with {@code @UnlessBuildProfile}.
- * The role requirement is the lasting protection that replaced it, and the resource now ships in
- * every profile.
+ * <p>Writing is restricted to administrators. Until sign-in existed these endpoints were open, and
+ * open they are a full compromise — anyone who can reach them can mint an {@code ADMIN} account or
+ * reset any password — so the resource was kept out of production builds with
+ * {@code @UnlessBuildProfile}. The role requirement is the lasting protection that replaced it, and
+ * the resource now ships in every profile.
+ *
+ * <p>Reading is open to every signed-in account. That is a deliberate widening: an analyst or a
+ * viewer can list every username, e-mail address and role in the system, which is enumeration
+ * material for whoever holds the lowest-privileged account. It is accepted because triage needs to
+ * know who owns an alert, and it is bounded by what {@link UserResponse} carries — no password
+ * hash, no token, nothing that grants access.
+ *
+ * <p>The roles are stated per method rather than on the class so that adding a method cannot
+ * silently inherit the wrong answer. {@code quarkus.security.jaxrs.deny-unannotated-endpoints}
+ * refuses an endpoint that states nothing at all, and {@code EndpointAuthorizationCoverageTest}
+ * turns that refusal into a build failure instead of a runtime surprise.
  */
-@RolesAllowed("ADMIN")
 @Path("/api/users")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -45,11 +55,13 @@ public class UserResource {
         this.passwords = passwords;
     }
 
+    @RolesAllowed({"ADMIN", "ANALYST", "VIEWER"})
     @GET
     public List<UserResponse> list() {
         return users.list().stream().map(this::toResponse).toList();
     }
 
+    @RolesAllowed({"ADMIN", "ANALYST", "VIEWER"})
     @GET
     @Path("/{id}")
     public UserResponse get(@PathParam("id") Long id) {
@@ -57,6 +69,7 @@ public class UserResource {
     }
 
     /** Creates an account and returns it, with a {@code Location} header pointing at it. */
+    @RolesAllowed("ADMIN")
     @POST
     public Response create(@Valid CreateUserRequest request, @Context UriInfo uriInfo) {
         User created =
@@ -71,6 +84,7 @@ public class UserResource {
                 .build();
     }
 
+    @RolesAllowed("ADMIN")
     @PUT
     @Path("/{id}")
     public UserResponse update(@PathParam("id") Long id, @Valid UpdateUserRequest request) {
@@ -85,6 +99,7 @@ public class UserResource {
      * <p>Returns no body: there is nothing to say about a password that is safe to say, and the
      * account itself is unchanged from the client's point of view apart from {@code passwordSet}.
      */
+    @RolesAllowed("ADMIN")
     @PUT
     @Path("/{id}/password")
     public Response changePassword(@PathParam("id") Long id, @Valid ChangePasswordRequest request) {
@@ -94,6 +109,7 @@ public class UserResource {
         return Response.noContent().build();
     }
 
+    @RolesAllowed("ADMIN")
     @DELETE
     @Path("/{id}")
     public Response delete(@PathParam("id") Long id) {
