@@ -132,6 +132,20 @@ alert's status, and the transition is audited.
   every session of that account. Logout is immediate — the access token's `jti` goes onto a
   Redis deny-list for the rest of its life — and every attempt lands in `auth_event`.
   Multi-tenancy remains **TBD**.
+- **Roles per endpoint (Shipped).** Authorization is decided server-side on every endpoint;
+  the SPA hides what a role cannot use, but hiding is not enforcing. Roles are declared per
+  method rather than per resource class, so a method added later inherits nothing and is
+  refused until someone states its rule. `/api/users` reads (`GET` on the collection and on
+  one account) are open to `ADMIN`, `ANALYST` and `VIEWER`; every write — create, update,
+  password reset, delete — is `ADMIN` alone. `/api/auth/login` and `/api/auth/refresh` are
+  open by necessity, `/api/auth/logout` and `/api/auth/me` need any signed-in account.
+  Opening the reads was a deliberate trade: any account can now enumerate usernames, e-mail
+  addresses and roles, accepted because triage needs to know who owns an alert and bounded
+  by what `UserResponse` carries. `UserResourceSecurityTest` and `AuthResourceSecurityTest`
+  assert the whole matrix per role, `RbacJwtTest` repeats the key cases over a real token to
+  prove the `groups` claim reaches the role check, and `EndpointAuthorizationCoverageTest`
+  scans the compiled resources so an unannotated endpoint fails the build rather than
+  answering `403` to everyone in production.
 - **Credentials.** Argon2id (password4j), cost configured under `app.security.argon2`. The
   parameters are stored inside each hash, so raising them leaves existing accounts able to
   sign in. `V2__users.sql` seeds an `admin` account whose hash is the locked marker `!`,
