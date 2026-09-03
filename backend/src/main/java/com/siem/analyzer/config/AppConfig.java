@@ -35,6 +35,17 @@ public interface AppConfig {
     @Valid
     Auth auth();
 
+    @Valid
+    Storage storage();
+
+    /** Settings for log file upload storage. */
+    interface Storage {
+
+        /** Directory where uploaded log files are stored. */
+        @WithDefault("data/uploads")
+        String uploadDir();
+    }
+
     /** Settings for the AI provider used to analyse logs. */
     interface Ai {
 
