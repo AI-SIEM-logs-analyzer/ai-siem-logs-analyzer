@@ -70,6 +70,14 @@ mp:
   jwt:
     verify:
       issuer: ${app.auth.issuer}
+  # --- Reactive Messaging (Kafka / Redpanda) ---
+  messaging:
+    outgoing:
+      "logs.ingest":
+        connector: smallrye-kafka
+        topic: logs.ingest
+        value:
+          serializer: org.apache.kafka.common.serialization.StringSerializer
 
 # --- Application settings (mapped by com.siem.analyzer.config.AppConfig) ---
 # app.ai.api-key is intentionally absent here: it is a secret, so it has to come from the
@@ -77,6 +85,8 @@ mp:
 # which makes a deployment without APP_AI_API_KEY fail at start-up instead of at runtime.
 app:
   environment: local
+  storage:
+    upload-dir: data/uploads
   security:
     # Argon2id cost, applied to every password this application hashes. The defaults live in
     # AppConfig; they are repeated here so the knobs are discoverable, and each one can be
@@ -104,6 +114,11 @@ app:
     environment: dev
     ai:
       api-key: dev-placeholder
+    storage:
+      upload-dir: target/dev-uploads
+  kafka:
+    bootstrap:
+      servers: localhost:19092
   quarkus:
     log:
       category:
@@ -140,6 +155,8 @@ app:
     environment: test
     ai:
       api-key: test-placeholder
+    storage:
+      upload-dir: target/test-uploads
     # A production-cost hash takes hundreds of milliseconds by design, and the suite hashes
     # on nearly every test. These values keep Argon2id exercised for real — same algorithm,
     # same encoding, same verification path — at a cost the test run can absorb. They are

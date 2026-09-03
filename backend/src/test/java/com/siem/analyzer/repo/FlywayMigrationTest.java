@@ -51,6 +51,36 @@ class FlywayMigrationTest {
 
     @Test
     @TestTransaction
+    void authEventsMigrationIsRecordedAsSuccessful() {
+        Object[] row =
+                (Object[])
+                        entityManager
+                                .createNativeQuery(
+                                        "select version, success from flyway_schema_history"
+                                                + " where version = '3'")
+                                .getSingleResult();
+
+        assertEquals("3", row[0]);
+        assertEquals(Boolean.TRUE, row[1]);
+    }
+
+    @Test
+    @TestTransaction
+    void logUploadsMigrationIsRecordedAsSuccessful() {
+        Object[] row =
+                (Object[])
+                        entityManager
+                                .createNativeQuery(
+                                        "select version, success from flyway_schema_history"
+                                                + " where version = '4'")
+                                .getSingleResult();
+
+        assertEquals("4", row[0]);
+        assertEquals(Boolean.TRUE, row[1]);
+    }
+
+    @Test
+    @TestTransaction
     void everyCoreTableExists() {
         Long count =
                 (Long)
@@ -60,9 +90,9 @@ class FlywayMigrationTest {
                                                 + " where table_schema = 'public'"
                                                 + " and table_name in ('log_source', 'log_event',"
                                                 + " 'alert_rule', 'alert', 'app_user',"
-                                                + " 'user_role')")
+                                                + " 'user_role', 'auth_event', 'log_upload')")
                                 .getSingleResult();
 
-        assertEquals(6L, count);
+        assertEquals(8L, count);
     }
 }

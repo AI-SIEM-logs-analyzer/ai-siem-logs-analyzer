@@ -93,6 +93,10 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-flyway</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-messaging-kafka</artifactId>
+        </dependency>
         <!-- Password hashing. Argon2id is not in the JDK and Quarkus ships no hashing
              extension of its own, so this is a direct dependency rather than a platform one;
              it is pure Java, with no native or Bouncy Castle component to carry into the
