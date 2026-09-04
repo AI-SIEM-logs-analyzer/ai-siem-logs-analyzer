@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -38,12 +39,75 @@ public interface AppConfig {
     @Valid
     Storage storage();
 
+    @Valid
+    Upload upload();
+
     /** Settings for log file upload storage. */
     interface Storage {
 
         /** Directory where uploaded log files are stored. */
         @WithDefault("data/uploads")
         String uploadDir();
+    }
+
+    /**
+     * Limits applied to an uploaded log file before it is stored.
+     *
+     * <p>Everything here is a rejection rule, so every value is deliberately conservative: raising
+     * a limit is a decision someone makes per deployment, and the default should not be the one
+     * that lets a 2 GiB core dump through.
+     */
+    interface Upload {
+
+        /**
+         * Largest file the application accepts, in bytes.
+         *
+         * <p>{@code quarkus.http.limits.max-body-size} is set above this on purpose. The HTTP limit
+         * exists so a runaway body is cut off before it fills the disk; this one exists so an
+         * upload that is merely too large gets a 413 that names the limit.
+         */
+        @WithDefault("52428800")
+        @Min(1)
+        long maxFileSizeBytes();
+
+        /**
+         * File name extensions accepted, without the leading dot and compared case-insensitively.
+         *
+         * <p>No compressed formats: ingestion reads the stored file as text and does not
+         * decompress, so accepting {@code .gz} would store batches nothing downstream can parse.
+         */
+        @WithDefault("log,txt,json,ndjson,csv")
+        List<String> allowedExtensions();
+
+        /**
+         * Multipart content types accepted, parameters stripped and compared case-insensitively.
+         *
+         * <p>{@code application/octet-stream} is in the list because curl and most HTTP clients
+         * send it for any file they cannot type, and refusing it would reject legitimate uploads.
+         * That makes this check a cheap filter rather than a barrier — the sniff of the leading
+         * bytes is what actually rejects a binary.
+         */
+        @WithDefault("text/plain,application/json,text/csv,application/octet-stream")
+        List<String> allowedContentTypes();
+
+        /** How many leading bytes are read to decide whether the content is text. */
+        @WithDefault("8192")
+        @Min(1)
+        int sniffBytes();
+
+        @Valid
+        RateLimit rateLimit();
+
+        /** How many uploads one account may make before being turned away. */
+        interface RateLimit {
+
+            @WithDefault("20")
+            @Min(1)
+            int requests();
+
+            @WithDefault("PT1M")
+            Duration window();
+        }
     }
 
     /** Settings for the AI provider used to analyse logs. */
