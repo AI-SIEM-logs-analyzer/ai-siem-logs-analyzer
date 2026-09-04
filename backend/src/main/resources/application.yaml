@@ -15,6 +15,12 @@ quarkus:
   # --- HTTP ---
   http:
     port: 8080
+    limits:
+      # Deliberately above app.upload.max-file-size-bytes. This limit exists so a runaway body is
+      # cut off at the connection before it is spooled to disk; the application limit exists so an
+      # upload that is merely too large gets a 413 that names the limit it exceeded. Raise both
+      # together, keeping this one the larger of the two.
+      max-body-size: 60M
 
   # --- OpenAPI / Swagger UI ---
   # Swagger UI is dev-mode-only unless always-include is set; the packaged app is
@@ -87,6 +93,17 @@ app:
   environment: local
   storage:
     upload-dir: data/uploads
+  # Limits applied to an uploaded log file. The defaults live in AppConfig.Upload; they are
+  # repeated here so the knobs are discoverable, and each one can be overridden per environment
+  # (APP_UPLOAD_MAX_FILE_SIZE_BYTES, and so on).
+  upload:
+    max-file-size-bytes: 52428800
+    allowed-extensions: log,txt,json,ndjson,csv
+    allowed-content-types: text/plain,application/json,text/csv,application/octet-stream
+    sniff-bytes: 8192
+    rate-limit:
+      requests: 20
+      window: PT1M
   security:
     # Argon2id cost, applied to every password this application hashes. The defaults live in
     # AppConfig; they are repeated here so the knobs are discoverable, and each one can be
@@ -157,6 +174,12 @@ app:
       api-key: test-placeholder
     storage:
       upload-dir: target/test-uploads
+    # The suite uploads repeatedly as the same test users, and the counter outlives a single test.
+    # An allowance well above what any test class spends keeps the limit from firing where it is
+    # not the thing under test; LogUploadRateLimitTest lowers it for itself instead.
+    upload:
+      rate-limit:
+        requests: 100
     # A production-cost hash takes hundreds of milliseconds by design, and the suite hashes
     # on nearly every test. These values keep Argon2id exercised for real — same algorithm,
     # same encoding, same verification path — at a cost the test run can absorb. They are
