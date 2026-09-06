@@ -101,10 +101,10 @@ class LogUploadValidationTest {
         // A refused upload must leave no metadata behind: validation runs before the file is
         // stored, the row is written or the ingest event is published.
         given().when()
-                .get("/api/logs/uploads?limit=100")
+                .get("/api/logs/uploads?size=100")
                 .then()
                 .statusCode(200)
-                .body("findAll { it.fileName == 'rejected.exe' }.size()", equalTo(0));
+                .body("items.findAll { it.fileName == 'rejected.exe' }.size()", equalTo(0));
     }
 
     public static class SmallLimitProfile implements QuarkusTestProfile {

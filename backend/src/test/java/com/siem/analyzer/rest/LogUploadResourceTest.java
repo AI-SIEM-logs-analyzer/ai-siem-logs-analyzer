@@ -91,11 +91,12 @@ class LogUploadResourceTest {
                 .statusCode(202);
 
         given().when()
-                .get("/api/logs/uploads?limit=10")
+                .get("/api/logs/uploads?size=10")
                 .then()
                 .statusCode(200)
-                .body("$", notNullValue())
-                .body("size()", greaterThan(0));
+                .body("items", notNullValue())
+                .body("items.size()", greaterThan(0))
+                .body("total", greaterThan(0));
     }
 
     @Test

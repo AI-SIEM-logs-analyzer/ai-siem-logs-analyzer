@@ -12,7 +12,6 @@ import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -74,19 +73,5 @@ class LogUploadRepositoryTest {
         Optional<LogUpload> found = uploadRepository.findByChecksum(checksum);
         assertTrue(found.isPresent());
         assertEquals("syslog.log", found.get().getFileName());
-    }
-
-    @Test
-    @TestTransaction
-    void listsByStatusAndRecent() {
-        String unique = UUID.randomUUID().toString();
-        createUpload(null, "f1.log", "c1-" + unique, LogUploadStatus.PROCESSING);
-        createUpload(null, "f2.log", "c2-" + unique, LogUploadStatus.INGESTED);
-
-        List<LogUpload> processing = uploadRepository.listByStatus(LogUploadStatus.PROCESSING);
-        assertTrue(processing.stream().anyMatch(u -> u.getFileName().equals("f1.log")));
-
-        List<LogUpload> recent = uploadRepository.listRecent(10);
-        assertTrue(recent.size() >= 2);
     }
 }
