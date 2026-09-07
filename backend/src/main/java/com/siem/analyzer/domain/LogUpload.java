@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
@@ -46,11 +47,42 @@ public class LogUpload {
     @Column(name = "status", nullable = false)
     private LogUploadStatus status = LogUploadStatus.PENDING;
 
+    /** Format detected from the file content. Null on rows written before detection existed. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "detected_format")
+    private LogFormat detectedFormat;
+
     @Column(name = "uploaded_by")
     private String uploadedBy;
 
+    /**
+     * The account behind {@link #uploadedBy}, when one is still there.
+     *
+     * <p>Deleting an account nulls this column but leaves the username text, so an audit of who
+     * uploaded what survives the account it points at.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "uploaded_by_id")
+    private User uploadedByUser;
+
+    @Column(name = "processing_started_at")
+    private Instant processingStartedAt;
+
+    @Column(name = "processed_at")
+    private Instant processedAt;
+
+    /** Events parsed out of the file, set when ingestion completes. */
+    @Column(name = "event_count")
+    private Long eventCount;
+
+    @Column(name = "error_message")
+    private String errorMessage;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
 
     @PrePersist
     void onPersist() {
@@ -60,6 +92,12 @@ public class LogUpload {
         if (status == null) {
             status = LogUploadStatus.PENDING;
         }
+        updatedAt = createdAt;
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = Instant.now();
     }
 
     public Long getId() {
@@ -136,5 +174,61 @@ public class LogUpload {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public LogFormat getDetectedFormat() {
+        return detectedFormat;
+    }
+
+    public void setDetectedFormat(LogFormat detectedFormat) {
+        this.detectedFormat = detectedFormat;
+    }
+
+    public User getUploadedByUser() {
+        return uploadedByUser;
+    }
+
+    public void setUploadedByUser(User uploadedByUser) {
+        this.uploadedByUser = uploadedByUser;
+    }
+
+    public Instant getProcessingStartedAt() {
+        return processingStartedAt;
+    }
+
+    public void setProcessingStartedAt(Instant processingStartedAt) {
+        this.processingStartedAt = processingStartedAt;
+    }
+
+    public Instant getProcessedAt() {
+        return processedAt;
+    }
+
+    public void setProcessedAt(Instant processedAt) {
+        this.processedAt = processedAt;
+    }
+
+    public Long getEventCount() {
+        return eventCount;
+    }
+
+    public void setEventCount(Long eventCount) {
+        this.eventCount = eventCount;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(Instant updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }
