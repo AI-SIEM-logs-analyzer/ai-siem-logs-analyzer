@@ -13,7 +13,7 @@
 | Local dev stack (Postgres/Redis/Redpanda) | Shipped     |
 | Backend skeleton, health, OpenAPI         | Shipped     |
 | PostgreSQL schema + Panache repositories  | Shipped     |
-| Ingestion pipeline (Kafka)                | Planned     |
+| Ingestion pipeline (Kafka)                | Producer shipped; consumer planned |
 | Detection (rules + AI)                    | Planned     |
 | Accounts + roles (`app_user`, `user_role`) | Shipped     |
 | REST API surface                          | Planned     |
@@ -111,7 +111,13 @@ erDiagram
 
 ## Runtime flows
 
-**Ingestion (Planned).** Source → Kafka topic → consumer → normalisation → `log_event`.
+**Ingestion (Producer shipped, consumer planned).** An accepted upload is stored, its
+metadata row is persisted, and `LogIngestProducer` publishes a JSON `LogIngestEvent` on the
+`logs.ingest` channel (SmallRye Reactive Messaging, `smallrye-kafka` connector, topic
+`logs.ingest`). The broker is Redpanda in the Compose stack; the test suite swaps the
+connector for `smallrye-in-memory`, so the emitter and the payload are exercised without a
+broker. Still to come: the consumer that reads the topic, drives the upload through
+`markProcessing` / `markIngested` / `markFailed`, and normalises into `log_event`.
 Deduplication uses the upstream identifier. Ordering guarantees, partitioning key and
 retention are **TBD**.
 

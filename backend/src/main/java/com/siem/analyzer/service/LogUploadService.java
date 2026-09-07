@@ -67,6 +67,10 @@ public class LogUploadService {
      * Stores the uploaded file, saves metadata to the database, and publishes a message to Kafka
      * {@code logs.ingest}.
      *
+     * <p>The message leaves only once this transaction commits; see {@link LogIngestProducer}. A
+     * failure anywhere below therefore takes the event with it, rather than pointing a consumer at
+     * a row that was rolled back.
+     *
      * <p>Both upload endpoints come through here, so the allowance and the file checks live here
      * rather than in either resource. The allowance is charged first: a caller sending one refused
      * file after another still costs the server the reads those checks make, and the limit is what

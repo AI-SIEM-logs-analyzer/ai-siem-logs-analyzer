@@ -202,11 +202,23 @@ app:
     redis:
       devservices:
         image-name: redis:7-alpine
+    # No broker is started for the suite at all: the logs.ingest channel runs on the in-memory
+    # connector configured below, so a Kafka container would only cost start-up time.
+    kafka:
+      devservices:
+        enabled: false
   mp:
     jwt:
       verify:
         publickey:
           location: classpath:jwt/publicKey.pem
+    # The suite proves the producer, not the broker: the emitter, the channel name and the JSON
+    # payload are the production ones, and only the connector is swapped. Dev Services would
+    # otherwise start a Redpanda container for every test class that boots the application.
+    messaging:
+      outgoing:
+        "logs.ingest":
+          connector: smallrye-in-memory
   smallrye:
     jwt:
       sign:
