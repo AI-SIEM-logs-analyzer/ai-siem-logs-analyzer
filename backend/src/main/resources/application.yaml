@@ -84,6 +84,21 @@ mp:
         topic: logs.ingest
         value:
           serializer: org.apache.kafka.common.serialization.StringSerializer
+    # The consumer reads the same topic under a different channel name. SmallRye connects an
+    # outgoing channel directly to an incoming one of the same name inside the same application,
+    # which would hand the producer's messages to the consumer without ever reaching the broker.
+    incoming:
+      "logs.ingest-in":
+        connector: smallrye-kafka
+        topic: logs.ingest
+        group:
+          id: siem-backend
+        value:
+          deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        # A batch uploaded while no consumer was running still gets ingested when one starts.
+        auto:
+          offset:
+            reset: earliest
 
 # --- Application settings (mapped by com.siem.analyzer.config.AppConfig) ---
 # app.ai.api-key is intentionally absent here: it is a secret, so it has to come from the
@@ -218,6 +233,9 @@ app:
     messaging:
       outgoing:
         "logs.ingest":
+          connector: smallrye-in-memory
+      incoming:
+        "logs.ingest-in":
           connector: smallrye-in-memory
   smallrye:
     jwt:
