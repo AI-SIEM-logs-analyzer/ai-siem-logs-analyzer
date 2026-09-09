@@ -123,11 +123,19 @@ services:
       QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       QUARKUS_DATASOURCE_USERNAME: ${POSTGRES_USER}
       QUARKUS_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      # The logs.ingest producer talks to the internal listener, so this is `redpanda:9092`
+      # on this network rather than the port published to the host. The prod profile
+      # configures no broker, the same way it configures no datasource: a deployment that
+      # forgets this fails on the first publish instead of dropping events quietly.
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     # Flyway migrates at start-up, so the database has to be accepting connections first.
+    # Redpanda is waited on for the same reason: the first upload publishes to logs.ingest.
     depends_on:
       postgres:
+        condition: service_healthy
+      redpanda:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/q/health/ready || exit 1"]

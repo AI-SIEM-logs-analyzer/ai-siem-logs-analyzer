@@ -106,6 +106,15 @@
             <artifactId>password4j</artifactId>
             <version>${password4j.version}</version>
         </dependency>
+        <!-- Swaps the logs.ingest outgoing channel for an in-memory sink under %test, so the
+             suite exercises the real Emitter and the real serialisation without a broker.
+             Kafka Dev Services stays off for the same reason; the Compose stack is where the
+             channel is proven against Redpanda. -->
+        <dependency>
+            <groupId>io.smallrye.reactive</groupId>
+            <artifactId>smallrye-reactive-messaging-in-memory</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-junit</artifactId>
