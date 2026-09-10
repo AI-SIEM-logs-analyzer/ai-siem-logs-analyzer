@@ -13,7 +13,7 @@
 | Local dev stack (Postgres/Redis/Redpanda) | Shipped     |
 | Backend skeleton, health, OpenAPI         | Shipped     |
 | PostgreSQL schema + Panache repositories  | Shipped     |
-| Ingestion pipeline (Kafka)                | Producer shipped; consumer planned |
+| Ingestion pipeline (Kafka)                | Producer and consumer shipped; parser planned |
 | Detection (rules + AI)                    | Planned     |
 | Accounts + roles (`app_user`, `user_role`) | Shipped     |
 | REST API surface                          | Planned     |
@@ -111,13 +111,20 @@ erDiagram
 
 ## Runtime flows
 
-**Ingestion (Producer shipped, consumer planned).** An accepted upload is stored, its
-metadata row is persisted, and `LogIngestProducer` publishes a JSON `LogIngestEvent` on the
-`logs.ingest` channel (SmallRye Reactive Messaging, `smallrye-kafka` connector, topic
-`logs.ingest`). The broker is Redpanda in the Compose stack; the test suite swaps the
-connector for `smallrye-in-memory`, so the emitter and the payload are exercised without a
-broker. Still to come: the consumer that reads the topic, drives the upload through
-`markProcessing` / `markIngested` / `markFailed`, and normalises into `log_event`.
+**Ingestion (Producer and consumer shipped, parser planned).** An accepted upload is
+stored, its metadata row is persisted, and `LogIngestProducer` publishes a JSON
+`LogIngestEvent` on the `logs.ingest` channel (SmallRye Reactive Messaging, `smallrye-kafka`
+connector, topic `logs.ingest`) once the enclosing transaction commits. `LogIngestConsumer`
+reads the same topic on the `logs.ingest-in` channel — a second channel name on one topic,
+because SmallRye would otherwise wire the outgoing channel straight into an incoming channel
+of the same name and skip the broker. The consumer runs `@Blocking`, moves the upload to
+`PROCESSING`, and hands the event to a `LogFileParser`. Every message is acknowledged: a
+batch that cannot be handled is recorded as `FAILED` with its reason on its own row, and a
+redelivered batch whose upload is already past `PENDING` is skipped rather than parsed twice.
+The broker is Redpanda in the Compose stack; the test suite swaps both connectors for
+`smallrye-in-memory`, so channels and payloads are exercised without a broker. Still to come:
+a `LogFileParser` that reads the stored file, normalises into `log_event` and calls
+`markIngested` — `PendingLogFileParser` currently leaves the batch in `PROCESSING`.
 Deduplication uses the upstream identifier. Ordering guarantees, partitioning key and
 retention are **TBD**.
 
