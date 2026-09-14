@@ -22,6 +22,7 @@
         <checkstyle.version>10.21.4</checkstyle.version>
         <jacoco-plugin.version>0.8.13</jacoco-plugin.version>
         <password4j.version>1.8.4</password4j.version>
+        <java-grok.version>0.1.9</java-grok.version>
     </properties>
 
     <dependencyManagement>
@@ -105,6 +106,15 @@
             <groupId>com.password4j</groupId>
             <artifactId>password4j</artifactId>
             <version>${password4j.version}</version>
+        </dependency>
+        <!-- Grok expressions for access-log parsing. The library bundles the Logstash pattern
+             set (IPORHOST, HTTPDATE, ...), so the access-log shape is written in the same
+             vocabulary operators already know from Logstash and Elastic ingest pipelines,
+             instead of one hand-rolled regular expression nobody can review. -->
+        <dependency>
+            <groupId>io.krakens</groupId>
+            <artifactId>java-grok</artifactId>
+            <version>${java-grok.version}</version>
         </dependency>
         <!-- Swaps the logs.ingest outgoing channel for an in-memory sink under %test, so the
              suite exercises the real Emitter and the real serialisation without a broker.
