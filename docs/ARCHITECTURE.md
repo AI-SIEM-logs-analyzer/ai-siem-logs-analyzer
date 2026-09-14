@@ -123,9 +123,12 @@ batch that cannot be handled is recorded as `FAILED` with its reason on its own 
 redelivered batch whose upload is already past `PENDING` is skipped rather than parsed twice.
 The broker is Redpanda in the Compose stack; the test suite swaps both connectors for
 `smallrye-in-memory`, so channels and payloads are exercised without a broker. Line parsers
-live in `com.siem.analyzer.parse` and turn one line into a `NormalizedEvent`; the first is
-`AccessLogParser`, which reads Apache and Nginx Common and Combined Log Format with a
-java-grok expression (`LogFormat.ACCESS_LOG`). Still to come: format detection for access
+live in `com.siem.analyzer.parse` and turn one line into a `NormalizedEvent`.
+`AccessLogParser` reads Apache and Nginx Common and Combined Log Format with a java-grok
+expression (`LogFormat.ACCESS_LOG`). `SyslogParser` reads RFC 5424 and BSD / RFC 3164 syslog
+(`LogFormat.SYSLOG`): rsyslog files with or without a priority, the RFC 3339 high-precision
+file format, and Cisco IOS / ASA lines; a year-less BSD timestamp takes the current year, or
+last year when that would put it in the future. Still to come: format detection for access
 logs, and a `LogFileParser` that reads the stored file line by line through those parsers,
 normalises into `log_event` and calls `markIngested` — `PendingLogFileParser` currently
 leaves the batch in `PROCESSING`.
