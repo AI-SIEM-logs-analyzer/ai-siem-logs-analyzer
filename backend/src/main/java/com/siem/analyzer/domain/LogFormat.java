@@ -21,6 +21,12 @@ public enum LogFormat {
     /** Comma-separated records, every line holding the same number of fields. */
     CSV,
 
+    /**
+     * Apache or Nginx access log in Common or Combined Log Format. Nginx's default {@code combined}
+     * format is the Apache one, so both servers share this constant.
+     */
+    ACCESS_LOG,
+
     /** Free-form text. The fallback: readable lines that match no known structure. */
     PLAIN
 }

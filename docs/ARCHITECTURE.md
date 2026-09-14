@@ -13,7 +13,7 @@
 | Local dev stack (Postgres/Redis/Redpanda) | Shipped     |
 | Backend skeleton, health, OpenAPI         | Shipped     |
 | PostgreSQL schema + Panache repositories  | Shipped     |
-| Ingestion pipeline (Kafka)                | Producer and consumer shipped; parser planned |
+| Ingestion pipeline (Kafka)                | Producer, consumer and access-log parser shipped; file parsing planned |
 | Detection (rules + AI)                    | Planned     |
 | Accounts + roles (`app_user`, `user_role`) | Shipped     |
 | REST API surface                          | Planned     |
@@ -111,7 +111,7 @@ erDiagram
 
 ## Runtime flows
 
-**Ingestion (Producer and consumer shipped, parser planned).** An accepted upload is
+**Ingestion (Producer, consumer and access-log parser shipped; file parsing planned).** An accepted upload is
 stored, its metadata row is persisted, and `LogIngestProducer` publishes a JSON
 `LogIngestEvent` on the `logs.ingest` channel (SmallRye Reactive Messaging, `smallrye-kafka`
 connector, topic `logs.ingest`) once the enclosing transaction commits. `LogIngestConsumer`
@@ -122,9 +122,13 @@ of the same name and skip the broker. The consumer runs `@Blocking`, moves the u
 batch that cannot be handled is recorded as `FAILED` with its reason on its own row, and a
 redelivered batch whose upload is already past `PENDING` is skipped rather than parsed twice.
 The broker is Redpanda in the Compose stack; the test suite swaps both connectors for
-`smallrye-in-memory`, so channels and payloads are exercised without a broker. Still to come:
-a `LogFileParser` that reads the stored file, normalises into `log_event` and calls
-`markIngested` — `PendingLogFileParser` currently leaves the batch in `PROCESSING`.
+`smallrye-in-memory`, so channels and payloads are exercised without a broker. Line parsers
+live in `com.siem.analyzer.parse` and turn one line into a `NormalizedEvent`; the first is
+`AccessLogParser`, which reads Apache and Nginx Common and Combined Log Format with a
+java-grok expression (`LogFormat.ACCESS_LOG`). Still to come: format detection for access
+logs, and a `LogFileParser` that reads the stored file line by line through those parsers,
+normalises into `log_event` and calls `markIngested` — `PendingLogFileParser` currently
+leaves the batch in `PROCESSING`.
 Deduplication uses the upstream identifier. Ordering guarantees, partitioning key and
 retention are **TBD**.
 
