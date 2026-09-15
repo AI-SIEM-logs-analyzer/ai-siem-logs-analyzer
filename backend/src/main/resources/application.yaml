@@ -119,6 +119,28 @@ app:
     rate-limit:
       requests: 20
       window: PT1M
+  # Where JsonLogParser looks for each standard event field. Each list is tried in order and the
+  # first path with a usable value wins; a path matches nested objects (http.request.method) and
+  # flat dotted keys ("http.request.method") alike. The defaults live in JsonFieldMapping and are
+  # repeated here so the knobs are discoverable. Overriding a field replaces its whole list, e.g.
+  # APP_PARSE_JSON_FIELDS_SRC_IP=sourceIPAddress for CloudTrail.
+  parse:
+    json:
+      fields:
+        timestamp: "@timestamp,timestamp,time,ts,datetime,date,eventTime,time_local"
+        host: host.name,hostname,host
+        src-ip: source.ip,client.ip,src_ip,client_ip,clientip,remote_addr,sourceIPAddress,ip
+        src-port: source.port,client.port,src_port,remote_port
+        user: user.name,user_name,username,user,remote_user
+        method: http.request.method,request_method,method
+        path: url.original,url.path,request_uri,uri,path
+        protocol: server_protocol,protocol,http.version
+        status: http.response.status_code,status_code,status
+        bytes: http.response.body.bytes,body_bytes_sent,bytes_sent,bytes
+        referrer: http.request.referrer,http_referer,referrer,referer
+        user-agent: user_agent.original,http_user_agent,user_agent,userAgent
+        severity: log.level,level,severity,levelname,loglevel
+        message: message,msg,log
   security:
     # Argon2id cost, applied to every password this application hashes. The defaults live in
     # AppConfig; they are repeated here so the knobs are discoverable, and each one can be

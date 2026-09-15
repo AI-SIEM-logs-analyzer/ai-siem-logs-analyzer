@@ -1,5 +1,6 @@
 package com.siem.analyzer.config;
 
+import com.siem.analyzer.parse.JsonFieldMapping;
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 import jakarta.validation.Valid;
@@ -41,6 +42,78 @@ public interface AppConfig {
 
     @Valid
     Upload upload();
+
+    @Valid
+    Parse parse();
+
+    /** Settings for the line parsers in {@code com.siem.analyzer.parse}. */
+    interface Parse {
+
+        @Valid
+        Json json();
+
+        /** Settings for {@link com.siem.analyzer.parse.JsonLogParser}. */
+        interface Json {
+
+            @Valid
+            Fields fields();
+
+            /**
+             * Candidate JSON paths for each standard event field, tried in order; the first that
+             * holds a usable value wins. Paths are dot-separated and match nested objects and flat
+             * dotted keys alike, see {@link com.siem.analyzer.parse.JsonFieldMapping}.
+             *
+             * <p>Overriding a field replaces its whole list, it does not extend it: set {@code
+             * APP_PARSE_JSON_FIELDS_SRC_IP=actor.addr} and {@code source.ip} is no longer read. The
+             * defaults are the constants on {@code JsonFieldMapping}, so the parser's unit tests
+             * run against exactly what is deployed.
+             */
+            interface Fields {
+
+                @WithDefault(JsonFieldMapping.DEFAULT_TIMESTAMP)
+                List<String> timestamp();
+
+                @WithDefault(JsonFieldMapping.DEFAULT_HOST)
+                List<String> host();
+
+                @WithDefault(JsonFieldMapping.DEFAULT_SRC_IP)
+                List<String> srcIp();
+
+                @WithDefault(JsonFieldMapping.DEFAULT_SRC_PORT)
+                List<String> srcPort();
+
+                @WithDefault(JsonFieldMapping.DEFAULT_USER)
+                List<String> user();
+
+                @WithDefault(JsonFieldMapping.DEFAULT_METHOD)
+                List<String> method();
+
+                @WithDefault(JsonFieldMapping.DEFAULT_PATH)
+                List<String> path();
+
+                @WithDefault(JsonFieldMapping.DEFAULT_PROTOCOL)
+                List<String> protocol();
+
+                @WithDefault(JsonFieldMapping.DEFAULT_STATUS)
+                List<String> status();
+
+                @WithDefault(JsonFieldMapping.DEFAULT_BYTES)
+                List<String> bytes();
+
+                @WithDefault(JsonFieldMapping.DEFAULT_REFERRER)
+                List<String> referrer();
+
+                @WithDefault(JsonFieldMapping.DEFAULT_USER_AGENT)
+                List<String> userAgent();
+
+                @WithDefault(JsonFieldMapping.DEFAULT_SEVERITY)
+                List<String> severity();
+
+                @WithDefault(JsonFieldMapping.DEFAULT_MESSAGE)
+                List<String> message();
+            }
+        }
+    }
 
     /** Settings for log file upload storage. */
     interface Storage {

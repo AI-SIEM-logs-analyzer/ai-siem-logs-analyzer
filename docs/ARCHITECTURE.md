@@ -128,7 +128,13 @@ live in `com.siem.analyzer.parse` and turn one line into a `NormalizedEvent`.
 expression (`LogFormat.ACCESS_LOG`). `SyslogParser` reads RFC 5424 and BSD / RFC 3164 syslog
 (`LogFormat.SYSLOG`): rsyslog files with or without a priority, the RFC 3339 high-precision
 file format, and Cisco IOS / ASA lines; a year-less BSD timestamp takes the current year, or
-last year when that would put it in the future. Still to come: format detection for access
+last year when that would put it in the future. `JsonLogParser` reads one JSON object per line
+with Jackson (`LogFormat.JSON`). Which key feeds which field comes from `JsonFieldMapping`,
+configured under `app.parse.json.fields.*`: each field has an ordered list of dot-separated
+paths that match nested objects and flat dotted keys alike, with defaults for ECS, nginx
+`escape=json`, pino/bunyan, Python JSON loggers and Docker `json-file`. Unmapped keys are kept,
+nested, in the event's attributes. Lines with repeated keys, trailing content or more than 64
+levels of nesting are refused. Still to come: format detection for access
 logs, and a `LogFileParser` that reads the stored file line by line through those parsers,
 normalises into `log_event` and calls `markIngested` — `PendingLogFileParser` currently
 leaves the batch in `PROCESSING`.
