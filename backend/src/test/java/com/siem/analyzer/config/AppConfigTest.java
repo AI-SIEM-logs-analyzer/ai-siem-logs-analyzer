@@ -3,6 +3,7 @@ package com.siem.analyzer.config;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
+import com.siem.analyzer.parse.JsonFieldMapping;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -24,5 +25,14 @@ class AppConfigTest {
         // prod deliberately has no value in application.yaml and must get one from the
         // environment.
         assertFalse(appConfig.ai().apiKey().isBlank());
+    }
+
+    @Test
+    void jsonFieldMappingInApplicationYamlMatchesTheParserDefaults() {
+        // application.yaml repeats the defaults for discoverability. The parser's unit tests run
+        // against JsonFieldMapping.defaults(), so a drift here would deploy an untested mapping.
+        assertEquals(
+                JsonFieldMapping.defaults(),
+                JsonFieldMapping.from(appConfig.parse().json().fields()));
     }
 }
