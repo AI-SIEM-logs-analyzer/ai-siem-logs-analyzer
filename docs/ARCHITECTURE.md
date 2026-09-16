@@ -13,7 +13,7 @@
 | Local dev stack (Postgres/Redis/Redpanda) | Shipped     |
 | Backend skeleton, health, OpenAPI         | Shipped     |
 | PostgreSQL schema + Panache repositories  | Shipped     |
-| Ingestion pipeline (Kafka)                | Producer, consumer and access-log parser shipped; file parsing planned |
+| Ingestion pipeline (Kafka)                | Shipped     |
 | Detection (rules + AI)                    | Planned     |
 | Accounts + roles (`app_user`, `user_role`) | Shipped     |
 | REST API surface                          | Planned     |
@@ -137,10 +137,10 @@ configured under `app.parse.json.fields.*`: each field has an ordered list of do
 paths that match nested objects and flat dotted keys alike, with defaults for ECS, nginx
 `escape=json`, pino/bunyan, Python JSON loggers and Docker `json-file`. Unmapped keys are kept,
 nested, in the event's attributes. Lines with repeated keys, trailing content or more than 64
-levels of nesting are refused. Still to come: format detection for access
-logs, and a `LogFileParser` that reads the stored file line by line through those parsers,
-normalises into `log_event` and calls `markIngested` — `PendingLogFileParser` currently
-leaves the batch in `PROCESSING`.
+levels of nesting are refused. Format detection supports access logs (`ACCESS_LOG`),
+syslog, JSON, and fallback to plain text. `DefaultLogFileParser` reads the stored file line by line
+through those parsers, normalises into `log_event` batches, indexes them via
+`EventIndexer.indexAfterCommit` into OpenSearch, and calls `markIngested`.
 Deduplication uses the upstream identifier. Ordering guarantees, partitioning key and
 retention are **TBD**.
 

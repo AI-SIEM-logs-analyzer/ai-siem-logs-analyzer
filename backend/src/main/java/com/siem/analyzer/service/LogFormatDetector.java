@@ -2,6 +2,7 @@ package com.siem.analyzer.service;
 
 import com.siem.analyzer.config.AppConfig;
 import com.siem.analyzer.domain.LogFormat;
+import com.siem.analyzer.parse.AccessLogParser;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.io.IOException;
@@ -12,6 +13,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
@@ -36,14 +38,20 @@ public class LogFormatDetector {
             Pattern.compile("^[A-Z][a-z]{2} [ \\d]\\d \\d{2}:\\d{2}:\\d{2}\\b");
 
     private final int sniffBytes;
+    private final AccessLogParser accessLogParser;
 
     @Inject
-    public LogFormatDetector(AppConfig config) {
-        this(config.upload().sniffBytes());
+    public LogFormatDetector(AppConfig config, AccessLogParser accessLogParser) {
+        this(config.upload().sniffBytes(), accessLogParser);
     }
 
     public LogFormatDetector(int sniffBytes) {
+        this(sniffBytes, new AccessLogParser());
+    }
+
+    public LogFormatDetector(int sniffBytes, AccessLogParser accessLogParser) {
         this.sniffBytes = sniffBytes;
+        this.accessLogParser = Objects.requireNonNull(accessLogParser, "accessLogParser");
     }
 
     /**
@@ -71,6 +79,9 @@ public class LogFormatDetector {
         if (SYSLOG_PRIORITY.matcher(trimmed).find()
                 || SYSLOG_RFC3164_TIMESTAMP.matcher(trimmed).find()) {
             return LogFormat.SYSLOG;
+        }
+        if (accessLogParser.parse(trimmed).isPresent()) {
+            return LogFormat.ACCESS_LOG;
         }
         if (hasCsvExtension(fileName) && hasConstantCommaCount(lines)) {
             return LogFormat.CSV;
