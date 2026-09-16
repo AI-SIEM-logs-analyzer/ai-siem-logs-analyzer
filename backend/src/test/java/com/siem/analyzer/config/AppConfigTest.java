@@ -2,10 +2,12 @@ package com.siem.analyzer.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.siem.analyzer.parse.JsonFieldMapping;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
 /** Verifies that the {@code app} configuration tree resolves under the {@code test} profile. */
@@ -34,5 +36,18 @@ class AppConfigTest {
         assertEquals(
                 JsonFieldMapping.defaults(),
                 JsonFieldMapping.from(appConfig.parse().json().fields()));
+    }
+
+    @Test
+    void searchDefaultsAreTheDocumentedOnes() {
+        AppConfig.Search search = appConfig.search();
+
+        assertEquals("log-events-v1", search.indexName());
+        assertEquals("log-events", search.alias());
+        assertEquals(500, search.bulkSize());
+        assertEquals(Duration.ofSeconds(10), search.queryTimeout());
+        assertTrue(search.backfill().enabled());
+        assertEquals(Duration.ofSeconds(30), search.backfill().interval());
+        assertEquals(1000, search.backfill().batchSize());
     }
 }

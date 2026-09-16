@@ -28,6 +28,7 @@ com.siem.analyzer
 ├── service   business logic
 ├── domain    JPA entities and domain enums
 ├── repo      Panache repositories (all queries live here)
+├── search    the derived OpenSearch index — projection, queries and backfill
 ├── config    typed configuration mappings
 └── health    custom health checks
 ```

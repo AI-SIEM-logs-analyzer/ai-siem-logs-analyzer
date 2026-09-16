@@ -19,7 +19,7 @@
 | REST API surface                          | Planned     |
 | Frontend application                      | Planned     |
 | AuthN/AuthZ (JWT + RBAC)                  | Shipped     |
-| Log search backend (OpenSearch?)          | TBD         |
+| Log search backend (OpenSearch)           | Shipped     |
 
 ## Context
 
@@ -56,7 +56,7 @@ flowchart TB
         pg[(PostgreSQL<br/>events · rules · alerts)]
         redis[(Redis<br/>cache · rate limiting)]
         kafka[[Kafka / Redpanda<br/>ingestion topics]]
-        search[(Search backend<br/>TBD)]
+        search[(OpenSearch<br/>derived event index)]
     end
 
     llm[LLM provider<br/>via LangChain4j]
@@ -81,11 +81,13 @@ Mirrors `com.siem.analyzer` — see [backend/README.md](../backend/README.md#pac
 | `service` | Business logic; the only layer that orchestrates             |
 | `domain`  | JPA entities and domain enums                                |
 | `repo`    | Panache repositories — every query lives here                |
+| `search`  | The derived OpenSearch index — projection, queries and backfill |
 | `config`  | Typed `@ConfigMapping` configuration                         |
 | `health`  | Custom health checks                                         |
 
-The dependency direction is one-way: `rest → service → repo → domain`. A resource never
-touches a repository, and a repository never returns a DTO.
+The dependency direction is one-way: `rest → service → repo → domain`, and `rest → service →
+search` alongside it. A resource never touches a repository, and a repository never returns a
+DTO. The `search` package never calls back into `rest` or `service`.
 
 ## Data model
 
@@ -104,6 +106,7 @@ erDiagram
 |--------------|--------------------------------------------------------------------------|
 | `log_source` | Registered sources (name, type, configuration)                            |
 | `log_event`  | Normalised events; carries the upstream identifier used to drop replays   |
+| `log_event_index_state` | Which events have reached the search index; absence of a row is the backlog |
 | `alert_rule` | Detection rules                                                           |
 | `alert`      | Raised alerts; the rule is nullable — a model-raised alert has none       |
 | `app_user`   | Accounts; stores an Argon2id hash, never a password                       |
@@ -140,6 +143,25 @@ normalises into `log_event` and calls `markIngested` — `PendingLogFileParser` 
 leaves the batch in `PROCESSING`.
 Deduplication uses the upstream identifier. Ordering guarantees, partitioning key and
 retention are **TBD**.
+
+**Search (Shipped).** `log_event` is projected into an OpenSearch index addressed through the
+`log-events` alias, described in [ADR 0001](adr/0001-log-search-backend.md). The index is
+derived and never authoritative: PostgreSQL keeps `raw` and `payload`, and the index can be
+rebuilt from them at any time. `SearchIndexInitializer` creates the index and alias at start-up
+from `opensearch/log-events-mapping.json`, whose mapping is `dynamic: strict` — `message` is
+`text` with a `keyword` subfield, `raw` is `wildcard` for substring matching, `src_ip` is `ip`
+with `ignore_malformed`, and anything a parser could not place goes to `attributes` as a
+`flat_object`, which is searchable but not efficiently aggregatable. A field the UI facets on
+must therefore be mapped explicitly. `EventIndexer` writes documents under the event's own
+identifier, so a redelivered batch overwrites rather than duplicating, and records the write in
+`log_event_index_state`. What guarantees an event becomes searchable is `SearchBackfillJob`,
+which drains the anti-join on a schedule; `indexAfterCommit` only shortens the wait and, like
+`LogIngestProducer`, fires after the transaction commits. An engine that is down degrades
+search and never blocks ingestion: the write is skipped, the event stays in the backlog, and
+readiness is unaffected — `quarkus.elasticsearch.health.enabled` is `false` and
+`SearchIndexHealthCheck` reports the engine's state as data instead. `GET /api/events/search`
+is open to every signed-in role and answers 503, not an empty page, when the index cannot be
+reached.
 
 **Detection (Planned).** Rule evaluation over incoming events, plus AI-assisted detection
 through LangChain4j and anomaly scoring with Smile. Whether detection runs inline with
@@ -192,8 +214,7 @@ an entry here once decided; substantial ones graduate to an ADR under `docs/adr/
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| —    | _No entries yet._ | |
+| 2026-09-15 | Log search runs on OpenSearch as a derived index; PostgreSQL stays the system of record — [ADR 0001](adr/0001-log-search-backend.md) | Aggregations and facets for the analyst dashboard are what PostgreSQL alone answers expensively; keeping the index derived means a failed index is a stale read, never lost data |
 
-Open questions carried by this document: the search backend (OpenSearch vs. PostgreSQL
-full-text), detection placement, ordering and retention on the ingestion topics, tenancy
-model, and the error contract.
+Open questions carried by this document: detection placement, ordering and retention on the
+ingestion topics, tenancy model, and the error contract.

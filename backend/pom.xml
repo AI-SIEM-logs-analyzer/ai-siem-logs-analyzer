@@ -98,6 +98,20 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-messaging-kafka</artifactId>
         </dependency>
+        <!-- The low-level Elasticsearch REST client, which is what talks to OpenSearch. The
+             typed quarkus-elasticsearch-java-client performs a product check and refuses any
+             server that does not identify itself as Elasticsearch, so it is not an option
+             here. See docs/adr/0001-log-search-backend.md. -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-elasticsearch-rest-client</artifactId>
+        </dependency>
+        <!-- Drives the search backfill job. The index is derived, so the guarantee that an
+             event reaches it is this schedule, not the ingestion path. -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-scheduler</artifactId>
+        </dependency>
         <!-- Password hashing. Argon2id is not in the JDK and Quarkus ships no hashing
              extension of its own, so this is a direct dependency rather than a platform one;
              it is pure Java, with no native or Bouncy Castle component to carry into the

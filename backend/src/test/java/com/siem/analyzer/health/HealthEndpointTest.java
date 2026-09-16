@@ -3,6 +3,7 @@ package com.siem.analyzer.health;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 
 import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.Test;
@@ -30,5 +31,17 @@ class HealthEndpointTest {
                 .body("checks.name", hasItem("app-readiness"))
                 .body("checks.find { it.name == 'app-readiness' }.status", is("UP"))
                 .body("checks.find { it.name == 'app-readiness' }.data.environment", is("test"));
+    }
+
+    @Test
+    void readinessReportsTheSearchIndexWithoutGatingOnIt() {
+        given().when()
+                .get("/q/health/ready")
+                .then()
+                .statusCode(200)
+                .body("status", is("UP"))
+                .body("checks.find { it.name == 'search-index' }.status", is("UP"))
+                .body("checks.find { it.name == 'search-index' }.data.engine", notNullValue())
+                .body("checks.find { it.name == 'search-index' }.data.backlog", notNullValue());
     }
 }

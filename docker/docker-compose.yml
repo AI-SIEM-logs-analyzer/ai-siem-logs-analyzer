@@ -78,6 +78,41 @@ services:
       retries: 10
       start_period: 15s
 
+  opensearch:
+    image: opensearchproject/opensearch:${OPENSEARCH_VERSION:-3.6.0}
+    container_name: siem-opensearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      # Single node, so no replica can ever be allocated and the cluster would otherwise sit
+      # at yellow forever. The index itself is created with zero replicas to match.
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+      # Development only. Without it the image demands a strong admin password, enables TLS
+      # with a demo certificate and refuses plain HTTP. A deployment runs the security plugin
+      # and gives the backend QUARKUS_ELASTICSEARCH_PROTOCOL=https plus credentials — see
+      # docs/adr/0001-log-search-backend.md.
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      # Bound to the loopback interface on purpose: with the security plugin off, anything
+      # that can reach this port can read and delete every index.
+      - "127.0.0.1:${OPENSEARCH_PORT:-9200}:9200"
+    volumes:
+      - opensearchdata:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
   # Optional web UI for topics/consumer groups. Not started by default:
   #   docker compose --profile tools up -d
   console:
@@ -148,3 +183,4 @@ volumes:
   pgdata:
   redisdata:
   redpandadata:
+  opensearchdata:
