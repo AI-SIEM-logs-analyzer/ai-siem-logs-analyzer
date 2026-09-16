@@ -62,6 +62,14 @@ quarkus:
     jaxrs:
       deny-unannotated-endpoints: true
 
+  # --- Search engine ---
+  # The index is derived and rebuildable, so an engine that is down degrades search and must
+  # not fail readiness and pull the whole application out of rotation. SearchIndexHealthCheck
+  # reports the engine's state as data instead.
+  elasticsearch:
+    health:
+      enabled: false
+
 mp:
   openapi:
     extensions:
@@ -141,6 +149,18 @@ app:
         user-agent: user_agent.original,http_user_agent,user_agent,userAgent
         severity: log.level,level,severity,levelname,loglevel
         message: message,msg,log
+  # The derived OpenSearch index. Defaults live in AppConfig.Search and are repeated here so
+  # the knobs are discoverable and overridable per environment (APP_SEARCH_ALIAS, and so on).
+  # See docs/adr/0001-log-search-backend.md for why the index is derived rather than primary.
+  search:
+    index-name: log-events-v1
+    alias: log-events
+    bulk-size: 500
+    query-timeout: PT10S
+    backfill:
+      enabled: true
+      interval: PT30S
+      batch-size: 1000
   security:
     # Argon2id cost, applied to every password this application hashes. The defaults live in
     # AppConfig; they are repeated here so the knobs are discoverable, and each one can be
@@ -191,6 +211,8 @@ app:
     redis:
       hosts: redis://localhost:6379
       password: ${REDIS_PASSWORD:siem_local_dev}
+    elasticsearch:
+      hosts: localhost:9200
   # Committed throwaway pair; see backend/dev-keys/README.md. Referenced by file path rather
   # than from the classpath so that it stays out of the jar and the container image.
   mp:
@@ -244,6 +266,14 @@ app:
     kafka:
       devservices:
         enabled: false
+    # No hosts on purpose: Dev Services starts a throwaway OpenSearch through Testcontainers,
+    # the same arrangement the datasource and Redis use. The distribution has to be stated —
+    # Dev Services defaults to Elasticsearch, whose image would answer the product check this
+    # client does not make but whose behaviour is not what production runs.
+    elasticsearch:
+      devservices:
+        distribution: opensearch
+        image-name: docker.io/opensearchproject/opensearch:3.6.0
   mp:
     jwt:
       verify:

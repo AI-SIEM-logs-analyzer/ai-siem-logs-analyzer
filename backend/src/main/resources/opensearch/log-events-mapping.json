@@ -1,0 +1,44 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "refresh_interval": "1s"
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "event_id": { "type": "long" },
+      "source_id": { "type": "long" },
+      "external_id": { "type": "keyword" },
+      "occurred_at": { "type": "date" },
+      "ingested_at": { "type": "date" },
+      "severity": { "type": "keyword" },
+      "format": { "type": "keyword" },
+      "host": { "type": "keyword" },
+      "src_ip": { "type": "ip", "ignore_malformed": true },
+      "src_port": { "type": "integer" },
+      "user": { "type": "keyword" },
+      "method": { "type": "keyword" },
+      "path": {
+        "type": "keyword",
+        "fields": { "text": { "type": "text" } }
+      },
+      "protocol": { "type": "keyword" },
+      "status": { "type": "short" },
+      "bytes": { "type": "long" },
+      "referrer": { "type": "keyword" },
+      "user_agent": {
+        "type": "keyword",
+        "fields": { "text": { "type": "text" } }
+      },
+      "message": {
+        "type": "text",
+        "fields": { "keyword": { "type": "keyword", "ignore_above": 1024 } }
+      },
+      "raw": { "type": "wildcard" },
+      "attributes": { "type": "flat_object" }
+    }
+  }
+}

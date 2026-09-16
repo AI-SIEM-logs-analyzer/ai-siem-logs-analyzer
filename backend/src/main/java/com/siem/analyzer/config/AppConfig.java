@@ -46,6 +46,9 @@ public interface AppConfig {
     @Valid
     Parse parse();
 
+    @Valid
+    Search search();
+
     /** Settings for the line parsers in {@code com.siem.analyzer.parse}. */
     interface Parse {
 
@@ -112,6 +115,57 @@ public interface AppConfig {
                 @WithDefault(JsonFieldMapping.DEFAULT_MESSAGE)
                 List<String> message();
             }
+        }
+    }
+
+    /** Settings for the derived OpenSearch index in {@code com.siem.analyzer.search}. */
+    interface Search {
+
+        /**
+         * The concrete index documents are written to.
+         *
+         * <p>Versioned on purpose. A mapping change builds the next index and repoints {@link
+         * #alias()} at it, so a rebuild needs neither downtime nor a coordinated deploy.
+         */
+        @WithDefault("log-events-v1")
+        @NotBlank
+        String indexName();
+
+        /** The name every query and every write uses. Points at {@link #indexName()}. */
+        @WithDefault("log-events")
+        @NotBlank
+        String alias();
+
+        /** Documents per `_bulk` request. */
+        @WithDefault("500")
+        @Min(1)
+        int bulkSize();
+
+        /** How long a search may take before the engine is told to give up. */
+        @WithDefault("PT10S")
+        Duration queryTimeout();
+
+        @Valid
+        Backfill backfill();
+
+        /**
+         * The scheduled drain of events PostgreSQL holds and the index does not.
+         *
+         * <p>This is the path that guarantees an event is eventually searchable. The after-commit
+         * hook in {@code EventIndexer} only makes it faster.
+         */
+        interface Backfill {
+
+            @WithDefault("true")
+            boolean enabled();
+
+            @WithDefault("PT30S")
+            Duration interval();
+
+            /** Events read from PostgreSQL per run. */
+            @WithDefault("1000")
+            @Min(1)
+            int batchSize();
         }
     }
 
