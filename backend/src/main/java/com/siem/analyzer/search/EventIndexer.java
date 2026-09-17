@@ -2,6 +2,7 @@ package com.siem.analyzer.search;
 
 import com.siem.analyzer.domain.LogEvent;
 import com.siem.analyzer.repo.LogEventIndexStateRepository;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -133,15 +134,19 @@ public class EventIndexer {
      * <p>Called after the caller's transaction has completed, so its persistence context is gone
      * and the entities it held cannot be read from here.
      */
-    @Transactional(Transactional.TxType.REQUIRES_NEW)
     void indexByIds(List<Long> ids) {
         try {
-            indexNow(
-                    entityManager
-                            .createQuery(
-                                    "select e from LogEvent e where e.id in :ids", LogEvent.class)
-                            .setParameter("ids", ids)
-                            .getResultList());
+            QuarkusTransaction.requiringNew()
+                    .run(
+                            () ->
+                                    indexNow(
+                                            entityManager
+                                                    .createQuery(
+                                                            "select e from LogEvent e where e.id"
+                                                                    + " in :ids",
+                                                            LogEvent.class)
+                                                    .setParameter("ids", ids)
+                                                    .getResultList()));
         } catch (RuntimeException e) {
             LOG.warnf(
                     e,

@@ -2,6 +2,7 @@ package com.siem.analyzer.search;
 
 import io.quarkus.test.Mock;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -20,6 +21,9 @@ public class RecordingEventSearch implements EventSearch {
 
     private final List<IndexableEvent> indexed = Collections.synchronizedList(new ArrayList<>());
     private volatile boolean failing;
+    private volatile boolean delegateToReal;
+
+    @Inject OpenSearchEventSearch realSearch;
 
     @Override
     public void index(List<IndexableEvent> events) {
@@ -27,6 +31,9 @@ public class RecordingEventSearch implements EventSearch {
             throw new SearchUnavailableException("Refusing on purpose");
         }
         indexed.addAll(events);
+        if (delegateToReal) {
+            realSearch.index(events);
+        }
     }
 
     @Override
@@ -34,11 +41,17 @@ public class RecordingEventSearch implements EventSearch {
         if (failing) {
             throw new SearchUnavailableException("Refusing on purpose");
         }
+        if (delegateToReal) {
+            return realSearch.search(query);
+        }
         return SearchPage.empty();
     }
 
     @Override
     public boolean available() {
+        if (delegateToReal) {
+            return realSearch.available();
+        }
         return !failing;
     }
 
@@ -50,8 +63,13 @@ public class RecordingEventSearch implements EventSearch {
         this.failing = value;
     }
 
+    public void setDelegateToReal(boolean delegateToReal) {
+        this.delegateToReal = delegateToReal;
+    }
+
     public void reset() {
         indexed.clear();
         failing = false;
+        delegateToReal = false;
     }
 }

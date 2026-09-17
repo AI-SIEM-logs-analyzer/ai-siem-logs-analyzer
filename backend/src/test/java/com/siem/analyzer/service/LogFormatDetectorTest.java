@@ -91,6 +91,17 @@ class LogFormatDetectorTest {
     }
 
     @Test
+    void detectsAccessLogFromCombinedLine() throws IOException {
+        Path file =
+                write(
+                        "access.log",
+                        "127.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] \"GET /apache_pb.gif"
+                                + " HTTP/1.0\" 200 2326\n");
+
+        assertEquals(LogFormat.ACCESS_LOG, detector.detect(file, "access.log"));
+    }
+
+    @Test
     void returnsPlainWhenEveryLineIsBlank() throws IOException {
         Path file = write("empty.log", "\n\n   \n");
 
