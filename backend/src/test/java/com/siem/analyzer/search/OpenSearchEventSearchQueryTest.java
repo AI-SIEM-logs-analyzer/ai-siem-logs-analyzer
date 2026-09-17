@@ -141,6 +141,98 @@ class OpenSearchEventSearchQueryTest {
     }
 
     @Test
+    void filtersByAnExactSourceAddress() {
+        SearchPage page =
+                search.search(
+                        EventQuery.builder().srcIps(Set.of(IpFilter.parse("203.0.113.9"))).build());
+
+        assertEquals(List.of(2L), page.hits().stream().map(EventHit::eventId).toList());
+    }
+
+    @Test
+    void filtersBySourceAddressRange() {
+        SearchPage page =
+                search.search(
+                        EventQuery.builder()
+                                .srcIps(Set.of(IpFilter.parse("203.0.113.0/24")))
+                                .build());
+
+        assertEquals(List.of(2L, 1L), page.hits().stream().map(EventHit::eventId).toList());
+    }
+
+    @Test
+    void matchesAnyOfSeveralSourceAddresses() {
+        SearchPage page =
+                search.search(
+                        EventQuery.builder()
+                                .srcIps(
+                                        Set.of(
+                                                IpFilter.parse("203.0.113.7"),
+                                                IpFilter.parse("198.51.100.0/24")))
+                                .build());
+
+        assertEquals(List.of(1L), page.hits().stream().map(EventHit::eventId).toList());
+    }
+
+    @Test
+    void filtersByAnExactStatus() {
+        SearchPage page =
+                search.search(
+                        EventQuery.builder().statuses(Set.of(StatusFilter.parse("401"))).build());
+
+        assertEquals(List.of(1L), page.hits().stream().map(EventHit::eventId).toList());
+    }
+
+    @Test
+    void filtersByStatusClassAndLeavesOutEventsWithoutAStatus() {
+        SearchPage page =
+                search.search(
+                        EventQuery.builder()
+                                .statuses(
+                                        Set.of(
+                                                StatusFilter.parse("2xx"),
+                                                StatusFilter.parse("4xx")))
+                                .build());
+
+        assertEquals(List.of(2L, 1L), page.hits().stream().map(EventHit::eventId).toList());
+    }
+
+    @Test
+    void combinesStatusWithTheOtherFilters() {
+        SearchPage page =
+                search.search(
+                        EventQuery.builder()
+                                .statuses(Set.of(StatusFilter.parse("4xx")))
+                                .severities(Set.of(Severity.INFO))
+                                .build());
+
+        assertTrue(page.hits().isEmpty());
+    }
+
+    @Test
+    void returnsOldestFirstWhenAsked() {
+        SearchPage page = search.search(EventQuery.builder().order(SortOrder.ASC).build());
+
+        assertEquals(List.of(1L, 2L, 3L), page.hits().stream().map(EventHit::eventId).toList());
+    }
+
+    @Test
+    void pagesOldestFirstWithoutRepeatingOrSkippingAHit() {
+        SearchPage first = search.search(EventQuery.builder().order(SortOrder.ASC).size(2).build());
+        SearchPage second =
+                search.search(
+                        EventQuery.builder()
+                                .order(SortOrder.ASC)
+                                .size(2)
+                                .cursor(first.nextCursor())
+                                .build());
+
+        assertEquals(List.of(1L, 2L), first.hits().stream().map(EventHit::eventId).toList());
+        assertEquals(List.of(3L), second.hits().stream().map(EventHit::eventId).toList());
+        assertNull(second.nextCursor());
+    }
+
+    @Test
     void countsFacetsAcrossTheWholeMatchNotThePage() {
         SearchPage page = search.search(EventQuery.builder().size(1).withFacets(true).build());
 

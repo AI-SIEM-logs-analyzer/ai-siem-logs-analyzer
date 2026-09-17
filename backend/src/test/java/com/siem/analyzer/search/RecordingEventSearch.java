@@ -22,6 +22,7 @@ public class RecordingEventSearch implements EventSearch {
     private final List<IndexableEvent> indexed = Collections.synchronizedList(new ArrayList<>());
     private volatile boolean failing;
     private volatile boolean delegateToReal;
+    private volatile EventQuery lastQuery;
 
     @Inject OpenSearchEventSearch realSearch;
 
@@ -38,6 +39,7 @@ public class RecordingEventSearch implements EventSearch {
 
     @Override
     public SearchPage search(EventQuery query) {
+        lastQuery = query;
         if (failing) {
             throw new SearchUnavailableException("Refusing on purpose");
         }
@@ -59,6 +61,11 @@ public class RecordingEventSearch implements EventSearch {
         return List.copyOf(indexed);
     }
 
+    /** The query the last search received, so a REST test can check what reached the seam. */
+    public EventQuery lastQuery() {
+        return lastQuery;
+    }
+
     public void failNextWrites(boolean value) {
         this.failing = value;
     }
@@ -71,5 +78,6 @@ public class RecordingEventSearch implements EventSearch {
         indexed.clear();
         failing = false;
         delegateToReal = false;
+        lastQuery = null;
     }
 }
