@@ -14,3 +14,11 @@ dist/
 coverage/
 *.log
 *.tsbuildinfo
+graphify-out
+/.opencode/AGENTS.md
+/AGENTS.md
+/.clinerules/caveman.md
+/.windsurf/rules/caveman.md
+/.cursor/rules/caveman.mdc
+/.github/copilot-instructions.md
+/CLAUDE.md
