@@ -12,16 +12,19 @@ import java.util.Set;
  * <p>Validated on construction rather than at the engine: every bound here is a limit on what one
  * caller can make the cluster do, and a limit enforced after the request has been built is a limit
  * that was not enforced. Built through {@link #builder()} because most of the fields are optional
- * and a constructor of nine arguments reads as nothing at the call site.
+ * and a constructor of twelve arguments reads as nothing at the call site.
  *
  * @param from earliest event time, inclusive; {@code null} for unbounded
  * @param to latest event time, exclusive; {@code null} for unbounded
  * @param sourceIds restrict to these sources; empty for all
  * @param severities restrict to these severities; empty for all
+ * @param srcIps restrict to source addresses matching any of these; empty for all
+ * @param statuses restrict to HTTP statuses within any of these ranges; empty for all
  * @param fullText ranked full-text over the message; {@code null} for none
  * @param substring literal substring of the raw line; {@code null} for none
  * @param size hits per page
- * @param cursor where to resume; {@code null} for the first page
+ * @param order direction of the event-time sort
+ * @param cursor where to resume; {@code null} for the first page; only valid with the same order
  * @param withFacets whether to compute aggregations, which cost a second pass
  */
 public record EventQuery(
@@ -29,9 +32,12 @@ public record EventQuery(
         Instant to,
         Set<Long> sourceIds,
         Set<Severity> severities,
+        Set<IpFilter> srcIps,
+        Set<StatusFilter> statuses,
         String fullText,
         String substring,
         int size,
+        SortOrder order,
         SearchCursor cursor,
         boolean withFacets) {
 
@@ -51,6 +57,14 @@ public record EventQuery(
      */
     public static final int MAX_SUBSTRING_LENGTH = 256;
 
+    /**
+     * The most values a caller may give one address or status filter.
+     *
+     * <p>Each value is a clause the engine evaluates per document, so the count is a cost bound
+     * like the page size.
+     */
+    public static final int MAX_FILTER_VALUES = 50;
+
     public EventQuery {
         if (size < 1 || size > MAX_SIZE) {
             throw new IllegalArgumentException("size must be between 1 and " + MAX_SIZE);
@@ -66,6 +80,19 @@ public record EventQuery(
         }
         sourceIds = unmodifiable(sourceIds);
         severities = unmodifiable(severities);
+        srcIps = unmodifiable(srcIps);
+        statuses = unmodifiable(statuses);
+        if (srcIps.size() > MAX_FILTER_VALUES) {
+            throw new IllegalArgumentException(
+                    "at most " + MAX_FILTER_VALUES + " srcIp values are allowed");
+        }
+        if (statuses.size() > MAX_FILTER_VALUES) {
+            throw new IllegalArgumentException(
+                    "at most " + MAX_FILTER_VALUES + " status values are allowed");
+        }
+        if (order == null) {
+            order = SortOrder.DESC;
+        }
     }
 
     public static Builder builder() {
@@ -91,9 +118,12 @@ public record EventQuery(
         private Instant to;
         private Set<Long> sourceIds = Set.of();
         private Set<Severity> severities = Set.of();
+        private Set<IpFilter> srcIps = Set.of();
+        private Set<StatusFilter> statuses = Set.of();
         private String fullText;
         private String substring;
         private int size = DEFAULT_SIZE;
+        private SortOrder order = SortOrder.DESC;
         private SearchCursor cursor;
         private boolean withFacets;
 
@@ -117,6 +147,16 @@ public record EventQuery(
             return this;
         }
 
+        public Builder srcIps(Set<IpFilter> value) {
+            this.srcIps = value;
+            return this;
+        }
+
+        public Builder statuses(Set<StatusFilter> value) {
+            this.statuses = value;
+            return this;
+        }
+
         public Builder fullText(String value) {
             this.fullText = value;
             return this;
@@ -132,6 +172,11 @@ public record EventQuery(
             return this;
         }
 
+        public Builder order(SortOrder value) {
+            this.order = value;
+            return this;
+        }
+
         public Builder cursor(SearchCursor value) {
             this.cursor = value;
             return this;
@@ -144,7 +189,18 @@ public record EventQuery(
 
         public EventQuery build() {
             return new EventQuery(
-                    from, to, sourceIds, severities, fullText, substring, size, cursor, withFacets);
+                    from,
+                    to,
+                    sourceIds,
+                    severities,
+                    srcIps,
+                    statuses,
+                    fullText,
+                    substring,
+                    size,
+                    order,
+                    cursor,
+                    withFacets);
         }
     }
 }

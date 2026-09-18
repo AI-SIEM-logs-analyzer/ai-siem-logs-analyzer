@@ -161,7 +161,9 @@ search and never blocks ingestion: the write is skipped, the event stays in the 
 readiness is unaffected — `quarkus.elasticsearch.health.enabled` is `false` and
 `SearchIndexHealthCheck` reports the engine's state as data instead. `GET /api/events/search`
 is open to every signed-in role and answers 503, not an empty page, when the index cannot be
-reached.
+reached. It filters by time, source, severity, source IP (address or CIDR) and HTTP status
+(code or class such as `5xx`). It sorts by event time in either direction and pages by
+`search_after` cursor, never by offset. Its contract is documented in `/q/openapi`.
 
 **Detection (Planned).** Rule evaluation over incoming events, plus AI-assisted detection
 through LangChain4j and anomaly scoring with Smile. Whether detection runs inline with

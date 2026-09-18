@@ -64,7 +64,7 @@ public class OpenSearchEventSearch implements EventSearch {
         body.put("track_total_hits", true);
         body.put("timeout", appConfig.search().queryTimeout().toSeconds() + "s");
         body.set("query", queryClause(query));
-        body.set("sort", sortClause());
+        body.set("sort", sortClause(query.order()));
         if (query.cursor() != null) {
             ArrayNode after = body.putArray("search_after");
             after.add(query.cursor().occurredAt().toEpochMilli());
@@ -140,6 +140,29 @@ public class OpenSearchEventSearch implements EventSearch {
             query.severities().forEach(severity -> values.add(severity.name()));
             filters.add(terms);
         }
+        if (!query.srcIps().isEmpty()) {
+            // `terms` on an `ip` field takes addresses and CIDR ranges alike.
+            ObjectNode terms = objectMapper.createObjectNode();
+            ArrayNode values = terms.putObject("terms").putArray("src_ip");
+            query.srcIps().forEach(ip -> values.add(ip.value()));
+            filters.add(terms);
+        }
+        if (!query.statuses().isEmpty()) {
+            // Any of the ranges. An event without a status matches none of them, so a status
+            // filter narrows the result to HTTP events.
+            ObjectNode anyStatus = objectMapper.createObjectNode();
+            ObjectNode inner = anyStatus.putObject("bool");
+            ArrayNode should = inner.putArray("should");
+            for (StatusFilter status : query.statuses()) {
+                ObjectNode range = should.addObject();
+                range.putObject("range")
+                        .putObject("status")
+                        .put("gte", status.from())
+                        .put("lte", status.to());
+            }
+            inner.put("minimum_should_match", 1);
+            filters.add(anyStatus);
+        }
         if (query.substring() != null) {
             // A literal substring, not a pattern: the caller's asterisks and question marks
             // are escaped so a search box cannot turn into a scan of the whole index.
@@ -168,11 +191,16 @@ public class OpenSearchEventSearch implements EventSearch {
         return literal.replace("\\", "\\\\").replace("*", "\\*").replace("?", "\\?");
     }
 
-    /** Newest first, with the identifier breaking ties so the sort key is unique. */
-    private ArrayNode sortClause() {
+    /**
+     * By event time, with the identifier breaking ties so the sort key is unique.
+     *
+     * <p>Both keys share one direction: {@code search_after} compares the cursor against them in
+     * order, so a mixed direction would page through a different sequence than the one sorted.
+     */
+    private ArrayNode sortClause(SortOrder order) {
         ArrayNode sort = objectMapper.createArrayNode();
-        sort.addObject().putObject("occurred_at").put("order", "desc");
-        sort.addObject().putObject("event_id").put("order", "desc");
+        sort.addObject().putObject("occurred_at").put("order", order.engineValue());
+        sort.addObject().putObject("event_id").put("order", order.engineValue());
         return sort;
     }
 
