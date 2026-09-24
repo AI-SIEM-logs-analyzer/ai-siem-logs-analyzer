@@ -251,6 +251,11 @@ app:
     # enricher itself is exercised with its own fixture databases, not through this profile.
     geoip:
       enabled: false
+    # Building the Yauaa rule engine takes seconds and over a hundred megabytes, which every
+    # @QuarkusTest boot would pay for. Parser tests substitute a stub instead, and the real
+    # classifier is exercised by its own unit test, which builds it once.
+    user-agent:
+      enabled: false
   quarkus:
     # Deliberately no JDBC URL: with none configured, Dev Services starts a throwaway
     # PostgreSQL container through Testcontainers, lets Flyway migrate it, and tears it down

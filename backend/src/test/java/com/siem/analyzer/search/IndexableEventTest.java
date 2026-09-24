@@ -142,6 +142,39 @@ class IndexableEventTest {
         assertNull(event.geoLongitude());
     }
 
+    @Test
+    void userAgentFieldsAreLiftedOutOfThePayload() {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("uaBrowser", "Chrome");
+        payload.put("uaBrowserVersion", "120.0.0.0");
+        payload.put("uaOs", "Windows NT");
+        payload.put("uaOsVersion", ">=10");
+        payload.put("uaDeviceClass", "Desktop");
+        payload.put("uaAgentClass", "Robot");
+        payload.put("uaBot", true);
+
+        IndexableEvent event = indexable(payload);
+
+        assertEquals("Chrome", event.uaBrowser());
+        assertEquals("120.0.0.0", event.uaBrowserVersion());
+        assertEquals("Windows NT", event.uaOs());
+        assertEquals(">=10", event.uaOsVersion());
+        assertEquals("Desktop", event.uaDeviceClass());
+        assertEquals("Robot", event.uaAgentClass());
+        assertEquals(Boolean.TRUE, event.uaBot());
+    }
+
+    @Test
+    void anAbsentBotFlagStaysNullRatherThanFalse() {
+        // Null means "not classified"; false would claim the agent was examined and found human.
+        assertNull(indexable(Map.of("uaBrowser", "Chrome")).uaBot());
+    }
+
+    @Test
+    void aBotFlagThatIsNotABooleanIsIgnored() {
+        assertNull(indexable(Map.of("uaBot", "true")).uaBot());
+    }
+
     private IndexableEvent indexable(Map<String, Object> payload) {
         return new IndexableEvent.Builder()
                 .eventId(7L)

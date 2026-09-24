@@ -296,6 +296,36 @@ class OpenSearchEventSearchQueryTest {
     }
 
     @Test
+    void surfacesUserAgentFieldsOnASearchHit() throws IOException {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("host", "web-03");
+        payload.put("uaBrowser", "Googlebot");
+        payload.put("uaDeviceClass", "Robot");
+        payload.put("uaBot", true);
+        search.index(
+                List.of(
+                        event(
+                                5L,
+                                1L,
+                                T0.plusSeconds(240),
+                                Severity.WARNING,
+                                "crawler event",
+                                "raw crawler",
+                                payload)));
+        restClient.performRequest(
+                new Request("POST", "/" + appConfig.search().alias() + "/_refresh"));
+
+        SearchPage page =
+                search.search(EventQuery.builder().severities(Set.of(Severity.WARNING)).build());
+
+        EventHit hit = page.hits().get(0);
+        assertEquals("Googlebot", hit.fields().get("uaBrowser"));
+        assertEquals("Robot", hit.fields().get("uaDeviceClass"));
+        // A boolean in the index comes back as a boolean, not as the string "true".
+        assertEquals(Boolean.TRUE, hit.fields().get("uaBot"));
+    }
+
+    @Test
     void answersAnImpossibleQueryWithAnEmptyPage() {
         SearchPage page = search.search(EventQuery.builder().substring("zzzz-not-here").build());
 

@@ -10,6 +10,7 @@ import com.siem.analyzer.domain.LogUpload;
 import com.siem.analyzer.domain.NormalizedEvent;
 import com.siem.analyzer.domain.Severity;
 import com.siem.analyzer.enrich.GeoIpEnricher;
+import com.siem.analyzer.enrich.UserAgentEnricher;
 import com.siem.analyzer.parse.AccessLogParser;
 import com.siem.analyzer.parse.JsonLogParser;
 import com.siem.analyzer.parse.SyslogParser;
@@ -56,6 +57,7 @@ public class DefaultLogFileParser implements LogFileParser {
     private final JsonLogParser jsonLogParser;
     private final AppConfig appConfig;
     private final GeoIpEnricher geoIpEnricher;
+    private final UserAgentEnricher userAgentEnricher;
 
     @Inject
     public DefaultLogFileParser(
@@ -69,7 +71,8 @@ public class DefaultLogFileParser implements LogFileParser {
             SyslogParser syslogParser,
             JsonLogParser jsonLogParser,
             AppConfig appConfig,
-            GeoIpEnricher geoIpEnricher) {
+            GeoIpEnricher geoIpEnricher,
+            UserAgentEnricher userAgentEnricher) {
         this.uploadService = uploadService;
         this.uploadRepository = uploadRepository;
         this.sourceRepository = sourceRepository;
@@ -81,6 +84,7 @@ public class DefaultLogFileParser implements LogFileParser {
         this.jsonLogParser = jsonLogParser;
         this.appConfig = appConfig;
         this.geoIpEnricher = geoIpEnricher;
+        this.userAgentEnricher = userAgentEnricher;
     }
 
     @Override
@@ -300,6 +304,7 @@ public class DefaultLogFileParser implements LogFileParser {
             }
         }
         applyGeo(payload, normalized.srcIp());
+        applyUserAgent(payload, normalized.userAgent());
         event.setPayload(payload.isEmpty() ? null : payload);
         return event;
     }
@@ -327,6 +332,29 @@ public class DefaultLogFileParser implements LogFileParser {
                                         "geoLocation",
                                         Map.of("lat", geo.latitude(), "lon", geo.longitude()));
                             }
+                        });
+    }
+
+    /**
+     * Adds the browser, operating system and bot classification of the event's User-Agent. Like
+     * {@link #applyGeo}, a value the header does not carry writes no key; {@code uaBot} is written
+     * whenever the header was classified at all, since {@code false} is a finding too.
+     */
+    private void applyUserAgent(Map<String, Object> payload, String userAgent) {
+        if (userAgent == null) {
+            return;
+        }
+        userAgentEnricher
+                .classify(userAgent)
+                .ifPresent(
+                        ua -> {
+                            putIfPresent(payload, "uaBrowser", ua.browser());
+                            putIfPresent(payload, "uaBrowserVersion", ua.browserVersion());
+                            putIfPresent(payload, "uaOs", ua.os());
+                            putIfPresent(payload, "uaOsVersion", ua.osVersion());
+                            putIfPresent(payload, "uaDeviceClass", ua.deviceClass());
+                            putIfPresent(payload, "uaAgentClass", ua.agentClass());
+                            payload.put("uaBot", ua.bot());
                         });
     }
 

@@ -23,6 +23,10 @@ import java.util.Map;
  * <p>The {@code geo*} fields are the GeoIP enrichment written for the event's source address.
  * {@code geoLocation} is only accepted, and split into {@code geoLatitude}/{@code geoLongitude},
  * when it is a map holding numeric {@code lat} and {@code lon}; anything else leaves both null.
+ *
+ * <p>The {@code ua*} fields are the User-Agent classification written for the event's {@code
+ * userAgent}. {@code uaBot} is only accepted as a real boolean: a string {@code "true"} is dropped
+ * like any other value of the wrong type.
  */
 public record IndexableEvent(
         long eventId,
@@ -52,6 +56,13 @@ public record IndexableEvent(
         Double geoLongitude,
         Long geoAsn,
         String geoAsOrg,
+        String uaBrowser,
+        String uaBrowserVersion,
+        String uaOs,
+        String uaOsVersion,
+        String uaDeviceClass,
+        String uaAgentClass,
+        Boolean uaBot,
         Map<String, Object> attributes) {
 
     public IndexableEvent {
@@ -163,6 +174,13 @@ public record IndexableEvent(
                     geoLongitude(),
                     number("geoAsn"),
                     text("geoAsOrg"),
+                    text("uaBrowser"),
+                    text("uaBrowserVersion"),
+                    text("uaOs"),
+                    text("uaOsVersion"),
+                    text("uaDeviceClass"),
+                    text("uaAgentClass"),
+                    bool("uaBot"),
                     attributes());
         }
 
@@ -179,6 +197,11 @@ public record IndexableEvent(
         private Long number(String key) {
             Object value = payload.get(key);
             return value instanceof Number n ? n.longValue() : null;
+        }
+
+        private Boolean bool(String key) {
+            Object value = payload.get(key);
+            return value instanceof Boolean b ? b : null;
         }
 
         @SuppressWarnings("unchecked")

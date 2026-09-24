@@ -23,6 +23,7 @@
         <jacoco-plugin.version>0.8.13</jacoco-plugin.version>
         <password4j.version>1.8.4</password4j.version>
         <java-grok.version>0.1.9</java-grok.version>
+        <yauaa.version>8.2.0</yauaa.version>
     </properties>
 
     <dependencyManagement>
@@ -137,6 +138,24 @@
             <groupId>com.maxmind.geoip2</groupId>
             <artifactId>geoip2</artifactId>
             <version>4.3.0</version>
+        </dependency>
+        <!-- Classifies the User-Agent header of access-log events (browser, operating system,
+             device class, robots). Yauaa ships its whole rule set inside the jar, so unlike
+             GeoIP there is no database to fetch, bundle or keep fresh; a new release is how its
+             knowledge of new browsers arrives. -->
+        <dependency>
+            <groupId>nl.basjes.parse.useragent</groupId>
+            <artifactId>yauaa</artifactId>
+            <version>${yauaa.version}</version>
+        </dependency>
+        <!-- Yauaa logs through the Log4j 2 API and leaves the implementation to the application
+             (its log4j dependencies are all `provided`), so without this its first log call is a
+             NoClassDefFoundError. The JBoss LogManager binding is the one Quarkus manages: it
+             routes those calls into the same log as everything else, with the same format and
+             levels, instead of starting a second logging system beside it. -->
+        <dependency>
+            <groupId>org.jboss.logmanager</groupId>
+            <artifactId>log4j2-jboss-logmanager</artifactId>
         </dependency>
         <!-- Swaps the logs.ingest outgoing channel for an in-memory sink under %test, so the
              suite exercises the real Emitter and the real serialisation without a broker.

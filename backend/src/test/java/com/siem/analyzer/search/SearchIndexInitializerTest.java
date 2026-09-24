@@ -32,6 +32,16 @@ class SearchIndexInitializerTest {
                     "geo_asn",
                     "geo_as_org");
 
+    private static final List<String> USER_AGENT_FIELDS =
+            List.of(
+                    "ua_browser",
+                    "ua_browser_version",
+                    "ua_os",
+                    "ua_os_version",
+                    "ua_device_class",
+                    "ua_agent_class",
+                    "ua_bot");
+
     @Inject Rest5Client restClient;
     @Inject AppConfig appConfig;
     @Inject SearchIndexInitializer initializer;
@@ -114,6 +124,29 @@ class SearchIndexInitializerTest {
             assertTrue(
                     get("/" + appConfig.search().alias() + "/_alias")
                             .has(appConfig.search().indexName()));
+            assertTrue(initializer.mappingCurrent());
+        } finally {
+            restoreFullIndex();
+        }
+    }
+
+    @Test
+    void anExistingIndexGainsTheUserAgentMapping() throws IOException {
+        // An index created before the User-Agent fields existed, but already carrying geo.
+        ObjectNode oldMapping = mappingResource();
+        ((ObjectNode) oldMapping.path("mappings").path("properties")).remove(USER_AGENT_FIELDS);
+
+        try {
+            recreateIndexWith(oldMapping);
+            assertTrue(mappingProperties().path("ua_browser").isMissingNode());
+
+            initializer.ensureIndex();
+
+            JsonNode properties = mappingProperties();
+            for (String field : USER_AGENT_FIELDS) {
+                String expected = "ua_bot".equals(field) ? "boolean" : "keyword";
+                assertEquals(expected, properties.path(field).path("type").asText(), field);
+            }
             assertTrue(initializer.mappingCurrent());
         } finally {
             restoreFullIndex();
