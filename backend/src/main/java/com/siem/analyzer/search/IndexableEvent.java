@@ -19,6 +19,10 @@ import java.util.Map;
  * <p>A payload value of the wrong type is dropped rather than raised. The payload is parser output,
  * the index is derived, and refusing to index an otherwise good event because one field is
  * malformed would hide the event instead of the field.
+ *
+ * <p>The {@code geo*} fields are the GeoIP enrichment written for the event's source address.
+ * {@code geoLocation} is only accepted, and split into {@code geoLatitude}/{@code geoLongitude},
+ * when it is a map holding numeric {@code lat} and {@code lon}; anything else leaves both null.
  */
 public record IndexableEvent(
         long eventId,
@@ -41,6 +45,13 @@ public record IndexableEvent(
         Long bytes,
         String referrer,
         String userAgent,
+        String geoCountryIso,
+        String geoCountryName,
+        String geoCity,
+        Double geoLatitude,
+        Double geoLongitude,
+        Long geoAsn,
+        String geoAsOrg,
         Map<String, Object> attributes) {
 
     public IndexableEvent {
@@ -145,6 +156,13 @@ public record IndexableEvent(
                     number("bytes"),
                     text("referrer"),
                     text("userAgent"),
+                    text("geoCountryIso"),
+                    text("geoCountryName"),
+                    text("geoCity"),
+                    geoLatitude(),
+                    geoLongitude(),
+                    number("geoAsn"),
+                    text("geoAsOrg"),
                     attributes());
         }
 
@@ -167,6 +185,26 @@ public record IndexableEvent(
         private Map<String, Object> attributes() {
             Object value = payload.get("attributes");
             return value instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
+        }
+
+        private Double geoLatitude() {
+            Object lat = geoLocation().get("lat");
+            return lat instanceof Number n ? n.doubleValue() : null;
+        }
+
+        private Double geoLongitude() {
+            Object lon = geoLocation().get("lon");
+            return lon instanceof Number n ? n.doubleValue() : null;
+        }
+
+        private Map<?, ?> geoLocation() {
+            Object value = payload.get("geoLocation");
+            if (!(value instanceof Map<?, ?> map)) {
+                return Map.of();
+            }
+            return map.get("lat") instanceof Number && map.get("lon") instanceof Number
+                    ? map
+                    : Map.of();
         }
     }
 }

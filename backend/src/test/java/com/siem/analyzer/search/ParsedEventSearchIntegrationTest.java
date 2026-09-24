@@ -14,6 +14,8 @@ import com.siem.analyzer.domain.LogSourceType;
 import com.siem.analyzer.domain.LogUpload;
 import com.siem.analyzer.domain.LogUploadStatus;
 import com.siem.analyzer.domain.Severity;
+import com.siem.analyzer.enrich.GeoEnrichment;
+import com.siem.analyzer.enrich.StubGeoIpEnricher;
 import com.siem.analyzer.repo.LogSourceRepository;
 import com.siem.analyzer.repo.LogUploadRepository;
 import com.siem.analyzer.service.DefaultLogFileParser;
@@ -41,6 +43,7 @@ class ParsedEventSearchIntegrationTest {
     @Inject DefaultLogFileParser parser;
     @Inject EventSearch search;
     @Inject RecordingEventSearch recordingSearch;
+    @Inject StubGeoIpEnricher stubGeoIpEnricher;
     @Inject Rest5Client restClient;
     @Inject AppConfig appConfig;
     @Inject SearchIndexInitializer initializer;
@@ -76,6 +79,7 @@ class ParsedEventSearchIntegrationTest {
     @AfterEach
     void tearDown() {
         recordingSearch.reset();
+        stubGeoIpEnricher.reset();
     }
 
     @Test
@@ -162,5 +166,82 @@ class ParsedEventSearchIntegrationTest {
         // Verify facets are computed
         assertNotNull(substringPage.facets());
         assertEquals(1L, substringPage.facets().bySeverity().get("INFO"));
+    }
+
+    @Test
+    void anEnrichedEventIsSearchableWithItsGeoFields() throws IOException {
+        // %test runs with app.geoip.enabled=false, so the real MaxMindGeoIpEnricher never runs;
+        // the stub stands in for it as the GeoIpEnricher CDI bean, same as RecordingEventSearch
+        // stands in for the real EventSearch.
+        String clientIp = "203.0.113.15";
+        stubGeoIpEnricher.answer(
+                clientIp,
+                new GeoEnrichment(
+                        "US", "United States", "Springfield", 39.78, -89.65, 15169L, "GOOGLE"));
+
+        String logContent =
+                clientIp
+                        + " - charlie [14/Sep/2026:10:15:30 +0000] \"GET /admin/dashboard"
+                        + " HTTP/1.1\" 200 1024 \"https://example.test/\" \"Mozilla/5.0\"\n";
+
+        Path file = tempDir.resolve("access-geo.log");
+        Files.write(file, logContent.getBytes(StandardCharsets.UTF_8));
+
+        Long uploadId =
+                QuarkusTransaction.requiringNew()
+                        .call(
+                                () -> {
+                                    LogUpload upload = new LogUpload();
+                                    upload.setSource(source);
+                                    upload.setFileName("access-geo.log");
+                                    upload.setContentType("text/plain");
+                                    upload.setFileSize(Files.size(file));
+                                    upload.setChecksumSha256("test-sha-geo");
+                                    upload.setStoragePath(file.toString());
+                                    upload.setStatus(LogUploadStatus.PROCESSING);
+                                    upload.setDetectedFormat(LogFormat.ACCESS_LOG);
+                                    upload.setUploadedBy("search-tester");
+                                    uploadRepository.persist(upload);
+                                    return upload.getId();
+                                });
+
+        LogIngestEvent ingestEvent =
+                new LogIngestEvent(
+                        uploadId,
+                        source.getId(),
+                        source.getName(),
+                        "APPLICATION",
+                        "access-geo.log",
+                        "text/plain",
+                        Files.size(file),
+                        "test-sha-geo",
+                        file.toString(),
+                        "search-tester",
+                        Instant.now());
+
+        // Parse file, persist events into PostgreSQL (with the stub's geo enrichment applied to
+        // the payload), and index into OpenSearch store.
+        parser.parse(ingestEvent);
+
+        LogUpload completed =
+                QuarkusTransaction.requiringNew().call(() -> uploadRepository.findById(uploadId));
+        assertEquals(LogUploadStatus.INGESTED, completed.getStatus());
+        assertEquals(1L, completed.getEventCount());
+
+        // Refresh the index so the document becomes visible to queries
+        restClient.performRequest(
+                new Request("POST", "/" + appConfig.search().alias() + "/_refresh"));
+
+        SearchPage page = search.search(new EventQuery.Builder().fullText("dashboard").build());
+
+        assertEquals(1, page.totalHits());
+        EventHit hit = page.hits().get(0);
+        assertEquals("203.0.113.15", hit.fields().get("srcIp"));
+        // Geo has no dedicated accessor on EventHit: like every other parsed field, it surfaces
+        // through the generic fields map, camelCase, matching the payload's own key names.
+        // geoAsn is indexed as OpenSearch `long`, but Jackson may hand back either an Integer or
+        // a Long for it, so compare numerically.
+        assertEquals("US", hit.fields().get("geoCountryIso"));
+        assertEquals(15169L, ((Number) hit.fields().get("geoAsn")).longValue());
     }
 }

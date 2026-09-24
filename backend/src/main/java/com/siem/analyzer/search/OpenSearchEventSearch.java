@@ -247,7 +247,12 @@ public class OpenSearchEventSearch implements EventSearch {
                         "status",
                         "bytes",
                         "referrer",
-                        "user_agent")) {
+                        "user_agent",
+                        "geo_country_iso",
+                        "geo_country_name",
+                        "geo_city",
+                        "geo_asn",
+                        "geo_as_org")) {
             JsonNode value = source.get(field);
             if (value != null && !value.isNull()) {
                 // The camelCase name the payload contract uses, so a caller sees one
@@ -256,6 +261,16 @@ public class OpenSearchEventSearch implements EventSearch {
                         toCamelCase(field),
                         value.isNumber() ? value.numberValue() : value.asText());
             }
+        }
+        // geo_location is an object ({lat, lon}), not a scalar, so asText() would return "" for
+        // it above; split it into the two numeric fields the payload contract already uses.
+        JsonNode location = source.get("geo_location");
+        if (location != null
+                && location.isObject()
+                && location.hasNonNull("lat")
+                && location.hasNonNull("lon")) {
+            fields.put("geoLatitude", location.path("lat").numberValue());
+            fields.put("geoLongitude", location.path("lon").numberValue());
         }
         return new EventHit(
                 source.path("event_id").asLong(),
@@ -360,6 +375,16 @@ public class OpenSearchEventSearch implements EventSearch {
         putText(document, "format", event.format());
         putText(document, "host", event.host());
         putText(document, "src_ip", event.srcIp());
+        putText(document, "geo_country_iso", event.geoCountryIso());
+        putText(document, "geo_country_name", event.geoCountryName());
+        putText(document, "geo_city", event.geoCity());
+        putNumber(document, "geo_asn", event.geoAsn());
+        putText(document, "geo_as_org", event.geoAsOrg());
+        if (event.geoLatitude() != null && event.geoLongitude() != null) {
+            ObjectNode location = document.putObject("geo_location");
+            location.put("lat", event.geoLatitude());
+            location.put("lon", event.geoLongitude());
+        }
         putNumber(document, "src_port", event.srcPort());
         putText(document, "user", event.user());
         putText(document, "method", event.method());

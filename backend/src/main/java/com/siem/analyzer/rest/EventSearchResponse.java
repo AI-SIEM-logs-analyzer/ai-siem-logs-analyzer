@@ -56,7 +56,10 @@ public record EventSearchResponse(
             @Schema(
                             description =
                                     "Standard parsed fields present on this event, in camelCase:"
-                                            + " host, srcIp, status, method, path, ...")
+                                            + " host, srcIp, status, method, path, ..., and when the"
+                                            + " source address was enriched: geoCountryIso,"
+                                            + " geoCountryName, geoCity, geoLatitude, geoLongitude,"
+                                            + " geoAsn, geoAsOrg")
                     Map<String, Object> fields) {
 
         static Hit from(EventHit hit) {

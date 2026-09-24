@@ -1,6 +1,7 @@
 package com.siem.analyzer.rest;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasItems;
@@ -56,6 +57,20 @@ class OpenApiEndpointTest {
                         is("string"))
                 .body(search + ".responses.keySet()", hasItems("200", "400", "401", "403", "503"))
                 .body("components.schemas.EventSearchResponse", notNullValue());
+    }
+
+    @Test
+    void documentsTheGeoFieldsOnASearchHit() {
+        // The geo fields surface generically through EventHit.fields, so this checks the
+        // Schema description on that map property rather than a set of typed properties.
+        given().accept("application/json")
+                .when()
+                .get("/q/openapi")
+                .then()
+                .statusCode(200)
+                .body(
+                        "components.schemas.EventHit.properties.fields.description",
+                        allOf(containsString("geoCountryIso"), containsString("geoLatitude")));
     }
 
     @Test

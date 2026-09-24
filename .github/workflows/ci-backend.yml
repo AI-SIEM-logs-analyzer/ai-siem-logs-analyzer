@@ -35,6 +35,28 @@ jobs:
       - name: Lint (Checkstyle)
         run: ./mvnw -B checkstyle:check
 
+      # Fork PRs don't get repo secrets, so MAXMIND_LICENSE_KEY is unset there; skip rather than
+      # fail, since %test runs with app.geoip.enabled=false and never opens these files.
+      - name: Fetch GeoLite2 databases
+        env:
+          MAXMIND_LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${MAXMIND_LICENSE_KEY:-}" ]; then
+            echo "::notice::MAXMIND_LICENSE_KEY not set; skipping GeoLite2 download (tests do not need it)"
+            exit 0
+          fi
+          mkdir -p src/main/jib/opt/geoip
+          TMP_GEOIP=$(mktemp -d)
+          trap 'rm -rf "$TMP_GEOIP"' EXIT
+          for edition in GeoLite2-City GeoLite2-ASN; do
+            curl -fsSL \
+              "https://download.maxmind.com/app/geoip_download?edition_id=${edition}&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" \
+              | tar -xz -C "$TMP_GEOIP"
+            find "$TMP_GEOIP" -name "${edition}.mmdb" -exec mv {} "src/main/jib/opt/geoip/${edition}.mmdb" \;
+          done
+          ls -la src/main/jib/opt/geoip
+
       - name: Build + teste (JUnit5 + RestAssured, Testcontainers)
         run: ./mvnw -B clean verify
 

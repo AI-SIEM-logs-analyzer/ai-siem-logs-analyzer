@@ -1,6 +1,7 @@
 package com.siem.analyzer.search;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -83,6 +84,62 @@ class IndexableEventTest {
         payload.put("attributes", "a string, not an object");
 
         assertTrue(indexable(payload).attributes().isEmpty());
+    }
+
+    @Test
+    void geoFieldsAreLiftedOutOfThePayload() {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("geoCountryIso", "US");
+        payload.put("geoCountryName", "United States");
+        payload.put("geoCity", "Mountain View");
+        payload.put("geoAsn", 15169);
+        payload.put("geoAsOrg", "Google LLC");
+        payload.put("geoLocation", Map.of("lat", 37.386, "lon", -122.084));
+
+        IndexableEvent event = indexable(payload);
+
+        assertEquals("US", event.geoCountryIso());
+        assertEquals("United States", event.geoCountryName());
+        assertEquals("Mountain View", event.geoCity());
+        assertEquals(15169L, event.geoAsn().longValue());
+        assertEquals("Google LLC", event.geoAsOrg());
+        assertEquals(37.386, event.geoLatitude(), 0.001);
+        assertEquals(-122.084, event.geoLongitude(), 0.001);
+    }
+
+    @Test
+    void geoFieldsDoNotLeakIntoAttributes() {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("geoCountryIso", "RO");
+        payload.put("attributes", Map.of("custom_key", "kept"));
+
+        IndexableEvent event = indexable(payload);
+
+        assertEquals("RO", event.geoCountryIso());
+        assertFalse(event.attributes().containsKey("geoCountryIso"));
+        assertEquals("kept", event.attributes().get("custom_key"));
+    }
+
+    @Test
+    void anAbsentGeoLocationLeavesCoordinatesNull() {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("geoCountryIso", "RO");
+
+        IndexableEvent event = indexable(payload);
+
+        assertNull(event.geoLatitude());
+        assertNull(event.geoLongitude());
+    }
+
+    @Test
+    void aGeoLocationOfTheWrongShapeIsIgnored() {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("geoLocation", "37.386,-122.084");
+
+        IndexableEvent event = indexable(payload);
+
+        assertNull(event.geoLatitude());
+        assertNull(event.geoLongitude());
     }
 
     private IndexableEvent indexable(Map<String, Object> payload) {

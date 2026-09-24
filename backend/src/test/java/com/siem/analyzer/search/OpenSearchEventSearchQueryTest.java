@@ -13,6 +13,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -263,6 +264,35 @@ class OpenSearchEventSearchQueryTest {
         assertEquals("failed login for admin", hit.message());
         assertEquals(Severity.ERROR, hit.severity());
         assertEquals("web-01", hit.fields().get("host"));
+    }
+
+    @Test
+    void surfacesGeoFieldsOnASearchHit() throws IOException {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("srcIp", "203.0.113.50");
+        payload.put("host", "web-02");
+        payload.put("geoCountryIso", "US");
+        payload.put("geoAsn", 15169);
+        payload.put("geoLocation", Map.of("lat", 37.386, "lon", -122.084));
+        search.index(
+                List.of(
+                        event(
+                                4L,
+                                1L,
+                                T0.plusSeconds(180),
+                                Severity.WARNING,
+                                "enriched event",
+                                "raw enriched",
+                                payload)));
+        restClient.performRequest(
+                new Request("POST", "/" + appConfig.search().alias() + "/_refresh"));
+
+        SearchPage page =
+                search.search(EventQuery.builder().severities(Set.of(Severity.WARNING)).build());
+
+        EventHit hit = page.hits().get(0);
+        assertEquals("US", hit.fields().get("geoCountryIso"));
+        assertEquals(37.386, ((Number) hit.fields().get("geoLatitude")).doubleValue(), 0.001);
     }
 
     @Test

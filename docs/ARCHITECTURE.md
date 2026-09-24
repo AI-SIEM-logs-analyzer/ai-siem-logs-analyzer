@@ -49,6 +49,7 @@ flowchart TB
         rest[rest/<br/>HTTP boundary]
         service[service/<br/>business logic]
         repo[repo/<br/>Panache repositories]
+        enrich[enrich/<br/>GeoIP enrichment]
         health[health/<br/>readiness · liveness]
     end
 
@@ -68,6 +69,7 @@ flowchart TB
     service --> redis
     service --> llm
     kafka --> service
+    service --> enrich
     service -.-> search
 ```
 
@@ -82,6 +84,7 @@ Mirrors `com.siem.analyzer` — see [backend/README.md](../backend/README.md#pac
 | `domain`  | JPA entities and domain enums                                |
 | `repo`    | Panache repositories — every query lives here                |
 | `search`  | The derived OpenSearch index — projection, queries and backfill |
+| `enrich`  | GeoIP enrichment of a source address (`GeoIpEnricher` seam, MaxMind GeoLite2 lookup) |
 | `config`  | Typed `@ConfigMapping` configuration                         |
 | `health`  | Custom health checks                                         |
 
@@ -112,6 +115,15 @@ erDiagram
 | `app_user`   | Accounts; stores an Argon2id hash, never a password                       |
 | `user_role`  | Roles per account (`ADMIN`, `ANALYST`, `VIEWER`); an account may hold several |
 
+`log_event.payload` is a JSON map keyed by the component names of `NormalizedEvent` — `format`,
+`host`, `srcIp`, `srcPort`, `user`, `method`, `path`, `protocol`, `status`, `bytes`, `referrer`,
+`userAgent`, and whatever a parser could not place, nested under `attributes`. GeoIP enrichment
+(see Cross-cutting concerns below) adds `geoCountryIso`, `geoCountryName`, `geoCity`,
+`geoLocation` (a `{lat, lon}` map), `geoAsn` and `geoAsOrg` alongside them when the event's
+`srcIp` resolves to a public address the databases know. These payload keys are camelCase; the
+OpenSearch document they are projected into uses snake_case for the same fields (`geo_country_iso`
+… `geo_as_org`, `geo_location` as a `geo_point`) — see Search below.
+
 ## Runtime flows
 
 **Ingestion (Producer, consumer and access-log parser shipped; file parsing planned).** An accepted upload is
@@ -139,10 +151,29 @@ paths that match nested objects and flat dotted keys alike, with defaults for EC
 nested, in the event's attributes. Lines with repeated keys, trailing content or more than 64
 levels of nesting are refused. Format detection supports access logs (`ACCESS_LOG`),
 syslog, JSON, and fallback to plain text. `DefaultLogFileParser` reads the stored file line by line
-through those parsers, normalises into `log_event` batches, indexes them via
-`EventIndexer.indexAfterCommit` into OpenSearch, and calls `markIngested`.
-Deduplication uses the upstream identifier. Ordering guarantees, partitioning key and
-retention are **TBD**.
+through those parsers, normalises into `log_event` batches, enriches each event's payload with
+GeoIP data for its `srcIp` (see below), indexes them via `EventIndexer.indexAfterCommit` into
+OpenSearch, and calls `markIngested`. Deduplication uses the upstream identifier. Ordering
+guarantees, partitioning key and retention are **TBD**.
+
+**GeoIP enrichment (Shipped).** `com.siem.analyzer.enrich` looks up an event's `srcIp` and, when
+the address is public and one of the bundled GeoLite2 databases (City, ASN) knows it, writes
+`geoCountryIso`, `geoCountryName`, `geoCity`, `geoLocation`, `geoAsn` and `geoAsOrg` onto the
+payload before it is persisted — the same step described just above, not a separate consumer.
+`GeoIpEnricher` is the seam; `MaxMindGeoIpEnricher` is the production implementation, reading
+`GeoLite2-City.mmdb` and `GeoLite2-ASN.mmdb` from `app.geoip.city-database-path` /
+`asn-database-path` (default `/opt/geoip/`) and refusing to boot in `%prod` if either file is
+missing. Private, loopback and link-local networks are skipped before they ever reach the
+database — a lookup on internal traffic has nothing useful to say. `app.geoip.enabled=false`
+under `%test`, so tests substitute a `StubGeoIpEnricher` CDI mock instead of shipping real
+database fixtures into every test run. Enrichment happens once, at ingestion time, rather than
+on every read: a search hit's geo fields come straight out of the index with no per-request
+lookup, and re-enriching each read would repeat the same MaxMind lookup for an address that
+does not move between requests. The databases ship inside the container image (`src/main/jib`,
+fetched from MaxMind during CI) rather than being downloaded per event or per boot, because a
+GeoLite2 database is tens of megabytes, changes on MaxMind's own release cadence rather than
+per deploy, and a missing network path to MaxMind at request time must never be how a log
+search endpoint degrades.
 
 **Search (Shipped).** `log_event` is projected into an OpenSearch index addressed through the
 `log-events` alias, described in [ADR 0001](adr/0001-log-search-backend.md). The index is
@@ -154,16 +185,25 @@ with `ignore_malformed`, and anything a parser could not place goes to `attribut
 `flat_object`, which is searchable but not efficiently aggregatable. A field the UI facets on
 must therefore be mapped explicitly. `EventIndexer` writes documents under the event's own
 identifier, so a redelivered batch overwrites rather than duplicating, and records the write in
-`log_event_index_state`. What guarantees an event becomes searchable is `SearchBackfillJob`,
-which drains the anti-join on a schedule; `indexAfterCommit` only shortens the wait and, like
-`LogIngestProducer`, fires after the transaction commits. An engine that is down degrades
-search and never blocks ingestion: the write is skipped, the event stays in the backlog, and
-readiness is unaffected — `quarkus.elasticsearch.health.enabled` is `false` and
-`SearchIndexHealthCheck` reports the engine's state as data instead. `GET /api/events/search`
-is open to every signed-in role and answers 503, not an empty page, when the index cannot be
+`log_event_index_state`. `SearchIndexInitializer` also pushes any new mapping properties onto an
+already-existing index at start-up, so a shipped mapping change (such as the geo fields) reaches
+a running deployment without a manual reindex. What guarantees an event becomes searchable is
+`SearchBackfillJob`, which drains the anti-join on a schedule; `indexAfterCommit` only shortens
+the wait and, like `LogIngestProducer`, fires after the transaction commits. An engine that is
+down degrades search and never blocks ingestion: the write is skipped, the event stays in the
+backlog, and readiness is unaffected — `quarkus.elasticsearch.health.enabled` is `false` and
+`SearchIndexHealthCheck` reports the engine's state as data instead. That check (`search-index`)
+always answers UP and carries a `mapping` data entry of `current` or `outdated`, so a stuck
+mapping push shows up as data on an otherwise-healthy check rather than as a failed readiness
+probe. `GET /api/events/search` is open to every signed-in role and answers 503, not an empty
+page, when the index cannot be
 reached. It filters by time, source, severity, source IP (address or CIDR) and HTTP status
 (code or class such as `5xx`). It sorts by event time in either direction and pages by
-`search_after` cursor, never by offset. Its contract is documented in `/q/openapi`.
+`search_after` cursor, never by offset. A hit does not carry the parsed fields — `srcIp`,
+`userAgent`, the `geo*` fields, and so on — as top-level properties; they surface generically
+through its `fields` map (`OpenSearchEventSearch.toHit`), converted back from the index's
+snake_case to the payload's own camelCase key names (`fields.geoCountryIso`, `fields.geoAsn`,
+…). Its contract is documented in `/q/openapi`.
 
 **Detection (Planned).** Rule evaluation over incoming events, plus AI-assisted detection
 through LangChain4j and anomaly scoring with Smile. Whether detection runs inline with
@@ -216,6 +256,7 @@ an entry here once decided; substantial ones graduate to an ADR under `docs/adr/
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-09-22 | GeoIP enrichment runs at ingestion time, writing geo fields onto the event payload, rather than at read time; the GeoLite2 databases are bundled into the container image rather than fetched per event | A search hit is read far more often than an event is ingested, so resolving `srcIp` once and storing the result avoids repeating the same MaxMind lookup on every page view; bundling the databases keeps a missing network path to MaxMind from ever being how the search endpoint degrades, at the cost of a larger image and a database that ages until the next deploy |
 | 2026-09-15 | Log search runs on OpenSearch as a derived index; PostgreSQL stays the system of record — [ADR 0001](adr/0001-log-search-backend.md) | Aggregations and facets for the analyst dashboard are what PostgreSQL alone answers expensively; keeping the index derived means a failed index is a stale read, never lost data |
 
 Open questions carried by this document: detection placement, ordering and retention on the
