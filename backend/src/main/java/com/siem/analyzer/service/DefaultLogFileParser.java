@@ -9,6 +9,7 @@ import com.siem.analyzer.domain.LogSourceType;
 import com.siem.analyzer.domain.LogUpload;
 import com.siem.analyzer.domain.NormalizedEvent;
 import com.siem.analyzer.domain.Severity;
+import com.siem.analyzer.enrich.GeoIpEnricher;
 import com.siem.analyzer.parse.AccessLogParser;
 import com.siem.analyzer.parse.JsonLogParser;
 import com.siem.analyzer.parse.SyslogParser;
@@ -54,6 +55,7 @@ public class DefaultLogFileParser implements LogFileParser {
     private final SyslogParser syslogParser;
     private final JsonLogParser jsonLogParser;
     private final AppConfig appConfig;
+    private final GeoIpEnricher geoIpEnricher;
 
     @Inject
     public DefaultLogFileParser(
@@ -66,7 +68,8 @@ public class DefaultLogFileParser implements LogFileParser {
             AccessLogParser accessLogParser,
             SyslogParser syslogParser,
             JsonLogParser jsonLogParser,
-            AppConfig appConfig) {
+            AppConfig appConfig,
+            GeoIpEnricher geoIpEnricher) {
         this.uploadService = uploadService;
         this.uploadRepository = uploadRepository;
         this.sourceRepository = sourceRepository;
@@ -77,6 +80,7 @@ public class DefaultLogFileParser implements LogFileParser {
         this.syslogParser = syslogParser;
         this.jsonLogParser = jsonLogParser;
         this.appConfig = appConfig;
+        this.geoIpEnricher = geoIpEnricher;
     }
 
     @Override
@@ -295,7 +299,40 @@ public class DefaultLogFileParser implements LogFileParser {
                 event.setExternalId(String.valueOf(extId));
             }
         }
+        applyGeo(payload, normalized.srcIp());
         event.setPayload(payload.isEmpty() ? null : payload);
         return event;
+    }
+
+    /**
+     * Adds geo data for the event's source address. Absent values write no key at all: an empty
+     * string or a "unknown" placeholder would be indexed and faceted as though it were a real
+     * value.
+     */
+    private void applyGeo(Map<String, Object> payload, String srcIp) {
+        if (srcIp == null) {
+            return;
+        }
+        geoIpEnricher
+                .lookup(srcIp)
+                .ifPresent(
+                        geo -> {
+                            putIfPresent(payload, "geoCountryIso", geo.countryIso());
+                            putIfPresent(payload, "geoCountryName", geo.countryName());
+                            putIfPresent(payload, "geoCity", geo.city());
+                            putIfPresent(payload, "geoAsn", geo.asn());
+                            putIfPresent(payload, "geoAsOrg", geo.asOrg());
+                            if (geo.latitude() != null && geo.longitude() != null) {
+                                payload.put(
+                                        "geoLocation",
+                                        Map.of("lat", geo.latitude(), "lon", geo.longitude()));
+                            }
+                        });
+    }
+
+    private static void putIfPresent(Map<String, Object> payload, String key, Object value) {
+        if (value != null) {
+            payload.put(key, value);
+        }
     }
 }

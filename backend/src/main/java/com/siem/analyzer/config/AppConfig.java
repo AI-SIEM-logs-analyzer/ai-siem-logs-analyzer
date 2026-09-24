@@ -49,6 +49,10 @@ public interface AppConfig {
     @Valid
     Search search();
 
+    /** GeoIP enrichment settings. */
+    @Valid
+    Geoip geoip();
+
     /** Settings for the line parsers in {@code com.siem.analyzer.parse}. */
     interface Parse {
 
@@ -167,6 +171,33 @@ public interface AppConfig {
             @Min(1)
             int batchSize();
         }
+    }
+
+    /**
+     * MaxMind GeoLite2 enrichment. Disabled deployments still start; events simply carry no geo
+     * data.
+     */
+    interface Geoip {
+
+        /** Whether events are enriched at all. */
+        @WithDefault("true")
+        boolean enabled();
+
+        /** Absolute path of the GeoLite2 City database inside the container. */
+        @WithDefault("/opt/geoip/GeoLite2-City.mmdb")
+        String cityDatabasePath();
+
+        /** Absolute path of the GeoLite2 ASN database inside the container. */
+        @WithDefault("/opt/geoip/GeoLite2-ASN.mmdb")
+        String asnDatabasePath();
+
+        /**
+         * Networks that are never looked up. A lookup on private, loopback or link-local space
+         * returns nothing useful, so it is skipped before it reaches the database.
+         */
+        @WithDefault(
+                "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8,169.254.0.0/16,::1/128,fc00::/7")
+        List<String> skippedNetworks();
     }
 
     /** Settings for log file upload storage. */

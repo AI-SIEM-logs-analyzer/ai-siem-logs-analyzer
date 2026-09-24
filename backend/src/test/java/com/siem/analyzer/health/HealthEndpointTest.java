@@ -42,6 +42,7 @@ class HealthEndpointTest {
                 .body("status", is("UP"))
                 .body("checks.find { it.name == 'search-index' }.status", is("UP"))
                 .body("checks.find { it.name == 'search-index' }.data.engine", notNullValue())
-                .body("checks.find { it.name == 'search-index' }.data.backlog", notNullValue());
+                .body("checks.find { it.name == 'search-index' }.data.backlog", notNullValue())
+                .body("checks.find { it.name == 'search-index' }.data.mapping", notNullValue());
     }
 }

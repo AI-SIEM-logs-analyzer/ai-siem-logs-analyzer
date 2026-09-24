@@ -247,6 +247,10 @@ app:
       argon2:
         memory-kib: 512
         iterations: 1
+    # No MaxMind databases are shipped with the test image, so enrichment stays off; the
+    # enricher itself is exercised with its own fixture databases, not through this profile.
+    geoip:
+      enabled: false
   quarkus:
     # Deliberately no JDBC URL: with none configured, Dev Services starts a throwaway
     # PostgreSQL container through Testcontainers, lets Flyway migrate it, and tears it down

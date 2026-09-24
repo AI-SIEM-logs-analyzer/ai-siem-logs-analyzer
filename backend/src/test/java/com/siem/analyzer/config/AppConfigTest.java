@@ -50,4 +50,20 @@ class AppConfigTest {
         assertEquals(Duration.ofSeconds(30), search.backfill().interval());
         assertEquals(1000, search.backfill().batchSize());
     }
+
+    @Test
+    void geoipDefaultsAreTheDocumentedOnes() {
+        AppConfig.Geoip geoip = appConfig.geoip();
+
+        assertEquals("/opt/geoip/GeoLite2-City.mmdb", geoip.cityDatabasePath());
+        assertEquals("/opt/geoip/GeoLite2-ASN.mmdb", geoip.asnDatabasePath());
+        assertTrue(geoip.skippedNetworks().contains("10.0.0.0/8"));
+        assertTrue(geoip.skippedNetworks().contains("127.0.0.0/8"));
+        assertTrue(geoip.skippedNetworks().contains("fc00::/7"));
+    }
+
+    @Test
+    void geoipIsDisabledUnderTest() {
+        assertFalse(appConfig.geoip().enabled());
+    }
 }

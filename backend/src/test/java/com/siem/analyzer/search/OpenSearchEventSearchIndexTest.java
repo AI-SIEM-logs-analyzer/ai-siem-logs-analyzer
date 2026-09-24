@@ -15,6 +15,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -77,6 +78,37 @@ class OpenSearchEventSearchIndexTest {
 
         assertTrue(document(9004L).path("found").asBoolean());
         assertFalse(mapping.has("tenant"));
+    }
+
+    @Test
+    void anEnrichedEventKeepsItsGeoFieldsInTheDocument() throws IOException {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("geoCountryIso", "US");
+        payload.put("geoCountryName", "United States");
+        payload.put("geoCity", "Mountain View");
+        payload.put("geoAsn", 15169);
+        payload.put("geoAsOrg", "Google LLC");
+        payload.put("geoLocation", Map.of("lat", 37.386, "lon", -122.084));
+        search.index(List.of(event(9005L, "enriched", payload)));
+        refresh();
+
+        JsonNode source = document(9005L).path("_source");
+
+        assertEquals("US", source.path("geo_country_iso").asText());
+        assertEquals("Mountain View", source.path("geo_city").asText());
+        assertEquals(15169L, source.path("geo_asn").asLong());
+        assertEquals(37.386, source.path("geo_location").path("lat").asDouble(), 0.001);
+    }
+
+    @Test
+    void anEventWithoutGeoDataWritesNoGeoFields() throws IOException {
+        search.index(List.of(event(9006L, "not enriched", Map.of())));
+        refresh();
+
+        JsonNode source = document(9006L).path("_source");
+
+        assertFalse(source.has("geo_country_iso"));
+        assertFalse(source.has("geo_location"));
     }
 
     @Test

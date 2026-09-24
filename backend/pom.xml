@@ -130,6 +130,14 @@
             <artifactId>java-grok</artifactId>
             <version>${java-grok.version}</version>
         </dependency>
+        <!-- Reads the bundled GeoLite2 City and ASN databases for source-address enrichment.
+             Pinned to a 4.x release: tryCity and tryAsn, which return Optional instead of
+             throwing AddressNotFoundException, only exist from 4.0 onward. -->
+        <dependency>
+            <groupId>com.maxmind.geoip2</groupId>
+            <artifactId>geoip2</artifactId>
+            <version>4.3.0</version>
+        </dependency>
         <!-- Swaps the logs.ingest outgoing channel for an in-memory sink under %test, so the
              suite exercises the real Emitter and the real serialisation without a broker.
              Kafka Dev Services stays off for the same reason; the Compose stack is where the

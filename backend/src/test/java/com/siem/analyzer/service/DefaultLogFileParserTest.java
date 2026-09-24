@@ -1,6 +1,7 @@
 package com.siem.analyzer.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,6 +14,8 @@ import com.siem.analyzer.domain.LogSourceType;
 import com.siem.analyzer.domain.LogUpload;
 import com.siem.analyzer.domain.LogUploadStatus;
 import com.siem.analyzer.domain.Severity;
+import com.siem.analyzer.enrich.GeoEnrichment;
+import com.siem.analyzer.enrich.StubGeoIpEnricher;
 import com.siem.analyzer.repo.LogEventIndexStateRepository;
 import com.siem.analyzer.repo.LogEventRepository;
 import com.siem.analyzer.repo.LogSourceRepository;
@@ -29,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +47,7 @@ class DefaultLogFileParserTest {
     @Inject LogEventRepository eventRepository;
     @Inject LogEventIndexStateRepository indexStateRepository;
     @Inject RecordingEventSearch search;
+    @Inject StubGeoIpEnricher geo;
 
     @TempDir Path tempDir;
 
@@ -51,6 +56,7 @@ class DefaultLogFileParserTest {
     @BeforeEach
     void setUp() {
         search.reset();
+        geo.reset();
         source =
                 QuarkusTransaction.requiringNew()
                         .call(
@@ -104,6 +110,83 @@ class DefaultLogFileParserTest {
                 events.stream().map(LogEvent::getId).sorted().toList(),
                 indexed.stream().map(IndexableEvent::eventId).sorted().toList());
         assertTrue(indexStateRepository.listUnindexed(10).isEmpty());
+    }
+
+    @Test
+    void geoFieldsLandInThePayload() throws IOException {
+        geo.answer(
+                "8.8.8.8",
+                new GeoEnrichment(
+                        "US",
+                        "United States",
+                        "Mountain View",
+                        37.386,
+                        -122.084,
+                        15169L,
+                        "Google LLC"));
+
+        String content =
+                "8.8.8.8 - alice [14/Sep/2026:10:15:30 +0000] \"GET /login HTTP/1.1\" 200 512"
+                        + " \"https://example.test/\" \"Mozilla/5.0\"\n";
+
+        Path file = write("access-geo.log", content);
+        Long uploadId = createUpload(file, LogFormat.ACCESS_LOG);
+        LogIngestEvent ingestEvent = createIngestEvent(uploadId, file);
+
+        parser.parse(ingestEvent);
+
+        List<LogEvent> events = listEvents(source.getId());
+        assertEquals(1, events.size());
+        Map<String, Object> payload = events.get(0).getPayload();
+
+        assertEquals("US", payload.get("geoCountryIso"));
+        assertEquals("United States", payload.get("geoCountryName"));
+        assertEquals("Mountain View", payload.get("geoCity"));
+        assertEquals(15169L, ((Number) payload.get("geoAsn")).longValue());
+        assertEquals("Google LLC", payload.get("geoAsOrg"));
+
+        Map<?, ?> location = (Map<?, ?>) payload.get("geoLocation");
+        assertEquals(37.386, ((Number) location.get("lat")).doubleValue(), 0.001);
+        assertEquals(-122.084, ((Number) location.get("lon")).doubleValue(), 0.001);
+    }
+
+    @Test
+    void anEventWithoutASourceAddressGetsNoGeoKeys() throws IOException {
+        String content =
+                "<34>1 2026-09-14T22:14:15.003Z host1 sshd 1234 ID47 - Failed password for root\n";
+
+        Path file = write("syslog-no-geo.log", content);
+        Long uploadId = createUpload(file, LogFormat.SYSLOG);
+        LogIngestEvent ingestEvent = createIngestEvent(uploadId, file);
+
+        parser.parse(ingestEvent);
+
+        List<LogEvent> events = listEvents(source.getId());
+        assertEquals(1, events.size());
+        Map<String, Object> payload = events.get(0).getPayload();
+
+        assertFalse(payload.containsKey("geoCountryIso"));
+        assertFalse(payload.containsKey("geoLocation"));
+    }
+
+    @Test
+    void anAddressWithNoGeoDataGetsNoGeoKeys() throws IOException {
+        String content =
+                "203.0.113.7 - alice [14/Sep/2026:10:15:30 +0000] \"GET /login HTTP/1.1\" 200 512"
+                        + " \"https://example.test/\" \"Mozilla/5.0\"\n";
+
+        Path file = write("access-no-geo.log", content);
+        Long uploadId = createUpload(file, LogFormat.ACCESS_LOG);
+        LogIngestEvent ingestEvent = createIngestEvent(uploadId, file);
+
+        parser.parse(ingestEvent);
+
+        List<LogEvent> events = listEvents(source.getId());
+        assertEquals(1, events.size());
+        Map<String, Object> payload = events.get(0).getPayload();
+
+        assertFalse(payload.containsKey("geoCountryIso"));
+        assertFalse(payload.containsKey("geoAsn"));
     }
 
     @Test

@@ -22,3 +22,6 @@ graphify-out
 /.cursor/rules/caveman.mdc
 /.github/copilot-instructions.md
 /CLAUDE.md
+
+# GeoLite2 databases: downloaded during CI, never committed (MaxMind EULA, ~70MB each)
+backend/src/main/jib/opt/geoip/*.mmdb
