@@ -252,14 +252,19 @@ public class OpenSearchEventSearch implements EventSearch {
                         "geo_country_name",
                         "geo_city",
                         "geo_asn",
-                        "geo_as_org")) {
+                        "geo_as_org",
+                        "ua_browser",
+                        "ua_browser_version",
+                        "ua_os",
+                        "ua_os_version",
+                        "ua_device_class",
+                        "ua_agent_class",
+                        "ua_bot")) {
             JsonNode value = source.get(field);
             if (value != null && !value.isNull()) {
                 // The camelCase name the payload contract uses, so a caller sees one
                 // vocabulary rather than the index's snake_case alongside it.
-                fields.put(
-                        toCamelCase(field),
-                        value.isNumber() ? value.numberValue() : value.asText());
+                fields.put(toCamelCase(field), scalar(value));
             }
         }
         // geo_location is an object ({lat, lon}), not a scalar, so asText() would return "" for
@@ -281,6 +286,16 @@ public class OpenSearchEventSearch implements EventSearch {
                 source.path("message").asText(),
                 source.path("raw").asText(),
                 fields);
+    }
+
+    private static Object scalar(JsonNode value) {
+        if (value.isNumber()) {
+            return value.numberValue();
+        }
+        if (value.isBoolean()) {
+            return value.booleanValue();
+        }
+        return value.asText();
     }
 
     private String toCamelCase(String snake) {
@@ -394,6 +409,15 @@ public class OpenSearchEventSearch implements EventSearch {
         putNumber(document, "bytes", event.bytes());
         putText(document, "referrer", event.referrer());
         putText(document, "user_agent", event.userAgent());
+        putText(document, "ua_browser", event.uaBrowser());
+        putText(document, "ua_browser_version", event.uaBrowserVersion());
+        putText(document, "ua_os", event.uaOs());
+        putText(document, "ua_os_version", event.uaOsVersion());
+        putText(document, "ua_device_class", event.uaDeviceClass());
+        putText(document, "ua_agent_class", event.uaAgentClass());
+        if (event.uaBot() != null) {
+            document.put("ua_bot", event.uaBot());
+        }
         document.put("message", event.message());
         document.put("raw", event.raw());
         if (!event.attributes().isEmpty()) {

@@ -49,7 +49,7 @@ flowchart TB
         rest[rest/<br/>HTTP boundary]
         service[service/<br/>business logic]
         repo[repo/<br/>Panache repositories]
-        enrich[enrich/<br/>GeoIP enrichment]
+        enrich[enrich/<br/>GeoIP · User-Agent enrichment]
         health[health/<br/>readiness · liveness]
     end
 
@@ -84,7 +84,7 @@ Mirrors `com.siem.analyzer` — see [backend/README.md](../backend/README.md#pac
 | `domain`  | JPA entities and domain enums                                |
 | `repo`    | Panache repositories — every query lives here                |
 | `search`  | The derived OpenSearch index — projection, queries and backfill |
-| `enrich`  | GeoIP enrichment of a source address (`GeoIpEnricher` seam, MaxMind GeoLite2 lookup) |
+| `enrich`  | GeoIP enrichment of a source address (`GeoIpEnricher` seam, MaxMind GeoLite2 lookup) and User-Agent classification (`UserAgentEnricher` seam, Yauaa) |
 | `config`  | Typed `@ConfigMapping` configuration                         |
 | `health`  | Custom health checks                                         |
 
@@ -120,9 +120,11 @@ erDiagram
 `userAgent`, and whatever a parser could not place, nested under `attributes`. GeoIP enrichment
 (see Cross-cutting concerns below) adds `geoCountryIso`, `geoCountryName`, `geoCity`,
 `geoLocation` (a `{lat, lon}` map), `geoAsn` and `geoAsOrg` alongside them when the event's
-`srcIp` resolves to a public address the databases know. These payload keys are camelCase; the
+`srcIp` resolves to a public address the databases know. User-Agent classification adds
+`uaBrowser`, `uaBrowserVersion`, `uaOs`, `uaOsVersion`, `uaDeviceClass`, `uaAgentClass` and the
+boolean `uaBot` when the event carries a `userAgent`. These payload keys are camelCase; the
 OpenSearch document they are projected into uses snake_case for the same fields (`geo_country_iso`
-… `geo_as_org`, `geo_location` as a `geo_point`) — see Search below.
+… `geo_as_org`, `geo_location` as a `geo_point`, `ua_browser` … `ua_bot`) — see Search below.
 
 ## Runtime flows
 
@@ -152,7 +154,7 @@ nested, in the event's attributes. Lines with repeated keys, trailing content or
 levels of nesting are refused. Format detection supports access logs (`ACCESS_LOG`),
 syslog, JSON, and fallback to plain text. `DefaultLogFileParser` reads the stored file line by line
 through those parsers, normalises into `log_event` batches, enriches each event's payload with
-GeoIP data for its `srcIp` (see below), indexes them via `EventIndexer.indexAfterCommit` into
+GeoIP data for its `srcIp` and a classification of its `userAgent` (see below), indexes them via `EventIndexer.indexAfterCommit` into
 OpenSearch, and calls `markIngested`. Deduplication uses the upstream identifier. Ordering
 guarantees, partitioning key and retention are **TBD**.
 
@@ -174,6 +176,25 @@ fetched from MaxMind during CI) rather than being downloaded per event or per bo
 GeoLite2 database is tens of megabytes, changes on MaxMind's own release cadence rather than
 per deploy, and a missing network path to MaxMind at request time must never be how a log
 search endpoint degrades.
+
+**User-Agent classification (Shipped).** In the same step, `UserAgentEnricher` classifies the
+event's `userAgent` and writes `uaBrowser`, `uaBrowserVersion`, `uaOs`, `uaOsVersion`,
+`uaDeviceClass`, `uaAgentClass` and `uaBot` onto the payload. `YauaaUserAgentEnricher` is the
+production implementation, built on [Yauaa](https://yauaa.basjes.nl/): its rule set ships inside
+the library jar, so unlike GeoIP there is nothing to download, bundle or refresh — a Yauaa upgrade
+is how knowledge of new browsers and crawlers arrives. The analyzer is built once at start-up
+(about three seconds, restricted to the six fields read) and caches the last
+`app.user-agent.cache-size` headers (default 10000), since real traffic repeats a small set of
+them. `uaBot` is true for Yauaa's `Robot`, `Robot Mobile`, `Robot Imitator`, `Cloud Application`
+and `Hacker` classes. Crawlers, command-line tools and HTTP libraries (curl, wget,
+python-requests) and headless browsers all fall in those classes. A `Hacker` header — an injection
+payload, a scanner signature such as sqlmap or Nmap, or a value no real client sends — keeps
+`Hacker` in the two class fields only, so it never shows up as a browser or operating system
+name. A value Yauaa does not know (`Unknown`, `??`) writes no key, and `-` (an access log's "no
+header") is not classified at all. `app.user-agent.enabled=false` under `%test`, where a
+`StubUserAgentEnricher` stands in so no test boot pays for the rule engine;
+`YauaaUserAgentEnricherTest` runs the real one. Yauaa logs through the Log4j 2 API, which
+`log4j2-jboss-logmanager` routes into the Quarkus log.
 
 **Search (Shipped).** `log_event` is projected into an OpenSearch index addressed through the
 `log-events` alias, described in [ADR 0001](adr/0001-log-search-backend.md). The index is
@@ -200,10 +221,10 @@ page, when the index cannot be
 reached. It filters by time, source, severity, source IP (address or CIDR) and HTTP status
 (code or class such as `5xx`). It sorts by event time in either direction and pages by
 `search_after` cursor, never by offset. A hit does not carry the parsed fields — `srcIp`,
-`userAgent`, the `geo*` fields, and so on — as top-level properties; they surface generically
-through its `fields` map (`OpenSearchEventSearch.toHit`), converted back from the index's
-snake_case to the payload's own camelCase key names (`fields.geoCountryIso`, `fields.geoAsn`,
-…). Its contract is documented in `/q/openapi`.
+`userAgent`, the `geo*` and `ua*` fields, and so on — as top-level properties; they surface
+generically through its `fields` map (`OpenSearchEventSearch.toHit`), converted back from the
+index's snake_case to the payload's own camelCase key names (`fields.geoCountryIso`,
+`fields.geoAsn`, `fields.uaBot`, …), with numbers and booleans keeping their JSON type. Its contract is documented in `/q/openapi`.
 
 **Detection (Planned).** Rule evaluation over incoming events, plus AI-assisted detection
 through LangChain4j and anomaly scoring with Smile. Whether detection runs inline with
@@ -256,6 +277,7 @@ an entry here once decided; substantial ones graduate to an ADR under `docs/adr/
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-09-24 | User-Agent classification uses Yauaa at ingestion time, and counts command-line tools, HTTP libraries, headless browsers and attack payloads as bots | Yauaa's rules ship inside the jar, so it adds no data file to fetch or bundle, and it classifies robots and hacking attempts, not only browsers. For a SIEM, "not a person at a browser" is the useful meaning of bot, and curl or sqlmap in a header is as automated as Googlebot |
 | 2026-09-22 | GeoIP enrichment runs at ingestion time, writing geo fields onto the event payload, rather than at read time; the GeoLite2 databases are bundled into the container image rather than fetched per event | A search hit is read far more often than an event is ingested, so resolving `srcIp` once and storing the result avoids repeating the same MaxMind lookup on every page view; bundling the databases keeps a missing network path to MaxMind from ever being how the search endpoint degrades, at the cost of a larger image and a database that ages until the next deploy |
 | 2026-09-15 | Log search runs on OpenSearch as a derived index; PostgreSQL stays the system of record — [ADR 0001](adr/0001-log-search-backend.md) | Aggregations and facets for the analyst dashboard are what PostgreSQL alone answers expensively; keeping the index derived means a failed index is a stale read, never lost data |
 

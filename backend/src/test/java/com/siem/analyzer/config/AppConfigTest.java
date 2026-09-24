@@ -66,4 +66,14 @@ class AppConfigTest {
     void geoipIsDisabledUnderTest() {
         assertFalse(appConfig.geoip().enabled());
     }
+
+    @Test
+    void userAgentDefaultsAreTheDocumentedOnes() {
+        assertEquals(10000, appConfig.userAgent().cacheSize());
+    }
+
+    @Test
+    void userAgentClassificationIsDisabledUnderTest() {
+        assertFalse(appConfig.userAgent().enabled());
+    }
 }

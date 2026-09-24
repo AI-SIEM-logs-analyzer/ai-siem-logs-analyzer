@@ -9,8 +9,9 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies that all geo fields are mapped explicitly in the OpenSearch index. The mapping is
- * strict, so an unmapped geo field would be rejected or fall into attributes.
+ * Verifies that all enrichment fields (geo and User-Agent) are mapped explicitly in the OpenSearch
+ * index. The mapping is strict, so an unmapped enrichment field would be rejected or fall into
+ * attributes.
  */
 class LogEventsMappingTest {
 
@@ -28,6 +29,27 @@ class LogEventsMappingTest {
         JsonNode properties = properties();
 
         GEO_FIELDS.forEach(
+                (field, type) -> {
+                    JsonNode node = properties.get(field);
+                    assertEquals(type, node == null ? null : node.path("type").asText(null), field);
+                });
+    }
+
+    private static final Map<String, String> USER_AGENT_FIELDS =
+            Map.of(
+                    "ua_browser", "keyword",
+                    "ua_browser_version", "keyword",
+                    "ua_os", "keyword",
+                    "ua_os_version", "keyword",
+                    "ua_device_class", "keyword",
+                    "ua_agent_class", "keyword",
+                    "ua_bot", "boolean");
+
+    @Test
+    void everyUserAgentFieldIsMappedExplicitly() throws Exception {
+        JsonNode properties = properties();
+
+        USER_AGENT_FIELDS.forEach(
                 (field, type) -> {
                     JsonNode node = properties.get(field);
                     assertEquals(type, node == null ? null : node.path("type").asText(null), field);

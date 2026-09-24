@@ -16,6 +16,8 @@ import com.siem.analyzer.domain.LogUploadStatus;
 import com.siem.analyzer.domain.Severity;
 import com.siem.analyzer.enrich.GeoEnrichment;
 import com.siem.analyzer.enrich.StubGeoIpEnricher;
+import com.siem.analyzer.enrich.StubUserAgentEnricher;
+import com.siem.analyzer.enrich.UserAgentEnrichment;
 import com.siem.analyzer.repo.LogEventIndexStateRepository;
 import com.siem.analyzer.repo.LogEventRepository;
 import com.siem.analyzer.repo.LogSourceRepository;
@@ -48,6 +50,7 @@ class DefaultLogFileParserTest {
     @Inject LogEventIndexStateRepository indexStateRepository;
     @Inject RecordingEventSearch search;
     @Inject StubGeoIpEnricher geo;
+    @Inject StubUserAgentEnricher userAgents;
 
     @TempDir Path tempDir;
 
@@ -57,6 +60,7 @@ class DefaultLogFileParserTest {
     void setUp() {
         search.reset();
         geo.reset();
+        userAgents.reset();
         source =
                 QuarkusTransaction.requiringNew()
                         .call(
@@ -190,6 +194,71 @@ class DefaultLogFileParserTest {
     }
 
     @Test
+    void userAgentFieldsLandInThePayloadAndReachTheIndex() throws IOException {
+        userAgents.answer(
+                "curl/8.4.0",
+                new UserAgentEnrichment("Curl", "8.4.0", "Cloud", null, "Robot", "Robot", true));
+        userAgents.answer(
+                "Mozilla/5.0",
+                new UserAgentEnrichment(
+                        "Firefox", "121.0", "Ubuntu", null, "Desktop", "Browser", false));
+
+        String content =
+                "198.51.100.2 - - [14/Sep/2026:10:15:35 +0000] \"POST /api/data HTTP/1.1\" 401"
+                        + " 128 \"-\" \"curl/8.4.0\"\n"
+                        + "198.51.100.3 - - [14/Sep/2026:10:15:36 +0000] \"GET / HTTP/1.1\" 200"
+                        + " 64 \"-\" \"Mozilla/5.0\"\n";
+
+        Path file = write("access-ua.log", content);
+        Long uploadId = createUpload(file, LogFormat.ACCESS_LOG);
+
+        parser.parse(createIngestEvent(uploadId, file));
+
+        List<LogEvent> events = listEvents(source.getId());
+        assertEquals(2, events.size());
+        Map<String, Object> bot = payloadWithUserAgent(events, "curl/8.4.0");
+        assertEquals("Curl", bot.get("uaBrowser"));
+        assertEquals("8.4.0", bot.get("uaBrowserVersion"));
+        assertEquals("Cloud", bot.get("uaOs"));
+        assertEquals("Robot", bot.get("uaDeviceClass"));
+        assertEquals("Robot", bot.get("uaAgentClass"));
+        assertEquals(Boolean.TRUE, bot.get("uaBot"));
+        // The classifier had no OS version for it, so no key rather than a null or a placeholder.
+        assertFalse(bot.containsKey("uaOsVersion"));
+
+        Map<String, Object> human = payloadWithUserAgent(events, "Mozilla/5.0");
+        assertEquals("Firefox", human.get("uaBrowser"));
+        // false is a finding of its own, so it is written, unlike an absent value.
+        assertEquals(Boolean.FALSE, human.get("uaBot"));
+
+        IndexableEvent indexedBot =
+                search.indexed().stream()
+                        .filter(e -> "curl/8.4.0".equals(e.userAgent()))
+                        .findFirst()
+                        .orElseThrow();
+        assertEquals("Curl", indexedBot.uaBrowser());
+        assertEquals(Boolean.TRUE, indexedBot.uaBot());
+    }
+
+    @Test
+    void anUnclassifiedUserAgentGetsNoUserAgentKeys() throws IOException {
+        String content =
+                "203.0.113.7 - - [14/Sep/2026:10:15:30 +0000] \"GET / HTTP/1.1\" 200 512"
+                        + " \"-\" \"-\"\n";
+
+        Path file = write("access-no-ua.log", content);
+        Long uploadId = createUpload(file, LogFormat.ACCESS_LOG);
+
+        parser.parse(createIngestEvent(uploadId, file));
+
+        List<LogEvent> events = listEvents(source.getId());
+        assertEquals(1, events.size());
+        Map<String, Object> payload = events.get(0).getPayload();
+        assertFalse(payload.containsKey("uaBrowser"));
+        assertFalse(payload.containsKey("uaBot"));
+    }
+
+    @Test
     void parsesSyslogFileAndIndexesEvents() throws IOException {
         String content =
                 "<34>1 2026-09-14T22:14:15.003Z host1 sshd 1234 ID47 - Failed password for root\n"
@@ -314,6 +383,14 @@ class DefaultLogFileParserTest {
                         Instant.now());
 
         assertThrows(NotFoundException.class, () -> parser.parse(ingestEvent));
+    }
+
+    private static Map<String, Object> payloadWithUserAgent(List<LogEvent> events, String ua) {
+        return events.stream()
+                .map(LogEvent::getPayload)
+                .filter(p -> ua.equals(p.get("userAgent")))
+                .findFirst()
+                .orElseThrow();
     }
 
     private Path write(String name, String content) throws IOException {

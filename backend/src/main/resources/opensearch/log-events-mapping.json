@@ -39,6 +39,13 @@
         "type": "keyword",
         "fields": { "text": { "type": "text" } }
       },
+      "ua_browser": { "type": "keyword" },
+      "ua_browser_version": { "type": "keyword" },
+      "ua_os": { "type": "keyword" },
+      "ua_os_version": { "type": "keyword" },
+      "ua_device_class": { "type": "keyword" },
+      "ua_agent_class": { "type": "keyword" },
+      "ua_bot": { "type": "boolean" },
       "message": {
         "type": "text",
         "fields": { "keyword": { "type": "keyword", "ignore_above": 1024 } }

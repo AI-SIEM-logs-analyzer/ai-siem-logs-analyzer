@@ -59,7 +59,10 @@ public record EventSearchResponse(
                                             + " host, srcIp, status, method, path, ..., and when the"
                                             + " source address was enriched: geoCountryIso,"
                                             + " geoCountryName, geoCity, geoLatitude, geoLongitude,"
-                                            + " geoAsn, geoAsOrg")
+                                            + " geoAsn, geoAsOrg; and when the User-Agent was"
+                                            + " classified: uaBrowser, uaBrowserVersion, uaOs,"
+                                            + " uaOsVersion, uaDeviceClass, uaAgentClass, uaBot"
+                                            + " (a boolean)")
                     Map<String, Object> fields) {
 
         static Hit from(EventHit hit) {

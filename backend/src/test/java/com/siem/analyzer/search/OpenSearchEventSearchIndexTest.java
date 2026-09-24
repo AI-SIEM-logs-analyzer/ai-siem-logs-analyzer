@@ -112,6 +112,39 @@ class OpenSearchEventSearchIndexTest {
     }
 
     @Test
+    void aClassifiedEventKeepsItsUserAgentFieldsInTheDocument() throws IOException {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("userAgent", "curl/8.4.0");
+        payload.put("uaBrowser", "Curl");
+        payload.put("uaBrowserVersion", "8.4.0");
+        payload.put("uaDeviceClass", "Robot");
+        payload.put("uaAgentClass", "Robot");
+        payload.put("uaBot", true);
+        search.index(List.of(event(9007L, "classified", payload)));
+        refresh();
+
+        JsonNode source = document(9007L).path("_source");
+
+        assertEquals("Curl", source.path("ua_browser").asText());
+        assertEquals("8.4.0", source.path("ua_browser_version").asText());
+        assertEquals("Robot", source.path("ua_device_class").asText());
+        assertTrue(source.path("ua_bot").isBoolean());
+        assertTrue(source.path("ua_bot").booleanValue());
+        assertFalse(source.has("ua_os"));
+    }
+
+    @Test
+    void anEventWithoutUserAgentDataWritesNoUserAgentFields() throws IOException {
+        search.index(List.of(event(9008L, "not classified", Map.of())));
+        refresh();
+
+        JsonNode source = document(9008L).path("_source");
+
+        assertFalse(source.has("ua_browser"));
+        assertFalse(source.has("ua_bot"));
+    }
+
+    @Test
     void reportsTheEngineAsAvailable() {
         assertTrue(search.available());
     }

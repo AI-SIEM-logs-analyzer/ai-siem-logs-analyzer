@@ -53,6 +53,10 @@ public interface AppConfig {
     @Valid
     Geoip geoip();
 
+    /** User-Agent classification settings. */
+    @Valid
+    UserAgent userAgent();
+
     /** Settings for the line parsers in {@code com.siem.analyzer.parse}. */
     interface Parse {
 
@@ -198,6 +202,25 @@ public interface AppConfig {
         @WithDefault(
                 "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8,169.254.0.0/16,::1/128,fc00::/7")
         List<String> skippedNetworks();
+    }
+
+    /**
+     * Yauaa User-Agent classification. Disabled deployments still start; events simply carry no
+     * browser, operating system or bot fields.
+     */
+    interface UserAgent {
+
+        /** Whether events are classified at all. */
+        @WithDefault("true")
+        boolean enabled();
+
+        /**
+         * How many distinct headers keep their classification in memory. Traffic repeats a small
+         * set of headers, so a hit here skips the rule engine entirely.
+         */
+        @WithDefault("10000")
+        @Min(0)
+        int cacheSize();
     }
 
     /** Settings for log file upload storage. */

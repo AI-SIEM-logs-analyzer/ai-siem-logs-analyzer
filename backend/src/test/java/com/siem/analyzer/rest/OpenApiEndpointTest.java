@@ -74,6 +74,18 @@ class OpenApiEndpointTest {
     }
 
     @Test
+    void documentsTheUserAgentFieldsOnASearchHit() {
+        given().accept("application/json")
+                .when()
+                .get("/q/openapi")
+                .then()
+                .statusCode(200)
+                .body(
+                        "components.schemas.EventHit.properties.fields.description",
+                        allOf(containsString("uaBrowser"), containsString("uaBot")));
+    }
+
+    @Test
     void swaggerUiIsServedOutsideDevMode() {
         given().when().get("/q/swagger-ui").then().statusCode(200);
     }
