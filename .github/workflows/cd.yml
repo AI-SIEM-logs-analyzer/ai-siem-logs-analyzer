@@ -54,11 +54,13 @@ jobs:
             exit 1
           fi
           mkdir -p src/main/jib/opt/geoip
+          TMP_GEOIP=$(mktemp -d)
+          trap 'rm -rf "$TMP_GEOIP"' EXIT
           for edition in GeoLite2-City GeoLite2-ASN; do
             curl -fsSL \
               "https://download.maxmind.com/app/geoip_download?edition_id=${edition}&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" \
-              | tar -xz -C /tmp
-            find /tmp -name "${edition}.mmdb" -exec mv {} "src/main/jib/opt/geoip/${edition}.mmdb" \;
+              | tar -xz -C "$TMP_GEOIP"
+            find "$TMP_GEOIP" -name "${edition}.mmdb" -exec mv {} "src/main/jib/opt/geoip/${edition}.mmdb" \;
           done
           ls -la src/main/jib/opt/geoip
 
