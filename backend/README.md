@@ -104,8 +104,29 @@ for f in target/synthetic-logs/*.log target/synthetic-logs/*.ndjson; do
 done
 ```
 
+### Mixing in your own scenarios
+
+`--inject DIR` interleaves existing log files with the generated traffic — samples from a public
+dataset, or scenarios you wrote for a detection rule. Each file in `DIR` is one scenario,
+labelled with its file name (`ssh-sample.log` → `ssh-sample`). Its lines keep their spacing
+from each other and the whole file is moved to a random point of the span; each line is sorted
+into the output stream of its own format (access log, RFC 5424 / BSD syslog, JSON), with its
+timestamp rewritten. Lines in none of those shapes are skipped and counted in the manifest.
+
+```bash
+make synth-logs SYNTH_ARGS="--events 500000 --inject ./scenarios"                      # each file once
+make synth-logs SYNTH_ARGS="--events 500000 --inject ./scenarios --inject-ratio 0.02"  # 2% of the lines
+```
+
+`--events` stays the total: injected lines replace generated ones. With `--inject-ratio` the
+files are repeated, round-robin, until they make up that share. Every injected line is listed in
+`ground-truth.csv` — output file, line number, timestamp, label, instance and source line — so
+detection results can be scored for hits and false positives. `manifest.json` counts the lines
+per label.
+
 `SyntheticLogsParseTest` runs the generator at 100k events and checks that every line is
-accepted by the production parsers and detected as the right format.
+accepted by the production parsers and detected as the right format; it also checks that
+injected lines land where `ground-truth.csv` says and keep their relative timing.
 
 ## Persistence
 

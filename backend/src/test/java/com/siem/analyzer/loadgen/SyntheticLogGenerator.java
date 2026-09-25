@@ -7,14 +7,18 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -24,6 +28,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Writes synthetic, benign log files for exercising ingestion, indexing and search at scale.
@@ -92,6 +98,10 @@ public final class SyntheticLogGenerator {
      * @param span how much time the events cover
      * @param streams which streams to write
      * @param maxFileBytes a file is rolled over before it grows past this size
+     * @param injectDir directory of log files to interleave with the generated traffic, or {@code
+     *     null} for none; see {@link Injector}
+     * @param injectRatio share of {@code events} the injected lines should make up, repeating the
+     *     files as often as needed; negative to inject every file exactly once
      */
     public record Options(
             long events,
@@ -100,7 +110,9 @@ public final class SyntheticLogGenerator {
             Instant start,
             Duration span,
             Set<Stream> streams,
-            long maxFileBytes) {
+            long maxFileBytes,
+            Path injectDir,
+            double injectRatio) {
 
         public static final long DEFAULT_EVENTS = 100_000;
         public static final long DEFAULT_SEED = 42;
@@ -122,7 +134,25 @@ public final class SyntheticLogGenerator {
             if (maxFileBytes < 4096) {
                 throw new IllegalArgumentException("max-file-bytes must be at least 4096");
             }
+            if (injectRatio >= 1) {
+                throw new IllegalArgumentException("inject-ratio must be below 1");
+            }
+            if (injectRatio >= 0 && injectDir == null) {
+                throw new IllegalArgumentException("inject-ratio needs --inject");
+            }
             streams = Set.copyOf(streams);
+        }
+
+        /** Generated traffic only, nothing injected. */
+        public Options(
+                long events,
+                Path outDir,
+                long seed,
+                Instant start,
+                Duration span,
+                Set<Stream> streams,
+                long maxFileBytes) {
+            this(events, outDir, seed, start, span, streams, maxFileBytes, null, -1);
         }
 
         /** Defaults: 100k events over the last day, every stream, into {@code outDir}. */
@@ -147,6 +177,8 @@ public final class SyntheticLogGenerator {
             Duration span = options.span();
             Set<Stream> streams = options.streams();
             long maxFileBytes = options.maxFileBytes();
+            Path injectDir = null;
+            double injectRatio = -1;
 
             for (int i = 0; i < args.length; i++) {
                 String flag = args[i];
@@ -165,13 +197,24 @@ public final class SyntheticLogGenerator {
                     case "--span" -> span = Duration.parse(value);
                     case "--streams" -> streams = parseStreams(value);
                     case "--max-file-bytes" -> maxFileBytes = Long.parseLong(value);
+                    case "--inject" -> injectDir = Path.of(value);
+                    case "--inject-ratio" -> injectRatio = Double.parseDouble(value);
                     default -> throw new UsageException("unknown option " + flag);
                 }
             }
             if (start == null) {
                 start = Instant.now().truncatedTo(ChronoUnit.MINUTES).minus(span);
             }
-            return new Options(events, outDir, seed, start, span, streams, maxFileBytes);
+            return new Options(
+                    events,
+                    outDir,
+                    seed,
+                    start,
+                    span,
+                    streams,
+                    maxFileBytes,
+                    injectDir,
+                    injectRatio);
         }
 
         private static Set<Stream> parseStreams(String value) {
@@ -189,9 +232,19 @@ public final class SyntheticLogGenerator {
      * @param events lines written across every file
      * @param linesPerFile lines per file name, in the order the files were opened
      * @param linesPerStream lines per stream
+     * @param injectedPerLabel injected lines per label, empty when nothing was injected
      */
     public record Summary(
-            long events, Map<String, Long> linesPerFile, Map<Stream, Long> linesPerStream) {}
+            long events,
+            Map<String, Long> linesPerFile,
+            Map<Stream, Long> linesPerStream,
+            Map<String, Long> injectedPerLabel) {
+
+        /** Lines that came from {@code --inject} rather than from the generator. */
+        public long injected() {
+            return injectedPerLabel.values().stream().mapToLong(Long::longValue).sum();
+        }
+    }
 
     /** Bad command line; a {@code null} message asks for the usage text alone. */
     static final class UsageException extends RuntimeException {
@@ -212,6 +265,10 @@ public final class SyntheticLogGenerator {
               --span DURATION      time covered, ISO-8601, e.g. PT6H or P7D (default P1D)
               --streams LIST       any of access,syslog,json (default all)
               --max-file-bytes N   roll a file over before this size (default 50331648)
+              --inject DIR         interleave the log files in DIR, labelled by file name,
+                                   and list where each line landed in ground-truth.csv
+              --inject-ratio R     make injected lines this share of --events, repeating
+                                   the files as needed, e.g. 0.02 (default: each file once)
             """;
 
     /** Relative traffic per hour of the day, UTC: a night trough and an afternoon peak. */
@@ -388,11 +445,25 @@ public final class SyntheticLogGenerator {
     }
 
     private Summary run() throws IOException {
+        Injector.Plan plan =
+                options.injectDir() == null
+                        ? new Injector.Plan(List.of(), 0)
+                        : Injector.plan(options);
+        List<Injected> injected = plan.lines();
+
         Map<Stream, RollingWriter> writers = new EnumMap<>(Stream.class);
         for (Stream stream : options.streams()) {
             writers.put(
                     stream, new RollingWriter(options.outDir(), stream, options.maxFileBytes()));
         }
+        for (Injected line : injected) {
+            // An injected file may be in a format whose generated stream is switched off.
+            writers.computeIfAbsent(
+                    line.stream(),
+                    stream -> new RollingWriter(options.outDir(), stream, options.maxFileBytes()));
+        }
+        long benign = Math.max(0, options.events() - injected.size());
+        Map<String, Long> perLabel = new LinkedHashMap<>();
 
         long minutes = options.span().toMinutes();
         double totalWeight = 0;
@@ -402,23 +473,35 @@ public final class SyntheticLogGenerator {
 
         long written = 0;
         double carry = 0;
-        try {
+        int next = 0;
+        try (BufferedWriter truth =
+                injected.isEmpty()
+                        ? null
+                        : Files.newBufferedWriter(
+                                options.outDir().resolve("ground-truth.csv"),
+                                StandardCharsets.UTF_8)) {
+            if (truth != null) {
+                truth.write("file,line,timestamp,label,instance,origin\n");
+            }
             for (long m = 0; m < minutes; m++) {
                 // Largest-remainder rounding keeps the curve and hits the requested total exactly.
-                double exact = options.events() * weightOf(m) / totalWeight + carry;
+                double exact = benign * weightOf(m) / totalWeight + carry;
                 long count = (long) exact;
                 carry = exact - count;
                 if (m == minutes - 1) {
-                    count = options.events() - written;
+                    count = benign - written;
                 }
                 Instant minuteStart = options.start().plus(Duration.ofMinutes(m));
                 for (int offset : sortedOffsets(count)) {
                     Instant at = minuteStart.plusMillis(offset);
+                    next = writeInjected(injected, next, at, writers, truth, perLabel);
                     Stream stream = streamTable[random.nextInt(streamTable.length)];
                     writers.get(stream).write(line(stream, at));
                 }
                 written += count;
             }
+            writeInjected(injected, next, Instant.MAX, writers, truth, perLabel);
+            written += injected.size();
         } finally {
             for (RollingWriter writer : writers.values()) {
                 writer.close();
@@ -431,9 +514,53 @@ public final class SyntheticLogGenerator {
             perFile.putAll(entry.getValue().linesPerFile);
             perStream.put(entry.getKey(), entry.getValue().totalLines);
         }
-        Summary summary = new Summary(written, perFile, perStream);
-        writeManifest(summary);
+        Summary summary = new Summary(written, perFile, perStream, perLabel);
+        writeManifest(summary, plan.skipped());
         return summary;
+    }
+
+    /**
+     * Writes the injected lines due at or before {@code until}, in time order, and records where
+     * each one landed.
+     *
+     * @return the index of the first injected line not yet written
+     */
+    private static int writeInjected(
+            List<Injected> injected,
+            int from,
+            Instant until,
+            Map<Stream, RollingWriter> writers,
+            BufferedWriter truth,
+            Map<String, Long> perLabel)
+            throws IOException {
+        int index = from;
+        while (index < injected.size() && !injected.get(index).at().isAfter(until)) {
+            Injected line = injected.get(index);
+            Position position = writers.get(line.stream()).write(line.line());
+            truth.write(
+                    csv(position.file())
+                            + ","
+                            + position.line()
+                            + ","
+                            + ISO_MILLIS.format(line.at())
+                            + ","
+                            + csv(line.label())
+                            + ","
+                            + line.instance()
+                            + ","
+                            + csv(line.origin())
+                            + "\n");
+            perLabel.merge(line.label(), 1L, Long::sum);
+            index++;
+        }
+        return index;
+    }
+
+    private static String csv(String value) {
+        if (value.indexOf(',') < 0 && value.indexOf('"') < 0 && value.indexOf('\n') < 0) {
+            return value;
+        }
+        return "\"" + value.replace("\"", "\"\"") + "\"";
     }
 
     private double weightOf(long minute) {
@@ -854,7 +981,7 @@ public final class SyntheticLogGenerator {
         return table.toArray(Stream[]::new);
     }
 
-    private void writeManifest(Summary summary) throws IOException {
+    private void writeManifest(Summary summary, long skipped) throws IOException {
         StringBuilder files = new StringBuilder();
         summary.linesPerFile()
                 .forEach(
@@ -864,6 +991,15 @@ public final class SyntheticLogGenerator {
                             }
                             files.append("    \"").append(file).append("\": ").append(lines);
                         });
+        StringBuilder labels = new StringBuilder();
+        summary.injectedPerLabel()
+                .forEach(
+                        (label, lines) ->
+                                labels.append(labels.isEmpty() ? "\n" : ",\n")
+                                        .append("    \"")
+                                        .append(json(label))
+                                        .append("\": ")
+                                        .append(lines));
         String manifest =
                 "{\n  \"seed\": "
                         + options.seed()
@@ -873,10 +1009,294 @@ public final class SyntheticLogGenerator {
                         + options.start().plus(options.span())
                         + "\",\n  \"events\": "
                         + summary.events()
+                        + ",\n  \"injected\": "
+                        + summary.injected()
+                        + ",\n  \"injectSkippedLines\": "
+                        + skipped
                         + ",\n  \"files\": {\n"
                         + files
-                        + "\n  }\n}\n";
+                        + "\n  },\n  \"labels\": {"
+                        + labels
+                        + (labels.isEmpty() ? "" : "\n  ")
+                        + "}\n}\n";
         Files.writeString(options.outDir().resolve("manifest.json"), manifest);
+    }
+
+    /** Where a line was written: file name and 1-based line number. */
+    private record Position(String file, long line) {}
+
+    /** One line taken from {@code --inject}, re-timed and ready to write. */
+    private record Injected(
+            Instant at, Stream stream, String line, String label, int instance, String origin) {}
+
+    /**
+     * Interleaves log files from {@code --inject} with the generated traffic.
+     *
+     * <p>Every file in the directory is one scenario, labelled with the file name minus its
+     * extension. Its lines keep their spacing relative to each other and the whole file is moved
+     * to a random point of the span, so the timestamps match the rest of the output. Each line is
+     * sorted into the stream of its own format, so one file may mix formats:
+     *
+     * <ul>
+     *   <li>a line starting with {@code {} is JSON; the first of {@code @timestamp}, {@code
+     *       timestamp}, {@code time} or {@code ts} is rewritten, or {@code @timestamp} is added;
+     *   <li>RFC 5424 syslog has its timestamp rewritten in place;
+     *   <li>BSD syslog gets an RFC 3339 timestamp, which carries the year its own format lacks,
+     *       and the {@code <13>} priority RFC 3164 tells a relay to add when a line has none;
+     *   <li>Common or Combined access-log lines have the bracketed date rewritten.
+     * </ul>
+     *
+     * <p>Lines in none of these shapes are skipped and counted in the manifest. A line whose
+     * timestamp cannot be read keeps the offset of the line before it.
+     */
+    private static final class Injector {
+
+        record Plan(List<Injected> lines, long skipped) {}
+
+        private record Template(
+                Stream stream,
+                long offsetMillis,
+                String prefix,
+                TimeStyle style,
+                String suffix,
+                int sourceLine) {}
+
+        private record Scenario(String label, String fileName, List<Template> lines, long length) {}
+
+        private enum TimeStyle {
+            HTTP,
+            ISO
+        }
+
+        private static final Pattern JSON_TIME =
+                Pattern.compile("\"(?:@timestamp|timestamp|time|ts)\"\\s*:\\s*\"([^\"]*)\"");
+
+        private static final Pattern RFC5424 = Pattern.compile("^(<\\d{1,3}>1 )(\\S+)( .*)$");
+
+        private static final Pattern BSD =
+                Pattern.compile(
+                        "^(<\\d{1,3}>)?([A-Z][a-z]{2}) {1,2}(\\d{1,2}) (\\d{2}:\\d{2}:\\d{2})( .*)$");
+
+        private static final Pattern ACCESS =
+                Pattern.compile("^(\\S+ \\S+ \\S+ \\[)([^\\]]+)(\\] \".*)$");
+
+        private static final DateTimeFormatter HTTP_IN =
+                DateTimeFormatter.ofPattern("dd/MMM/yyyy:HH:mm:ss Z", Locale.ENGLISH);
+
+        private static final DateTimeFormatter BSD_IN =
+                DateTimeFormatter.ofPattern("yyyy MMM d HH:mm:ss", Locale.ENGLISH);
+
+        private Injector() {}
+
+        static Plan plan(Options options) throws IOException {
+            long[] skipped = {0};
+            List<Scenario> scenarios = new ArrayList<>();
+            List<Path> files;
+            try (java.util.stream.Stream<Path> listing = Files.list(options.injectDir())) {
+                files =
+                        listing.filter(Files::isRegularFile)
+                                .filter(path -> !path.getFileName().toString().startsWith("."))
+                                .sorted()
+                                .toList();
+            }
+            for (Path file : files) {
+                Scenario scenario = read(file, skipped);
+                if (!scenario.lines().isEmpty()) {
+                    scenarios.add(scenario);
+                }
+            }
+            if (scenarios.isEmpty()) {
+                throw new IllegalArgumentException("no usable log lines in " + options.injectDir());
+            }
+
+            // Separate from the generator's random source, so the traffic around the injected
+            // lines does not shift when the injected files change.
+            SplittableRandom random = new SplittableRandom(options.seed() * 31 + 17);
+            long spanMillis = options.span().toMillis();
+            long target =
+                    options.injectRatio() < 0
+                            ? Long.MAX_VALUE
+                            : Math.round(options.events() * options.injectRatio());
+
+            List<Injected> lines = new ArrayList<>();
+            int instance = 0;
+            while (lines.size() < target) {
+                Scenario scenario = scenarios.get(instance % scenarios.size());
+                instance++;
+                long room = Math.max(0, spanMillis - scenario.length());
+                Instant base =
+                        options.start().plusMillis(room == 0 ? 0 : random.nextLong(room + 1));
+                for (Template template : scenario.lines()) {
+                    if (lines.size() >= target) {
+                        break;
+                    }
+                    Instant at = base.plusMillis(template.offsetMillis());
+                    String time =
+                            template.style() == TimeStyle.HTTP
+                                    ? HTTP_DATE.format(at)
+                                    : ISO_MILLIS.format(at);
+                    lines.add(
+                            new Injected(
+                                    at,
+                                    template.stream(),
+                                    template.prefix() + time + template.suffix(),
+                                    scenario.label(),
+                                    instance,
+                                    scenario.fileName() + ":" + template.sourceLine()));
+                }
+                if (options.injectRatio() < 0 && instance == scenarios.size()) {
+                    break;
+                }
+            }
+            lines.sort(Comparator.comparing(Injected::at));
+            return new Plan(lines, skipped[0]);
+        }
+
+        private static Scenario read(Path file, long[] skipped) throws IOException {
+            String fileName = file.getFileName().toString();
+            int dot = fileName.lastIndexOf('.');
+            String label = dot > 0 ? fileName.substring(0, dot) : fileName;
+
+            List<String> raw = Files.readAllLines(file, StandardCharsets.UTF_8);
+            List<Template> parsed = new ArrayList<>();
+            List<Instant> times = new ArrayList<>();
+            List<String> yearless = new ArrayList<>();
+            for (int i = 0; i < raw.size(); i++) {
+                String line = raw.get(i).strip();
+                if (line.isEmpty()) {
+                    continue;
+                }
+                Instant[] time = {null};
+                String[] bsdTime = {null};
+                Template template = template(line, i + 1, time, bsdTime);
+                if (template == null) {
+                    skipped[0]++;
+                    continue;
+                }
+                parsed.add(template);
+                times.add(time[0]);
+                yearless.add(bsdTime[0]);
+            }
+
+            // BSD syslog has no year. Take it from the file's first dated line, so a file mixing
+            // the two formats keeps its lines seconds apart rather than years apart.
+            int year =
+                    times.stream()
+                            .filter(t -> t != null)
+                            .findFirst()
+                            .map(t -> t.atZone(ZoneOffset.UTC).getYear())
+                            .orElse(2024);
+            for (int i = 0; i < yearless.size(); i++) {
+                if (yearless.get(i) != null) {
+                    times.set(i, bsdInstant(year, yearless.get(i)));
+                }
+            }
+
+            Instant first =
+                    times.stream().filter(t -> t != null).min(Instant::compareTo).orElse(null);
+            List<Template> lines = new ArrayList<>();
+            long previous = 0;
+            for (int i = 0; i < parsed.size(); i++) {
+                Template template = parsed.get(i);
+                long offset =
+                        times.get(i) == null || first == null
+                                ? previous
+                                : Duration.between(first, times.get(i)).toMillis();
+                previous = offset;
+                lines.add(
+                        new Template(
+                                template.stream(),
+                                offset,
+                                template.prefix(),
+                                template.style(),
+                                template.suffix(),
+                                template.sourceLine()));
+            }
+            lines.sort(Comparator.comparingLong(Template::offsetMillis));
+            long length = lines.isEmpty() ? 0 : lines.getLast().offsetMillis();
+            return new Scenario(label, fileName, lines, length);
+        }
+
+        /** Splits a line around its timestamp; {@code null} when the shape is not recognised. */
+        private static Template template(
+                String line, int sourceLine, Instant[] time, String[] bsdTime) {
+            if (line.startsWith("{")) {
+                Matcher match = JSON_TIME.matcher(line);
+                if (match.find()) {
+                    time[0] = instant(match.group(1));
+                    return new Template(
+                            Stream.JSON,
+                            0,
+                            line.substring(0, match.start(1)),
+                            TimeStyle.ISO,
+                            line.substring(match.end(1)),
+                            sourceLine);
+                }
+                String rest = line.substring(1).strip();
+                return new Template(
+                        Stream.JSON,
+                        0,
+                        "{\"@timestamp\":\"",
+                        TimeStyle.ISO,
+                        rest.startsWith("}") ? "\"" + rest : "\"," + rest,
+                        sourceLine);
+            }
+            Matcher rfc5424 = RFC5424.matcher(line);
+            if (rfc5424.matches()) {
+                time[0] = instant(rfc5424.group(2));
+                return new Template(
+                        Stream.SYSLOG,
+                        0,
+                        rfc5424.group(1),
+                        TimeStyle.ISO,
+                        rfc5424.group(3),
+                        sourceLine);
+            }
+            Matcher bsd = BSD.matcher(line);
+            if (bsd.matches()) {
+                bsdTime[0] = bsd.group(2) + " " + bsd.group(3) + " " + bsd.group(4);
+                String priority = bsd.group(1) == null ? "<13>" : bsd.group(1);
+                return new Template(
+                        Stream.SYSLOG, 0, priority, TimeStyle.ISO, bsd.group(5), sourceLine);
+            }
+            Matcher access = ACCESS.matcher(line);
+            if (access.matches()) {
+                try {
+                    time[0] = OffsetDateTime.parse(access.group(2), HTTP_IN).toInstant();
+                } catch (DateTimeException e) {
+                    time[0] = null;
+                }
+                return new Template(
+                        Stream.ACCESS,
+                        0,
+                        access.group(1),
+                        TimeStyle.HTTP,
+                        access.group(3),
+                        sourceLine);
+            }
+            return null;
+        }
+
+        private static Instant bsdInstant(int year, String monthDayTime) {
+            try {
+                return LocalDateTime.parse(year + " " + monthDayTime, BSD_IN)
+                        .toInstant(ZoneOffset.UTC);
+            } catch (DateTimeException e) {
+                return null;
+            }
+        }
+
+        private static Instant instant(String value) {
+            try {
+                return OffsetDateTime.parse(value).toInstant();
+            } catch (DateTimeException e) {
+                try {
+                    return LocalDateTime.parse(value).toInstant(ZoneOffset.UTC);
+                } catch (DateTimeException ignored) {
+                    return null;
+                }
+            }
+        }
     }
 
     /** Appends lines to {@code prefix-NNNN.ext}, opening the next file before one grows too big. */
@@ -898,7 +1318,7 @@ public final class SyntheticLogGenerator {
             this.maxBytes = maxBytes;
         }
 
-        void write(String line) {
+        Position write(String line) {
             // Every character written is ASCII, so the string length is the byte count.
             long size = line.length() + 1L;
             try {
@@ -912,7 +1332,7 @@ public final class SyntheticLogGenerator {
             }
             currentBytes += size;
             totalLines++;
-            linesPerFile.merge(currentName, 1L, Long::sum);
+            return new Position(currentName, linesPerFile.merge(currentName, 1L, Long::sum));
         }
 
         private void open() throws IOException {
