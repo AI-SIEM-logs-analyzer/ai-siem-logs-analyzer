@@ -45,5 +45,8 @@ jobs:
       - name: Type check (tsc --noEmit)
         run: pnpm typecheck
 
-      # Testele (Vitest) și build-ul (Vite) revin odată cu scheletul aplicației —
-      # deocamdată frontend/ conține doar configurația de tooling.
+      - name: Teste (Vitest)
+        run: pnpm test
+
+      - name: Build (Vite)
+        run: pnpm exec vite build
