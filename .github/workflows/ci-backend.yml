@@ -60,6 +60,16 @@ jobs:
       - name: Build + teste (JUnit5 + RestAssured, Testcontainers)
         run: ./mvnw -B clean verify
 
+      # The build writes the spec to target/openapi/ (quarkus.smallrye-openapi.store-schema-directory).
+      # The frontend's typed client is generated from the committed copy, so an API change has to
+      # bring that copy along: `make api-client` refreshes it and regenerates the types.
+      - name: Verifică că frontend/openapi/openapi.json e la zi
+        run: |
+          if ! diff -u ../frontend/openapi/openapi.json target/openapi/openapi.json; then
+            echo "::error file=frontend/openapi/openapi.json::The OpenAPI spec changed. Run 'make api-client' and commit the result."
+            exit 1
+          fi
+
       # `warn`, nu `ignore`: raportul lipsește legitim când build-ul pică înainte de teste,
       # dar lipsește la fel de tăcut și când agentul JaCoCo încetează să mai ruleze (argLine
       # suprascris, execuția scoasă din pom). `ignore` face cele două cazuri

@@ -1,0 +1,1353 @@
+{
+  "openapi" : "3.1.0",
+  "components" : {
+    "schemas" : {
+      "ChangePasswordRequest" : {
+        "type" : "object",
+        "required" : [ "password" ],
+        "properties" : {
+          "password" : {
+            "type" : "string",
+            "pattern" : "\\S",
+            "minLength" : 12,
+            "maxLength" : 128
+          }
+        }
+      },
+      "CreateUserRequest" : {
+        "type" : "object",
+        "required" : [ "username", "password", "roles" ],
+        "properties" : {
+          "username" : {
+            "type" : "string",
+            "pattern" : "^[a-z0-9](?:[a-z0-9._-]{1,62}[a-z0-9])$"
+          },
+          "email" : {
+            "type" : "string",
+            "maxLength" : 254
+          },
+          "password" : {
+            "type" : "string",
+            "pattern" : "\\S",
+            "minLength" : 12,
+            "maxLength" : 128
+          },
+          "roles" : {
+            "type" : "array",
+            "uniqueItems" : true,
+            "items" : {
+              "$ref" : "#/components/schemas/Role"
+            },
+            "minItems" : 1
+          }
+        }
+      },
+      "EventFacets" : {
+        "type" : "object",
+        "properties" : {
+          "bySeverity" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "integer",
+              "format" : "int64"
+            }
+          },
+          "bySourceId" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "integer",
+              "format" : "int64"
+            }
+          },
+          "byHost" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "integer",
+              "format" : "int64"
+            }
+          },
+          "bySrcIp" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "integer",
+              "format" : "int64"
+            }
+          },
+          "overTime" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/TimeBucket"
+            }
+          }
+        }
+      },
+      "EventHit" : {
+        "type" : "object",
+        "description" : "One matching event",
+        "properties" : {
+          "eventId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "sourceId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "occurredAt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "ingestedAt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "severity" : {
+            "$ref" : "#/components/schemas/Severity",
+            "type" : "object"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "raw" : {
+            "type" : "string"
+          },
+          "fields" : {
+            "type" : "object",
+            "additionalProperties" : { },
+            "description" : "Standard parsed fields present on this event, in camelCase: host, srcIp, status, method, path, ..., and when the source address was enriched: geoCountryIso, geoCountryName, geoCity, geoLatitude, geoLongitude, geoAsn, geoAsOrg; and when the User-Agent was classified: uaBrowser, uaBrowserVersion, uaOs, uaOsVersion, uaDeviceClass, uaAgentClass, uaBot (a boolean)"
+          }
+        }
+      },
+      "EventSearchResponse" : {
+        "description" : "One page of matching events",
+        "type" : "object",
+        "properties" : {
+          "hits" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EventHit"
+            }
+          },
+          "totalHits" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Events matching the filters across all pages"
+          },
+          "nextCursorOccurredAt" : {
+            "description" : "Send back as cursorOccurredAt for the next page; null on the last page",
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Instant"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "nextCursorEventId" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Send back as cursorEventId for the next page; null on the last page"
+          },
+          "facets" : {
+            "description" : "Aggregations over the whole match; empty unless facets=true",
+            "type" : "object",
+            "$ref" : "#/components/schemas/EventFacets"
+          }
+        }
+      },
+      "Instant" : {
+        "type" : "string",
+        "format" : "date-time",
+        "examples" : [ "2022-03-10T16:15:50Z" ]
+      },
+      "LogFormat" : {
+        "type" : "string",
+        "enum" : [ "JSON", "SYSLOG", "CEF", "CSV", "ACCESS_LOG", "PLAIN" ]
+      },
+      "LogSourceType" : {
+        "type" : "string",
+        "enum" : [ "SYSLOG", "FIREWALL", "CLOUD_TRAIL", "APPLICATION", "ENDPOINT" ]
+      },
+      "LogUploadResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "sourceId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "sourceName" : {
+            "type" : "string"
+          },
+          "fileName" : {
+            "type" : "string"
+          },
+          "contentType" : {
+            "type" : "string"
+          },
+          "detectedFormat" : {
+            "$ref" : "#/components/schemas/LogFormat"
+          },
+          "fileSize" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "checksum" : {
+            "type" : "string"
+          },
+          "status" : {
+            "$ref" : "#/components/schemas/LogUploadStatus"
+          },
+          "storagePath" : {
+            "type" : "string"
+          },
+          "uploadedBy" : {
+            "type" : "string"
+          },
+          "uploadedById" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "createdAt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "processingStartedAt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "processedAt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "eventCount" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "errorMessage" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "$ref" : "#/components/schemas/Instant"
+          }
+        }
+      },
+      "LogUploadStatus" : {
+        "type" : "string",
+        "enum" : [ "PENDING", "PROCESSING", "INGESTED", "FAILED" ]
+      },
+      "LoginRequest" : {
+        "type" : "object",
+        "required" : [ "username", "password" ],
+        "properties" : {
+          "username" : {
+            "type" : "string",
+            "pattern" : "\\S"
+          },
+          "password" : {
+            "type" : "string",
+            "pattern" : "\\S"
+          }
+        }
+      },
+      "PageResponseLogUploadResponse" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LogUploadResponse"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "RefreshRequest" : {
+        "type" : "object",
+        "required" : [ "refreshToken" ],
+        "properties" : {
+          "refreshToken" : {
+            "type" : "string",
+            "pattern" : "\\S"
+          }
+        }
+      },
+      "Role" : {
+        "type" : "string",
+        "enum" : [ "ADMIN", "ANALYST", "VIEWER" ]
+      },
+      "Severity" : {
+        "type" : "string",
+        "enum" : [ "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL" ]
+      },
+      "TimeBucket" : {
+        "type" : "object",
+        "properties" : {
+          "start" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "count" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "TokenResponse" : {
+        "type" : "object",
+        "properties" : {
+          "accessToken" : {
+            "type" : "string"
+          },
+          "refreshToken" : {
+            "type" : "string"
+          },
+          "tokenType" : {
+            "type" : "string"
+          },
+          "expiresIn" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "UpdateUserRequest" : {
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "type" : "string",
+            "maxLength" : 254
+          },
+          "roles" : {
+            "type" : "array",
+            "uniqueItems" : true,
+            "items" : {
+              "$ref" : "#/components/schemas/Role"
+            },
+            "minItems" : 1
+          },
+          "enabled" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "roles" ]
+      },
+      "UserResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "username" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "roles" : {
+            "type" : "array",
+            "uniqueItems" : true,
+            "items" : {
+              "$ref" : "#/components/schemas/Role"
+            }
+          },
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "passwordSet" : {
+            "type" : "boolean"
+          },
+          "createdAt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "updatedAt" : {
+            "$ref" : "#/components/schemas/Instant"
+          }
+        }
+      },
+      "HealthResponse" : {
+        "type" : "object",
+        "properties" : {
+          "checks" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/HealthCheck"
+            }
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "UP", "DOWN" ]
+          }
+        }
+      },
+      "HealthCheck" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : [ "object", "null" ]
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "UP", "DOWN" ]
+          }
+        }
+      }
+    },
+    "securitySchemes" : {
+      "SecurityScheme" : {
+        "type" : "http",
+        "scheme" : "bearer",
+        "bearerFormat" : "JWT",
+        "description" : "Authentication"
+      }
+    }
+  },
+  "paths" : {
+    "/api/auth/login" : {
+      "post" : {
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Login",
+        "tags" : [ "Auth Resource" ]
+      }
+    },
+    "/api/auth/logout" : {
+      "post" : {
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Logout",
+        "tags" : [ "Auth Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/auth/me" : {
+      "get" : {
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Me",
+        "tags" : [ "Auth Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/auth/refresh" : {
+      "post" : {
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Refresh",
+        "tags" : [ "Auth Resource" ]
+      }
+    },
+    "/api/events/search" : {
+      "get" : {
+        "summary" : "Search events",
+        "description" : "Filters combine with AND; the values of one repeated parameter combine with OR. Results are sorted by event time, with the event id breaking ties, and paged by cursor: pass nextCursorOccurredAt and nextCursorEventId from a response back as cursorOccurredAt and cursorEventId, with the same filters and order, to get the next page. A null next cursor means the last page.",
+        "operationId" : "searchEvents",
+        "tags" : [ "Events" ],
+        "parameters" : [ {
+          "description" : "Resume after this event id; send together with cursorOccurredAt",
+          "name" : "cursorEventId",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "description" : "Resume after this event time; send together with cursorEventId",
+          "name" : "cursorOccurredAt",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Also count severities, sources, hosts, source IPs and events per hour across the whole match",
+          "name" : "facets",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "description" : "Earliest event time, inclusive (ISO-8601 instant)",
+          "example" : "2026-09-01T00:00:00Z",
+          "name" : "from",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Direction of the event-time sort",
+          "schema" : {
+            "type" : "string",
+            "default" : "desc",
+            "enum" : [ "asc", "desc" ]
+          },
+          "name" : "order",
+          "in" : "query"
+        }, {
+          "description" : "Full-text search over the message",
+          "example" : "failed login",
+          "name" : "q",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Restrict to these severities; repeatable",
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Severity"
+            }
+          },
+          "name" : "severity",
+          "in" : "query"
+        }, {
+          "description" : "Hits per page",
+          "schema" : {
+            "maximum" : 1000,
+            "minimum" : 1,
+            "type" : "integer",
+            "default" : 50
+          },
+          "name" : "size",
+          "in" : "query"
+        }, {
+          "description" : "Restrict to these log sources; repeatable",
+          "name" : "sourceId",
+          "in" : "query",
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "integer",
+              "format" : "int64"
+            }
+          }
+        }, {
+          "description" : "Source IP address or CIDR range, IPv4 or IPv6; repeatable, at most 50",
+          "example" : "10.0.0.0/8",
+          "name" : "srcIp",
+          "in" : "query",
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }, {
+          "description" : "HTTP status code (404) or class (5xx); repeatable, at most 50. Events without a status never match.",
+          "example" : "5xx",
+          "name" : "status",
+          "in" : "query",
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }, {
+          "description" : "Literal, case-insensitive substring of the raw line; at most 256 characters",
+          "example" : "192.168.1.",
+          "name" : "substring",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Latest event time, exclusive (ISO-8601 instant)",
+          "example" : "2026-09-02T00:00:00Z",
+          "name" : "to",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "One page of matching events",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EventSearchResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "A parameter is malformed or exceeds a limit"
+          },
+          "401" : {
+            "description" : "No valid access token"
+          },
+          "403" : {
+            "description" : "The caller's roles do not allow searching"
+          },
+          "503" : {
+            "description" : "The search index is unreachable; ingestion continues"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN", "ANALYST", "VIEWER" ]
+        } ]
+      }
+    },
+    "/api/logs/upload" : {
+      "post" : {
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  },
+                  "sourceId" : {
+                    "type" : "integer",
+                    "format" : "int64"
+                  },
+                  "sourceName" : {
+                    "type" : "string"
+                  },
+                  "sourceType" : {
+                    "$ref" : "#/components/schemas/LogSourceType"
+                  }
+                }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Upload",
+        "tags" : [ "Log Upload Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN", "ANALYST" ]
+        } ]
+      }
+    },
+    "/api/logs/uploads" : {
+      "get" : {
+        "parameters" : [ {
+          "name" : "format",
+          "in" : "query",
+          "schema" : {
+            "$ref" : "#/components/schemas/LogFormat"
+          }
+        }, {
+          "name" : "from",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 50
+          }
+        }, {
+          "name" : "status",
+          "in" : "query",
+          "schema" : {
+            "$ref" : "#/components/schemas/LogUploadStatus"
+          }
+        }, {
+          "name" : "to",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "uploadedBy",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseLogUploadResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "List",
+        "tags" : [ "Log Upload Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN", "ANALYST", "VIEWER" ]
+        } ]
+      }
+    },
+    "/api/logs/uploads/{id}" : {
+      "get" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LogUploadResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Get",
+        "tags" : [ "Log Upload Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN", "ANALYST", "VIEWER" ]
+        } ]
+      }
+    },
+    "/api/users" : {
+      "get" : {
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/UserResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "List",
+        "tags" : [ "User Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN", "ANALYST", "VIEWER" ]
+        } ]
+      },
+      "post" : {
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateUserRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Create",
+        "tags" : [ "User Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN" ]
+        } ]
+      }
+    },
+    "/api/users/{id}" : {
+      "put" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Update",
+        "tags" : [ "User Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN" ]
+        } ]
+      },
+      "get" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Get",
+        "tags" : [ "User Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN", "ANALYST", "VIEWER" ]
+        } ]
+      },
+      "delete" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Delete",
+        "tags" : [ "User Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN" ]
+        } ]
+      }
+    },
+    "/api/users/{id}/password" : {
+      "put" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Change Password",
+        "tags" : [ "User Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN" ]
+        } ]
+      }
+    },
+    "/logs/upload" : {
+      "post" : {
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  },
+                  "sourceId" : {
+                    "type" : "integer",
+                    "format" : "int64"
+                  },
+                  "sourceName" : {
+                    "type" : "string"
+                  },
+                  "sourceType" : {
+                    "$ref" : "#/components/schemas/LogSourceType"
+                  }
+                }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Upload",
+        "tags" : [ "Log Root Upload Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN", "ANALYST" ]
+        } ]
+      }
+    },
+    "/logs/upload/{id}" : {
+      "get" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LogUploadResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Get",
+        "tags" : [ "Log Root Upload Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN", "ANALYST", "VIEWER" ]
+        } ]
+      }
+    },
+    "/q/health" : {
+      "description" : "MicroProfile Health Endpoint",
+      "summary" : "MicroProfile Health provides a way for your application to distribute information about its healthiness state to state whether or not it is able to function properly",
+      "get" : {
+        "operationId" : "microprofile_health_root",
+        "description" : "Check the health of the application",
+        "tags" : [ "MicroProfile Health" ],
+        "summary" : "An aggregated view of the Liveness, Readiness and Startup of this application",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Service Unavailable",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/q/health/live" : {
+      "description" : "MicroProfile Health - Liveness Endpoint",
+      "summary" : "Liveness checks are utilized to tell whether the application should be restarted",
+      "get" : {
+        "operationId" : "microprofile_health_liveness",
+        "description" : "Check the liveness of the application",
+        "tags" : [ "MicroProfile Health" ],
+        "summary" : "The Liveness check of this application",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Service Unavailable",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/q/health/ready" : {
+      "description" : "MicroProfile Health - Readiness Endpoint",
+      "summary" : "Readiness checks are used to tell whether the application is able to process requests",
+      "get" : {
+        "operationId" : "microprofile_health_readiness",
+        "description" : "Check the readiness of the application",
+        "tags" : [ "MicroProfile Health" ],
+        "summary" : "The Readiness check of this application",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Service Unavailable",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/q/health/started" : {
+      "description" : "MicroProfile Health - Startup Endpoint",
+      "summary" : "Startup checks are an used to tell when the application has started",
+      "get" : {
+        "operationId" : "microprofile_health_startup",
+        "description" : "Check the startup of the application",
+        "tags" : [ "MicroProfile Health" ],
+        "summary" : "The Startup check of this application",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Service Unavailable",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags" : [ {
+    "name" : "Events",
+    "description" : "Search over ingested log events"
+  }, {
+    "name" : "MicroProfile Health",
+    "description" : "Check the health of the application"
+  } ],
+  "info" : {
+    "title" : "SIEM Logs Analyzer API",
+    "version" : "0.1.0",
+    "description" : "AI-assisted SIEM log analysis platform — backend API."
+  }
+}

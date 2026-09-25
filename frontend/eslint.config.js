@@ -8,7 +8,8 @@ import tseslint from 'typescript-eslint';
 import prettierConfig from 'eslint-config-prettier';
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'node_modules'] },
+  // src/api/schema.d.ts is openapi-typescript output: regenerated, never edited, so not linted.
+  { ignores: ['dist', 'coverage', 'node_modules', 'src/api/schema.d.ts'] },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {

@@ -16,7 +16,7 @@
 | Ingestion pipeline (Kafka)                | Shipped     |
 | Detection (rules + AI)                    | Planned     |
 | Accounts + roles (`app_user`, `user_role`) | Shipped     |
-| REST API surface                          | Planned     |
+| REST API surface                          | In progress |
 | Frontend application                      | In progress |
 | AuthN/AuthZ (JWT + RBAC)                  | Shipped     |
 | Log search backend (OpenSearch)           | Shipped     |
@@ -266,8 +266,19 @@ alert's status, and the transition is audited.
   `@ConfigMapping` interfaces. No configuration is read as loose strings.
 - **Observability.** Health endpoints under `/q/health` today. Metrics and tracing are
   **TBD**.
-- **API contract.** The OpenAPI document generated at `/q/openapi` is the source of truth;
-  the frontend client is generated from it, so the contract cannot drift silently.
+- **API contract (Shipped).** The OpenAPI document generated at `/q/openapi` is the source of
+  truth. Every backend build also writes it to `backend/target/openapi/`; a copy is committed
+  as `frontend/openapi/openapi.json`, and `openapi-typescript` turns it into
+  `frontend/src/api/schema.d.ts`, which types every call the SPA makes through `openapi-fetch`.
+  `ci-backend` fails when the committed spec differs from the one the build produced, and
+  `ci-frontend` fails when the types differ from the spec, so the contract cannot drift
+  silently: `make api-client` refreshes both.
+- **SPA session (Shipped).** The SPA keeps the token pair in `localStorage`, shared by every
+  tab, and attaches the access token to each call. It renews the pair 30 seconds before the
+  access token expires and once more on a `401`, then replays the request. Refreshes are
+  serialised across tabs with a Web Lock and re-read storage inside it, because refresh
+  rotation treats a second use of one token as theft. A refresh the backend refuses ends the
+  session and sends the user to `/login`, which returns them where they were.
 - **Errors.** Exception mapping and a common error payload shape are **TBD**.
 
 ## Decision log
@@ -277,6 +288,7 @@ an entry here once decided; substantial ones graduate to an ADR under `docs/adr/
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-09-25 | The SPA's API client is `openapi-typescript` types over `openapi-fetch`, not a generated per-endpoint SDK (orval); the SPA stores its tokens in `localStorage` and serialises refreshes across tabs with a Web Lock | Types alone keep the generated output to one declaration file and the runtime to a few kilobytes, and TanStack Query hooks stay hand-written next to the screens that use them. `localStorage` is readable by any script on the page, but the backend issues the refresh token in the response body, not as an `HttpOnly` cookie, so no storage the SPA can reach is safer; sharing it across tabs is what keeps two tabs from spending one refresh token twice and tripping reuse detection. An `HttpOnly` refresh cookie is the upgrade path |
 | 2026-09-24 | User-Agent classification uses Yauaa at ingestion time, and counts command-line tools, HTTP libraries, headless browsers and attack payloads as bots | Yauaa's rules ship inside the jar, so it adds no data file to fetch or bundle, and it classifies robots and hacking attempts, not only browsers. For a SIEM, "not a person at a browser" is the useful meaning of bot, and curl or sqlmap in a header is as automated as Googlebot |
 | 2026-09-22 | GeoIP enrichment runs at ingestion time, writing geo fields onto the event payload, rather than at read time; the GeoLite2 databases are bundled into the container image rather than fetched per event | A search hit is read far more often than an event is ingested, so resolving `srcIp` once and storing the result avoids repeating the same MaxMind lookup on every page view; bundling the databases keeps a missing network path to MaxMind from ever being how the search endpoint degrades, at the cost of a larger image and a database that ages until the next deploy |
 | 2026-09-15 | Log search runs on OpenSearch as a derived index; PostgreSQL stays the system of record — [ADR 0001](adr/0001-log-search-backend.md) | Aggregations and facets for the analyst dashboard are what PostgreSQL alone answers expensively; keeping the index derived means a failed index is a stale read, never lost data |

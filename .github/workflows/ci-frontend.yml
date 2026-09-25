@@ -36,6 +36,12 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # src/api/schema.d.ts must be exactly what openapi-typescript makes of openapi/openapi.json:
+      # a hand edit, or a spec refreshed without regenerating, fails here. ci-backend checks the
+      # other half — that openapi/openapi.json is what the backend actually serves.
+      - name: Verifică clientul API generat (openapi-typescript)
+        run: pnpm api:check
+
       - name: Lint (ESLint)
         run: pnpm lint
 
