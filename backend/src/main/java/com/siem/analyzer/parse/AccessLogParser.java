@@ -60,6 +60,17 @@ public class AccessLogParser {
             "(?:%{WORD:method} %{NOTSPACE:path}(?: %{NOTSPACE:protocol})?|%{QUOTEDBODY})";
 
     /**
+     * The client: an IP address or a host name, when {@code HostnameLookups} is on.
+     *
+     * <p>Replaces the stock {@code IPORHOST}, whose {@code HOSTNAME} repeats a group once per dot
+     * label. java.util.regex recurses once per repetition, so a first field of a few thousand
+     * {@code a.} overflows the stack — and the first field is the one every line, of any format, is
+     * tried against when the upload's format is sniffed. A name is at most 255 characters, so a
+     * bounded run of the characters a name can hold costs no stack and accepts every real one.
+     */
+    private static final String CLIENT = "(?:%{IP}|[0-9A-Za-z][0-9A-Za-z.-]{0,254}+)";
+
+    /**
      * Common Log Format, then the optional Combined tail.
      *
      * <p>{@code ident} and {@code auth} use {@code NOTSPACE} rather than the stock {@code USER}
@@ -67,7 +78,7 @@ public class AccessLogParser {
      * with extra fields (an Nginx {@code $http_x_forwarded_for}, say) is not silently truncated.
      */
     private static final String EXPRESSION =
-            "^%{IPORHOST:clientip} %{NOTSPACE:ident} %{NOTSPACE:auth} \\[%{HTTPDATE:timestamp}\\]"
+            "^%{ACCESSCLIENT:clientip} %{NOTSPACE:ident} %{NOTSPACE:auth} \\[%{HTTPDATE:timestamp}\\]"
                     + " \"%{ACCESSREQUEST:request}\" %{INT:status} (?:%{INT:bytes}|-)"
                     + "(?: \"%{QUOTEDBODY:referrer}\" \"%{QUOTEDBODY:agent}\")?$";
 
@@ -87,6 +98,7 @@ public class AccessLogParser {
         compiler.registerDefaultPatterns();
         compiler.register("QUOTEDBODY", QUOTED_BODY);
         compiler.register("ACCESSREQUEST", REQUEST);
+        compiler.register("ACCESSCLIENT", CLIENT);
         // Named-only keeps the captures to the fields above, not every sub-pattern of HTTPDATE.
         this.grok = compiler.compile(EXPRESSION, true);
     }

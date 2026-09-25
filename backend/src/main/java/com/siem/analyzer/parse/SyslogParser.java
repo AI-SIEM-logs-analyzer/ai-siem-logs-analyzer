@@ -188,7 +188,7 @@ public class SyslogParser {
             return Optional.empty();
         }
 
-        Map<String, Map<String, Object>> structuredData = new LinkedHashMap<>();
+        Map<String, Map<String, List<String>>> structuredData = new LinkedHashMap<>();
         int end = readStructuredData(line, header.end(), structuredData);
         if (end < 0) {
             return Optional.empty();
@@ -208,8 +208,7 @@ public class SyslogParser {
         putIfPresent(attributes, "procId", header.group("procid"));
         putIfPresent(attributes, "msgId", header.group("msgid"));
         if (!structuredData.isEmpty()) {
-            structuredData.replaceAll((id, params) -> Collections.unmodifiableMap(params));
-            attributes.put("structuredData", Collections.unmodifiableMap(structuredData));
+            attributes.put("structuredData", freeze(structuredData));
         }
 
         return Optional.of(
@@ -326,13 +325,16 @@ public class SyslogParser {
      *
      * <p>The escapes RFC 5424 defines ({@code \"}, {@code \\}, {@code \]}) are decoded, because the
      * RFC makes them part of the encoding, not the data; any other backslash is kept, as the RFC
-     * requires. An unescaped {@code ]} inside a value is accepted, as rsyslog accepts it. A
-     * parameter that appears twice in one element is kept as a list of its values, in order.
+     * requires. An unescaped {@code ]} inside a value is accepted, as rsyslog accepts it.
+     *
+     * <p>Every parameter collects all of its values, in order; {@link #freeze} decides afterwards
+     * whether that is one value or a list. Building the list as it grows keeps a line that repeats
+     * one parameter a hundred thousand times linear rather than quadratic.
      *
      * @return the index just past the field, or -1 when it is malformed
      */
     private static int readStructuredData(
-            String line, int start, Map<String, Map<String, Object>> into) {
+            String line, int start, Map<String, Map<String, List<String>>> into) {
         int length = line.length();
         if (start < length && line.charAt(start) == '-') {
             return start + 1;
@@ -348,7 +350,7 @@ public class SyslogParser {
             if (idEnd == idStart || idEnd - idStart > MAX_SD_NAME) {
                 return -1;
             }
-            Map<String, Object> params =
+            Map<String, List<String>> params =
                     into.computeIfAbsent(
                             line.substring(idStart, idEnd), id -> new LinkedHashMap<>());
             pos = idEnd;
@@ -379,10 +381,9 @@ public class SyslogParser {
                 }
                 pos++; // the closing quote
 
-                params.merge(
-                        line.substring(nameStart, nameEnd),
-                        value.toString(),
-                        SyslogParser::appendValue);
+                params.computeIfAbsent(
+                                line.substring(nameStart, nameEnd), name -> new ArrayList<>())
+                        .add(value.toString());
             }
 
             if (pos >= length || line.charAt(pos) != ']') {
@@ -410,15 +411,23 @@ public class SyslogParser {
         return c == '"' || c == '\\' || c == ']';
     }
 
-    private static Object appendValue(Object existing, Object added) {
-        List<Object> values = new ArrayList<>();
-        if (existing instanceof List<?> list) {
-            values.addAll(list);
-        } else {
-            values.add(existing);
-        }
-        values.add(added);
-        return List.copyOf(values);
+    /**
+     * The read-only attribute value for the structured data: a parameter that appears once is its
+     * value, one that appears more than once in an element is the list of its values, in order.
+     */
+    private static Map<String, Object> freeze(Map<String, Map<String, List<String>>> elements) {
+        Map<String, Object> frozen = new LinkedHashMap<>();
+        elements.forEach(
+                (id, params) -> {
+                    Map<String, Object> values = new LinkedHashMap<>();
+                    params.forEach(
+                            (name, all) ->
+                                    values.put(
+                                            name,
+                                            all.size() == 1 ? all.getFirst() : List.copyOf(all)));
+                    frozen.put(id, Collections.unmodifiableMap(values));
+                });
+        return Collections.unmodifiableMap(frozen);
     }
 
     private static Map<String, Object> priorityAttributes(int priority) {
