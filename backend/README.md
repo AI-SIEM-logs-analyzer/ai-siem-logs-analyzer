@@ -74,6 +74,60 @@ see the [root README](../README.md#format--lint).
 Spotless needs a JDK 21: google-java-format does not run on JDK 22+. The commit hook picks
 one up automatically through `/usr/libexec/java_home -v 21` when the host has it.
 
+## Synthetic logs for load tests
+
+[`SyntheticLogGenerator`](src/test/java/com/siem/analyzer/loadgen/SyntheticLogGenerator.java)
+writes benign traffic at any volume — 100k events by default, a million in a couple of seconds
+— in the three formats the ingestion path parses:
+
+| File              | Format                      | Content                                              |
+|-------------------|-----------------------------|------------------------------------------------------|
+| `access-NNNN.log` | nginx Combined Log Format   | page views, assets, API calls, crawlers, some 404/500 |
+| `syslog-NNNN.log` | RFC 5424                    | SSH key logins, cron, systemd, sudo, PostgreSQL       |
+| `app-NNNN.ndjson` | ECS-style JSON, unique `id` | sign-ins, orders, cart and profile events             |
+
+It needs only a JDK, no build:
+
+```bash
+make synth-logs                                   # 100k events → backend/target/synthetic-logs
+make synth-logs SYNTH_ARGS="--events 1000000 --span P7D --seed 7"
+java src/test/java/com/siem/analyzer/loadgen/SyntheticLogGenerator.java --help
+```
+
+Timestamps follow a day/night curve and are written in order; users keep the same address and
+browser across events. The same `--seed` and `--start` give byte-identical files, and each file
+rolls over below the 50 MiB upload limit, so every file uploads as is:
+
+```bash
+for f in target/synthetic-logs/*.log target/synthetic-logs/*.ndjson; do
+  curl -s -H "Authorization: Bearer $TOKEN" -F "file=@$f" localhost:8080/api/logs/upload
+done
+```
+
+### Mixing in your own scenarios
+
+`--inject DIR` interleaves existing log files with the generated traffic — samples from a public
+dataset, or scenarios you wrote for a detection rule. Each file in `DIR` is one scenario,
+labelled with its file name (`ssh-sample.log` → `ssh-sample`). Its lines keep their spacing
+from each other and the whole file is moved to a random point of the span; each line is sorted
+into the output stream of its own format (access log, RFC 5424 / BSD syslog, JSON), with its
+timestamp rewritten. Lines in none of those shapes are skipped and counted in the manifest.
+
+```bash
+make synth-logs SYNTH_ARGS="--events 500000 --inject ./scenarios"                      # each file once
+make synth-logs SYNTH_ARGS="--events 500000 --inject ./scenarios --inject-ratio 0.02"  # 2% of the lines
+```
+
+`--events` stays the total: injected lines replace generated ones. With `--inject-ratio` the
+files are repeated, round-robin, until they make up that share. Every injected line is listed in
+`ground-truth.csv` — output file, line number, timestamp, label, instance and source line — so
+detection results can be scored for hits and false positives. `manifest.json` counts the lines
+per label.
+
+`SyntheticLogsParseTest` runs the generator at 100k events and checks that every line is
+accepted by the production parsers and detected as the right format; it also checks that
+injected lines land where `ground-truth.csv` says and keep their relative timing.
+
 ## Persistence
 
 - **Flyway owns the schema:** `V1__init.sql` creates the log, rule and alert tables; `V2__users.sql` adds `app_user` and `user_role`. Hibernate ORM runs with `quarkus.hibernate-orm.schema-management.strategy=validate` so it never emits DDL.
