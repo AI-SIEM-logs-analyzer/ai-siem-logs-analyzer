@@ -1,7 +1,6 @@
 {
-  // Type checking only — Vite does the transpiling, so nothing here emits JavaScript.
-  // React/Vite specific options (jsx, vite/client types) are already set so the scaffold
-  // can drop its sources into src/ without touching this file.
+  // The application in src/. Type checking only — Vite does the transpiling, so nothing
+  // here emits JavaScript. vite.config.ts runs in Node and is checked by tsconfig.node.json.
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
@@ -24,7 +23,12 @@
     "noUncheckedSideEffectImports": true,
 
     // Third-party .d.ts files are not ours to fix; checking them only adds noise.
-    "skipLibCheck": true
+    "skipLibCheck": true,
+
+    // `@/…` resolves to src/ — the alias shadcn/ui generates imports against. Vite gets the
+    // same mapping in vite.config.ts.
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom/vitest"]
   },
   "include": ["src"]
 }

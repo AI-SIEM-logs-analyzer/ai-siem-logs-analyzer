@@ -31,6 +31,12 @@ Every other endpoint expects the `accessToken` from that response as
 Check it: <http://localhost:8080/q/health> · Swagger UI at
 <http://localhost:8080/q/swagger-ui>.
 
+The UI runs alongside, proxying `/api` and `/q` to that backend:
+
+```bash
+cd frontend && pnpm install && pnpm dev    # UI on http://localhost:5173
+```
+
 ## Architecture
 
 ```mermaid
@@ -133,10 +139,11 @@ CI enforces the same checks, so nothing depends on the hook being installed.
 - Both CI workflows (`ci-backend`, `ci-frontend`) run on **every** PR — no `paths`
   filter, so a required check never hangs on a PR that skipped it. CodeQL scans as well.
 - `ci-backend`: Spotless, Checkstyle, then `./mvnw verify` (JUnit 5 + Testcontainers).
-- `ci-frontend`: ESLint, Prettier, then `tsc --noEmit`.
+- `ci-frontend`: ESLint, Prettier, `tsc --noEmit`, Vitest, then the Vite production build.
 - CI re-checks formatting and linting; the commit hook only saves you the round trip.
 
 > The backend includes health checks, OpenAPI documentation, and a PostgreSQL persistence
 > layer (Panache entities and repositories over a Flyway-managed schema); REST resources
-> and ingestion land in later PRs. The frontend carries only its tooling configuration
-> so far — the Vite application scaffold lands in a later PR.
+> and ingestion land in later PRs. The frontend is scaffolded — routing, layout, TanStack
+> Query and shadcn/ui are wired up, with a live backend health card on the dashboard; the
+> feature screens land in later PRs.

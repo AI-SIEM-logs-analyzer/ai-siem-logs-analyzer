@@ -17,7 +17,7 @@
 | Detection (rules + AI)                    | Planned     |
 | Accounts + roles (`app_user`, `user_role`) | Shipped     |
 | REST API surface                          | Planned     |
-| Frontend application                      | Planned     |
+| Frontend application                      | In progress |
 | AuthN/AuthZ (JWT + RBAC)                  | Shipped     |
 | Log search backend (OpenSearch)           | Shipped     |
 
