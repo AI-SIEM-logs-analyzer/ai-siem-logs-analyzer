@@ -1,38 +1,36 @@
-import { ApiError, apiFetch } from './api-client';
+import { json, stubBackend } from '@/test/backend-stub';
+import { ApiError, publicApi, unwrap } from './api-client';
 
-describe('apiFetch', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
+describe('unwrap', () => {
+  it('resolves to the parsed body of a 2xx', async () => {
+    stubBackend({ 'POST /api/auth/login': () => json(200, { accessToken: 'a' }) });
+
+    await expect(
+      unwrap(publicApi.POST('/api/auth/login', { body: { username: 'u', password: 'p' } })),
+    ).resolves.toEqual({ accessToken: 'a' });
   });
 
-  it('parses JSON and asks for it', async () => {
-    const fetchMock = vi.fn(() => Promise.resolve(new Response('{"ok":true}', { status: 200 })));
-    vi.stubGlobal('fetch', fetchMock);
+  it('throws ApiError with status, body and headers outside 2xx', async () => {
+    stubBackend({
+      'POST /api/auth/login': () =>
+        json(429, { error: 'too_many_attempts' }, { 'Retry-After': '60' }),
+    });
 
-    await expect(apiFetch('/api/thing')).resolves.toEqual({ ok: true });
-    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(new Headers(init.headers).get('Accept')).toBe('application/json');
-  });
+    const error: unknown = await unwrap(
+      publicApi.POST('/api/auth/login', { body: { username: 'u', password: 'p' } }),
+    ).catch((e: unknown) => e);
 
-  it('throws ApiError with status and body outside 2xx', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.resolve(new Response('{"error":"nope"}', { status: 404 }))),
-    );
-
-    const error: unknown = await apiFetch('/api/missing').catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ApiError);
-    expect(error).toMatchObject({ status: 404, body: { error: 'nope' } });
+    expect(error).toMatchObject({ status: 429, body: { error: 'too_many_attempts' } });
+    expect((error as ApiError).headers.get('Retry-After')).toBe('60');
   });
 
   it('returns the body for an accepted non-2xx status', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.resolve(new Response('{"status":"DOWN"}', { status: 503 }))),
-    );
+    stubBackend({ 'GET /q/health': () => json(503, { status: 'DOWN', checks: [] }) });
 
-    await expect(apiFetch('/q/health', { acceptStatuses: [503] })).resolves.toEqual({
+    await expect(unwrap(publicApi.GET('/q/health'), { acceptStatuses: [503] })).resolves.toEqual({
       status: 'DOWN',
+      checks: [],
     });
   });
 });

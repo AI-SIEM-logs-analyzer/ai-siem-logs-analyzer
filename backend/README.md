@@ -225,6 +225,11 @@ confirm which configuration a running instance picked up.
 | `/q/openapi`      | OpenAPI document                            |
 | `/q/swagger-ui`   | Swagger UI (enabled outside dev mode too)   |
 
+Every build also writes the OpenAPI document to `target/openapi/openapi.{json,yaml}`. The
+frontend generates its typed client from a committed copy, `frontend/openapi/openapi.json`,
+and CI fails when the two differ: after changing an endpoint or a DTO, run `make api-client`
+from the repository root and commit what it changes.
+
 Application endpoints:
 
 | Endpoint                        | What                                          |

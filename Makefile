@@ -32,7 +32,7 @@ BUILDER_RUN_TESTS := docker run --rm \
 	$(BUILDER_IMAGE)
 
 .PHONY: up up-app down stop logs ps reset tools help builder image verify hooks \
-	format format-backend format-frontend lint lint-backend lint-frontend synth-logs
+	format format-backend format-frontend lint lint-backend lint-frontend synth-logs api-client
 
 ## Start the dev stack (creates docker/.env from the example on first run)
 up: docker/.env
@@ -90,6 +90,12 @@ lint-frontend: frontend/node_modules
 frontend/node_modules: frontend/package.json frontend/pnpm-lock.yaml
 	cd frontend && $(PNPM) install
 	@touch frontend/node_modules
+
+## Refresh frontend/openapi/openapi.json from the backend build and regenerate the typed client
+api-client: builder frontend/node_modules
+	$(BUILDER_RUN) ./mvnw -B -q package -DskipTests
+	cp backend/target/openapi/openapi.json frontend/openapi/openapi.json
+	cd frontend && $(PNPM) api:generate
 
 ## Write synthetic benign logs for load tests (override with SYNTH_ARGS="--events 1000000")
 synth-logs:

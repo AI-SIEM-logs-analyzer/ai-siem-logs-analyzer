@@ -2,3 +2,7 @@ dist
 coverage
 node_modules
 pnpm-lock.yaml
+# Generated: the spec is copied verbatim from the backend build (ci-backend compares the bytes),
+# and the types are compared against fresh openapi-typescript output by `pnpm api:check`.
+openapi/openapi.json
+src/api/schema.d.ts
