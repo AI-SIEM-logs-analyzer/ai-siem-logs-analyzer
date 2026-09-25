@@ -39,6 +39,26 @@ class LogFormatDetectorTest {
     }
 
     @Test
+    void detectsJsonWhenAPrettyPrintedArrayOpensOnItsOwnLine() throws IOException {
+        Path file = write("events.json", "[\n  {\"msg\":\"hi\"}\n]\n");
+
+        assertEquals(LogFormat.JSON, detector.detect(file, "events.json"));
+    }
+
+    @Test
+    void bracketedTimestampOrLevelIsNotJson() throws IOException {
+        Path apacheError =
+                write(
+                        "error_log",
+                        "[Sun Dec 04 04:47:44 2005] [notice] workerEnv.init() ok\n"
+                                + "[Sun Dec 04 04:47:44 2005] [error] mod_jk child in error state 6\n");
+        Path levelFirst = write("app.log", "[INFO] started in 1.2s\n");
+
+        assertEquals(LogFormat.PLAIN, detector.detect(apacheError, "error_log"));
+        assertEquals(LogFormat.PLAIN, detector.detect(levelFirst, "app.log"));
+    }
+
+    @Test
     void detectsCefFromItsPrefix() throws IOException {
         Path file =
                 write(

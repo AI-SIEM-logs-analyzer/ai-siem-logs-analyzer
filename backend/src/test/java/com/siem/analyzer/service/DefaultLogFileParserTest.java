@@ -346,6 +346,60 @@ class DefaultLogFileParserTest {
     }
 
     @Test
+    void malformedLinesInASyslogFileAreKeptAsPlainEvents() throws IOException {
+        String good =
+                "Dec 10 07:13:43 LabSZ sshd[24227]: Failed password for root from 5.36.59.76 port"
+                        + " 42393 ssh2";
+        String truncated = "<34>1 2026-09-14T22:14:15.003Z host1 sshd 1234 ID47 [origin ip=\"10.0";
+        String foreign =
+                "[Sun Dec 04 04:47:44 2005] [error] mod_jk child workerEnv in error state 6";
+        String control = "\u0001\u0002\u007F binary é ﻿";
+        String content = good + "\r\n" + truncated + "\n" + foreign + "\n" + control + "\n";
+
+        Path file = write("mixed.log", content);
+        Long uploadId = createUpload(file, LogFormat.SYSLOG);
+
+        parser.parse(createIngestEvent(uploadId, file));
+
+        LogUpload upload = readUpload(uploadId);
+        assertEquals(LogUploadStatus.INGESTED, upload.getStatus());
+        assertEquals(4L, upload.getEventCount());
+
+        List<LogEvent> events = listEvents(source.getId());
+        assertEquals(4, events.size());
+        LogEvent parsed = byRaw(events, good);
+        assertEquals("SYSLOG", parsed.getPayload().get("format"));
+        assertEquals("LabSZ", parsed.getPayload().get("host"));
+        for (String line : List.of(truncated, foreign, control)) {
+            LogEvent plain = byRaw(events, line);
+            assertEquals("PLAIN", plain.getPayload().get("format"), line);
+            assertEquals(line.strip(), plain.getMessage(), line);
+        }
+        assertEquals(4, search.indexed().size());
+    }
+
+    /**
+     * A first line that once overflowed the stack in the access-log grammar, which both the format
+     * detector and the plain-text fallback try on every line.
+     */
+    @Test
+    void lineThatIsAllDotsAndLabelsDoesNotStopThePlainTextFallback() throws IOException {
+        String hostile = "a.".repeat(50_000) + "a - - [14/Sep/2026:10:15:30 +0000] \"GET /\" 200 1";
+        String content = hostile + "\nan ordinary line\n";
+
+        Path file = write("hostile.log", content);
+        Long uploadId = createUpload(file, LogFormat.PLAIN);
+
+        parser.parse(createIngestEvent(uploadId, file));
+
+        LogUpload upload = readUpload(uploadId);
+        assertEquals(LogUploadStatus.INGESTED, upload.getStatus());
+        assertEquals(2L, upload.getEventCount());
+        assertEquals(
+                "PLAIN", byRaw(listEvents(source.getId()), hostile).getPayload().get("format"));
+    }
+
+    @Test
     void throwsWhenFileNotFound() {
         Long uploadId = createUpload(tempDir.resolve("missing.log"), LogFormat.PLAIN);
         LogIngestEvent ingestEvent =
@@ -391,6 +445,10 @@ class DefaultLogFileParserTest {
                 .filter(p -> ua.equals(p.get("userAgent")))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private static LogEvent byRaw(List<LogEvent> events, String raw) {
+        return events.stream().filter(e -> raw.equals(e.getRaw())).findFirst().orElseThrow();
     }
 
     private Path write(String name, String content) throws IOException {

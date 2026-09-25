@@ -30,6 +30,14 @@ import java.util.regex.Pattern;
 @ApplicationScoped
 public class LogFormatDetector {
 
+    /**
+     * The start of a JSON array of objects or arrays, or its bracket alone on the first line of a
+     * pretty-printed file. A bare {@code [} is not enough: Apache's error log ({@code [Sun Dec 04
+     * 04:47:44 2005] [notice] ...}) and many application logs open every line with a bracketed
+     * timestamp or level.
+     */
+    private static final Pattern JSON_ARRAY_START = Pattern.compile("^\\[\\s*(?:[\\[{\\]]|$)");
+
     /** RFC 5424 and RFC 3164 both start with the priority in angle brackets, when it is present. */
     private static final Pattern SYSLOG_PRIORITY = Pattern.compile("^<\\d{1,3}>");
 
@@ -70,7 +78,7 @@ public class LogFormatDetector {
         }
 
         String trimmed = first.strip();
-        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+        if (trimmed.startsWith("{") || JSON_ARRAY_START.matcher(trimmed).find()) {
             return LogFormat.JSON;
         }
         if (trimmed.startsWith("CEF:")) {
