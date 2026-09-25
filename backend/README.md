@@ -74,6 +74,39 @@ see the [root README](../README.md#format--lint).
 Spotless needs a JDK 21: google-java-format does not run on JDK 22+. The commit hook picks
 one up automatically through `/usr/libexec/java_home -v 21` when the host has it.
 
+## Synthetic logs for load tests
+
+[`SyntheticLogGenerator`](src/test/java/com/siem/analyzer/loadgen/SyntheticLogGenerator.java)
+writes benign traffic at any volume — 100k events by default, a million in a couple of seconds
+— in the three formats the ingestion path parses:
+
+| File              | Format                      | Content                                              |
+|-------------------|-----------------------------|------------------------------------------------------|
+| `access-NNNN.log` | nginx Combined Log Format   | page views, assets, API calls, crawlers, some 404/500 |
+| `syslog-NNNN.log` | RFC 5424                    | SSH key logins, cron, systemd, sudo, PostgreSQL       |
+| `app-NNNN.ndjson` | ECS-style JSON, unique `id` | sign-ins, orders, cart and profile events             |
+
+It needs only a JDK, no build:
+
+```bash
+make synth-logs                                   # 100k events → backend/target/synthetic-logs
+make synth-logs SYNTH_ARGS="--events 1000000 --span P7D --seed 7"
+java src/test/java/com/siem/analyzer/loadgen/SyntheticLogGenerator.java --help
+```
+
+Timestamps follow a day/night curve and are written in order; users keep the same address and
+browser across events. The same `--seed` and `--start` give byte-identical files, and each file
+rolls over below the 50 MiB upload limit, so every file uploads as is:
+
+```bash
+for f in target/synthetic-logs/*.log target/synthetic-logs/*.ndjson; do
+  curl -s -H "Authorization: Bearer $TOKEN" -F "file=@$f" localhost:8080/api/logs/upload
+done
+```
+
+`SyntheticLogsParseTest` runs the generator at 100k events and checks that every line is
+accepted by the production parsers and detected as the right format.
+
 ## Persistence
 
 - **Flyway owns the schema:** `V1__init.sql` creates the log, rule and alert tables; `V2__users.sql` adds `app_user` and `user_role`. Hibernate ORM runs with `quarkus.hibernate-orm.schema-management.strategy=validate` so it never emits DDL.

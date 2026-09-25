@@ -32,7 +32,7 @@ BUILDER_RUN_TESTS := docker run --rm \
 	$(BUILDER_IMAGE)
 
 .PHONY: up up-app down stop logs ps reset tools help builder image verify hooks \
-	format format-backend format-frontend lint lint-backend lint-frontend
+	format format-backend format-frontend lint lint-backend lint-frontend synth-logs
 
 ## Start the dev stack (creates docker/.env from the example on first run)
 up: docker/.env
@@ -90,6 +90,11 @@ lint-frontend: frontend/node_modules
 frontend/node_modules: frontend/package.json frontend/pnpm-lock.yaml
 	cd frontend && $(PNPM) install
 	@touch frontend/node_modules
+
+## Write synthetic benign logs for load tests (override with SYNTH_ARGS="--events 1000000")
+synth-logs:
+	java backend/src/test/java/com/siem/analyzer/loadgen/SyntheticLogGenerator.java \
+		--out backend/target/synthetic-logs $(SYNTH_ARGS)
 
 ## Stop and remove containers (volumes are kept)
 down:
