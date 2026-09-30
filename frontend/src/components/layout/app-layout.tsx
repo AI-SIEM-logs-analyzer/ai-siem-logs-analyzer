@@ -2,11 +2,19 @@ import { LogOut, Shield } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router';
 import { signOut, useCurrentUser } from '@/api/auth';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { can, primaryRole, roleLabels } from '@/lib/auth/permissions';
 import { cn } from '@/lib/utils';
 import { navItems } from './nav-items';
 
 export function AppLayout() {
+  const { data: user } = useCurrentUser();
+  // Until the roles are known, only the items every account may see.
+  const visibleItems = navItems.filter(
+    ({ permission }) => !permission || can(user?.roles, permission),
+  );
+
   return (
     <div className="flex min-h-svh flex-col md:flex-row">
       <aside className="border-sidebar-border bg-sidebar text-sidebar-foreground flex shrink-0 flex-col border-b md:w-60 md:border-r md:border-b-0">
@@ -15,7 +23,7 @@ export function AppLayout() {
           <span>SIEM Analyzer</span>
         </div>
         <nav aria-label="Main" className="flex gap-1 overflow-x-auto px-2 pb-2 md:flex-col">
-          {navItems.map(({ to, label, icon: Icon }) => (
+          {visibleItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -47,12 +55,16 @@ export function AppLayout() {
 function UserPanel() {
   const { data: user } = useCurrentUser();
   const [signingOut, setSigningOut] = useState(false);
+  const role = primaryRole(user?.roles);
 
   return (
     <div className="border-sidebar-border flex items-center justify-between gap-2 border-t px-4 py-3 md:mt-auto">
-      <span className="truncate text-sm" title={user?.username}>
-        {user?.username ?? '…'}
-      </span>
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="truncate text-sm" title={user?.username}>
+          {user?.username ?? '…'}
+        </span>
+        {role && <Badge variant="outline">{roleLabels[role]}</Badge>}
+      </div>
       <Button
         variant="ghost"
         size="sm"

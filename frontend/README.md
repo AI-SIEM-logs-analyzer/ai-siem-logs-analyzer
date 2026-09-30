@@ -47,7 +47,7 @@ src/
     client.ts           `api`, the authenticated typed client
   components/
     layout/             app shell (sidebar, navigation)
-    auth/               RequireAuth, the route guard
+    auth/               RequireAuth, RequirePermission (route guards) and Can
     ui/                 shadcn/ui components — vendored, edit freely
   lib/                  api-client (typed client factory, unwrap, ApiError), cn()
     auth/               session store, token refresh, useSession()
@@ -58,6 +58,10 @@ src/
 - Imports use the `@/` alias for `src/` (tsconfig `paths` + Vite `resolve.alias`).
 - A new page: add a component under `pages/`, a route in `app/routes.tsx` and, if it belongs
   in the sidebar, an entry in `components/layout/nav-items.ts`.
+- A page or action for some roles only: add a permission to `lib/auth/permissions.ts`
+  mirroring the backend's `@RolesAllowed`, wrap the route in `<RequirePermission>`, give its
+  nav item the same `permission`, and wrap actions in `<Can>`. This only hides what the
+  backend would refuse anyway; the backend stays the control.
 - A new endpoint: add its query keys and hook under `api/`, calling
   `unwrap(api.GET('/api/…'))`. Paths, parameters, bodies and responses are typed from the
   spec, so take types from `components['schemas']` rather than writing them. Non-2xx responses

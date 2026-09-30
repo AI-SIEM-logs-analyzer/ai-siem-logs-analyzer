@@ -165,3 +165,100 @@ describe('authentication', () => {
     expect(localStorage.length).toBe(0);
   });
 });
+
+describe('roles', () => {
+  const account = (username: string, roles: string[]) => () =>
+    json(200, { id: 2, username, roles });
+  const viewer = account('vera', ['VIEWER']);
+  const analyst = account('anna', ['ANALYST']);
+
+  it('gives an admin the users page, from the sidebar', async () => {
+    startTestSession();
+    stubBackend({
+      'GET /q/health': healthy,
+      'GET /api/auth/me': me,
+      'GET /api/users': () =>
+        json(200, [
+          { id: 1, username: 'admin', roles: ['ADMIN'], enabled: true },
+          { id: 2, username: 'vera', email: 'vera@example.com', roles: ['VIEWER'], enabled: false },
+        ]),
+    });
+    const user = userEvent.setup();
+
+    renderRoute('/');
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    await user.click(await within(nav).findByRole('link', { name: 'Users' }));
+
+    expect(screen.getByRole('heading', { name: 'Users' })).toBeInTheDocument();
+    const row = (await screen.findByText('vera')).closest('tr');
+    expect(row).not.toBeNull();
+    expect(within(row!).getByText('Viewer')).toBeInTheDocument();
+    expect(within(row!).getByText('Disabled')).toBeInTheDocument();
+  });
+
+  it('shows the signed-in role next to the username', async () => {
+    startTestSession();
+    stubBackend({ 'GET /q/health': healthy, 'GET /api/auth/me': viewer });
+
+    renderRoute('/');
+
+    expect(await screen.findByText('vera')).toBeInTheDocument();
+    expect(screen.getByText('Viewer')).toBeInTheDocument();
+  });
+
+  it('hides admin navigation from a viewer', async () => {
+    startTestSession();
+    stubBackend({ 'GET /q/health': healthy, 'GET /api/auth/me': viewer });
+
+    renderRoute('/');
+    await screen.findByText('vera');
+
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    expect(within(nav).getByRole('link', { name: 'Events' })).toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: 'Users' })).not.toBeInTheDocument();
+  });
+
+  it('refuses the users page to a viewer who types its address', async () => {
+    startTestSession();
+    const fetchMock = stubBackend({ 'GET /api/auth/me': viewer });
+
+    renderRoute('/users');
+
+    expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Users' })).not.toBeInTheDocument();
+    expect(callsTo(fetchMock, 'GET /api/users')).toHaveLength(0);
+  });
+
+  it('refuses the users page to an analyst too', async () => {
+    startTestSession();
+    stubBackend({ 'GET /api/auth/me': analyst });
+
+    renderRoute('/users');
+
+    expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument();
+  });
+
+  it('shows no page before the roles are known', () => {
+    startTestSession();
+    stubBackend({ 'GET /api/auth/me': () => new Promise<Response>(() => {}) });
+
+    renderRoute('/users');
+
+    expect(screen.getByLabelText('Checking access')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Users' })).not.toBeInTheDocument();
+  });
+
+  it('offers uploading to an analyst but not to a viewer', async () => {
+    startTestSession();
+    stubBackend({ 'GET /api/auth/me': analyst });
+    const { unmount } = renderRoute('/uploads');
+    expect(await screen.findByText('Upload a log file')).toBeInTheDocument();
+    unmount();
+
+    stubBackend({ 'GET /api/auth/me': viewer });
+    renderRoute('/uploads');
+    await screen.findByText('vera');
+    expect(screen.getByText('Log uploads')).toBeInTheDocument();
+    expect(screen.queryByText('Upload a log file')).not.toBeInTheDocument();
+  });
+});
