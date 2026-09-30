@@ -1,5 +1,8 @@
-import { Shield } from 'lucide-react';
+import { LogOut, Shield } from 'lucide-react';
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router';
+import { signOut, useCurrentUser } from '@/api/auth';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { navItems } from './nav-items';
 
@@ -30,12 +33,39 @@ export function AppLayout() {
             </NavLink>
           ))}
         </nav>
+        <UserPanel />
       </aside>
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 p-4 md:p-8">
           <Outlet />
         </div>
       </main>
+    </div>
+  );
+}
+
+function UserPanel() {
+  const { data: user } = useCurrentUser();
+  const [signingOut, setSigningOut] = useState(false);
+
+  return (
+    <div className="border-sidebar-border flex items-center justify-between gap-2 border-t px-4 py-3 md:mt-auto">
+      <span className="truncate text-sm" title={user?.username}>
+        {user?.username ?? '…'}
+      </span>
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={signingOut}
+        onClick={() => {
+          setSigningOut(true);
+          // Ending the session is what leaves the page: RequireAuth redirects to /login.
+          void signOut().finally(() => setSigningOut(false));
+        }}
+      >
+        <LogOut aria-hidden />
+        Sign out
+      </Button>
     </div>
   );
 }

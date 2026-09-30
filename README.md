@@ -138,12 +138,16 @@ CI enforces the same checks, so nothing depends on the hook being installed.
 - All changes via Pull Request, **min. 1 review** required.
 - Both CI workflows (`ci-backend`, `ci-frontend`) run on **every** PR — no `paths`
   filter, so a required check never hangs on a PR that skipped it. CodeQL scans as well.
-- `ci-backend`: Spotless, Checkstyle, then `./mvnw verify` (JUnit 5 + Testcontainers).
-- `ci-frontend`: ESLint, Prettier, `tsc --noEmit`, Vitest, then the Vite production build.
+- `ci-backend`: Spotless, Checkstyle, then `./mvnw verify` (JUnit 5 + Testcontainers), and a
+  check that `frontend/openapi/openapi.json` matches the spec the build produced.
+- `ci-frontend`: the generated API types match that spec, ESLint, Prettier, `tsc --noEmit`,
+  Vitest, then the Vite production build.
+- Changed an endpoint? `make api-client` refreshes the committed spec and the frontend types.
 - CI re-checks formatting and linting; the commit hook only saves you the round trip.
 
 > The backend includes health checks, OpenAPI documentation, and a PostgreSQL persistence
 > layer (Panache entities and repositories over a Flyway-managed schema); REST resources
 > and ingestion land in later PRs. The frontend is scaffolded — routing, layout, TanStack
-> Query and shadcn/ui are wired up, with a live backend health card on the dashboard; the
-> feature screens land in later PRs.
+> Query and shadcn/ui are wired up, calls go through a type-safe client generated from the
+> OpenAPI spec, and sign-in keeps the session renewed; the dashboard shows live backend
+> health, and the feature screens land in later PRs.

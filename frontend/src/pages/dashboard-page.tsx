@@ -22,7 +22,9 @@ export function DashboardPage() {
   );
 }
 
-function StatusBadge({ status }: { status: HealthStatus }) {
+// The spec leaves every field optional; a status the backend did not report reads as unknown.
+function StatusBadge({ status }: { status: HealthStatus | undefined }) {
+  if (!status) return <Badge variant="outline">UNKNOWN</Badge>;
   return <Badge variant={status === 'UP' ? 'secondary' : 'destructive'}>{status}</Badge>;
 }
 
@@ -58,7 +60,7 @@ function BackendHealthCard() {
               Overall <StatusBadge status={data.status} />
             </div>
             <ul className="divide-y rounded-md border text-sm">
-              {data.checks.map((check) => (
+              {data.checks?.map((check) => (
                 <li key={check.name} className="flex items-center justify-between px-3 py-2">
                   <span>{check.name}</span>
                   <StatusBadge status={check.status} />

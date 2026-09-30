@@ -27,6 +27,17 @@ quarkus:
   # expected to serve /q/swagger-ui too.
   swagger-ui:
     always-include: true
+  # Every build also writes the spec to target/openapi/. The frontend's type-safe client is
+  # generated from a committed copy of it (frontend/openapi/openapi.json), and ci-backend fails
+  # when the two differ, so an API change cannot land without the client following it.
+  # Servers are left out: the auto-generated ones name this machine's host and port, which is
+  # neither stable nor where a browser reaches the API. Health is in, so /q/health is typed too.
+  smallrye-openapi:
+    store-schema-directory: target/openapi
+    auto-add-server: false
+  smallrye-health:
+    openapi:
+      included: true
 
   # --- Container image (Jib) ---
   # cd.yml overrides registry, group and tags on the command line; everything else is

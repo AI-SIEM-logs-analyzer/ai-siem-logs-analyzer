@@ -81,8 +81,10 @@ if [ -n "$web_files" ] && [ -f frontend/package.json ]; then
 
     lintable=$(printf '%s\n' "$rel" | grep -E '\.(ts|tsx|js|jsx|mjs|cjs)$' || true)
     if [ -n "$lintable" ]; then
+        # --no-warn-ignored: a staged file the config ignores (the generated API types) is
+        # skipped quietly instead of tripping --max-warnings=0.
         (cd frontend && printf '%s\n' "$lintable" | tr '\n' '\0' \
-            | xargs -0 $pnpm_cmd exec eslint --fix --max-warnings=0)
+            | xargs -0 $pnpm_cmd exec eslint --fix --no-warn-ignored --max-warnings=0)
     fi
     restage "$web_files"
 fi
