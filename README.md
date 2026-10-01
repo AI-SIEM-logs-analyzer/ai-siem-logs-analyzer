@@ -150,5 +150,5 @@ CI enforces the same checks, so nothing depends on the hook being installed.
 > and ingestion land in later PRs. The frontend is scaffolded — routing, layout, TanStack
 > Query and shadcn/ui are wired up, calls go through a type-safe client generated from the
 > OpenAPI spec, and sign-in keeps the session renewed; the dashboard charts events over
-> time (Apache ECharts) next to live backend health, and the other feature screens land in
-> later PRs.
+> time, the top source IPs, HTTP status codes and the most frequent errors (Apache ECharts)
+> next to live backend health, and the other feature screens land in later PRs.

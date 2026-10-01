@@ -1,8 +1,9 @@
 # Frontend — React + Vite + TypeScript
 
 The analyst UI. Scaffolded: routing, layout, data fetching, sign-in and the component kit
-are in place; the dashboard charts events over time and shows live backend health, and the
-other pages are placeholders until their features land.
+are in place; the dashboard charts events over time, the top source IPs, status codes and
+errors, and shows live backend health, and the other pages are placeholders until their
+features land.
 
 ## Stack
 
@@ -131,11 +132,43 @@ the types do too: read them with `?.` and `??`.
   “Show as table” lists them all. An empty range and an unreachable search index (`503`) are
   explained in place.
 - ECharts paints with concrete colours, so
-  [`event-timeline-option.ts`](src/components/dashboard/event-timeline-option.ts) mirrors the
-  theme's greys and keeps a dark set for when `.dark` is on the root.
+  [`chart-theme.ts`](src/components/charts/chart-theme.ts) mirrors the theme's greys, keeps a
+  dark set for when `.dark` is on the root, and holds the status colours.
 - A new chart: register its series type and components in `echart.tsx` (and in
-  `EChartOption`), build the option in a plain function and render `<EChart>` lazily, as
-  `event-timeline-card.tsx` does, so ECharts stays out of the main bundle.
+  `EChartOption`), build the option in a plain function and render `<LazyEChart>`
+  ([`lazy-echart.tsx`](src/components/charts/lazy-echart.tsx)) inside `<Suspense>`, so
+  ECharts stays out of the main bundle.
+
+## Dashboard: aggregate widgets
+
+- Under the timeline, for the same range: **Top source IPs**, **Status codes** and **Top
+  errors**. They read the facets of the timeline's own request (`useEventOverview` in
+  [`api/events.ts`](src/api/events.ts)), so the dashboard still costs one search per range
+  and refresh, and every card changes range, refreshes and dims together.
+- The backend counts them across the whole window: `facets.bySrcIp` (top 20 addresses),
+  `facets.byStatus` (every HTTP status code) and `facets.topErrors` (the 10 most frequent
+  messages of `ERROR` and `CRITICAL` events, by exact text).
+  [`lib/facets.ts`](src/lib/facets.ts) ranks them, keeps the top 10 and splits the status
+  codes into classes (1xx–5xx); anything outside 100–599 is left out.
+- **Top source IPs** and **Top errors** are horizontal bars, largest on top, each with its
+  count. Messages sit on their own line above their bar, so the bars keep the card's width
+  on a phone; long values are cut with an ellipsis and given whole in the tooltip and the
+  table. Backend text is escaped before it goes into a tooltip's HTML.
+- **Status codes** is a column per code, coloured by class (2xx green, 3xx blue, 4xx amber,
+  5xx red). The class list above it names each colour with its share and count, so colour
+  never carries the class alone.
+- Each card has a “Show as table” view with shares (of all events, of error events, of
+  events with a status) and explains an empty facet in place. An unreachable search index is
+  announced once, by the timeline; the widgets say the same without repeating the alert.
+
+The widgets are built from:
+
+- [`aggregate-widgets.tsx`](src/components/dashboard/aggregate-widgets.tsx) — the three
+  cards
+- [`aggregate-card.tsx`](src/components/dashboard/aggregate-card.tsx) — their shared frame
+  (loading, error and empty states) and the table view
+- [`aggregate-options.ts`](src/components/dashboard/aggregate-options.ts) — the ECharts
+  options
 
 ### Adding shadcn/ui components
 

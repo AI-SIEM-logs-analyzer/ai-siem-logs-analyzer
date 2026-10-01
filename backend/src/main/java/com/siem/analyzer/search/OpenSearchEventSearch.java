@@ -211,6 +211,24 @@ public class OpenSearchEventSearch implements EventSearch {
         aggs.putObject("by_source").putObject("terms").put("field", "source_id").put("size", 20);
         aggs.putObject("by_host").putObject("terms").put("field", "host").put("size", 20);
         aggs.putObject("by_src_ip").putObject("terms").put("field", "src_ip").put("size", 20);
+        // HTTP defines about sixty codes, so 60 buckets hold every one a log can carry.
+        aggs.putObject("by_status").putObject("terms").put("field", "status").put("size", 60);
+        // The most frequent error messages, by exact text (message.keyword; a message longer
+        // than its ignore_above is not counted). Severity is filtered here rather than in the
+        // query, so the other facets still count every severity.
+        ObjectNode topErrors = aggs.putObject("top_errors");
+        topErrors
+                .putObject("filter")
+                .putObject("terms")
+                .putArray("severity")
+                .add(Severity.ERROR.name())
+                .add(Severity.CRITICAL.name());
+        topErrors
+                .putObject("aggs")
+                .putObject("messages")
+                .putObject("terms")
+                .put("field", "message.keyword")
+                .put("size", 10);
         aggs.putObject("over_time")
                 .putObject("date_histogram")
                 .put("field", "occurred_at")
@@ -325,6 +343,8 @@ public class OpenSearchEventSearch implements EventSearch {
                 terms(aggregations.path("by_source")),
                 terms(aggregations.path("by_host")),
                 terms(aggregations.path("by_src_ip")),
+                terms(aggregations.path("by_status")),
+                terms(aggregations.path("top_errors").path("messages")),
                 overTime);
     }
 

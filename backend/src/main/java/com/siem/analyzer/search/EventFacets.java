@@ -13,12 +13,18 @@ import java.util.Map;
  * sorting again. Every field here is an explicitly mapped one: a value kept in {@code attributes}
  * cannot be aggregated efficiently, which is why the mapping promotes the fields the dashboard
  * needs.
+ *
+ * <p>{@code byStatus} counts events per HTTP status code; events without one are not counted.
+ * {@code topErrors} counts the most frequent messages among ERROR and CRITICAL events, by their
+ * exact text.
  */
 public record EventFacets(
         Map<String, Long> bySeverity,
         Map<String, Long> bySourceId,
         Map<String, Long> byHost,
         Map<String, Long> bySrcIp,
+        Map<String, Long> byStatus,
+        Map<String, Long> topErrors,
         List<TimeBucket> overTime) {
 
     public EventFacets {
@@ -26,12 +32,15 @@ public record EventFacets(
         bySourceId = copy(bySourceId);
         byHost = copy(byHost);
         bySrcIp = copy(bySrcIp);
+        byStatus = copy(byStatus);
+        topErrors = copy(topErrors);
         overTime = overTime == null ? List.of() : List.copyOf(overTime);
     }
 
     /** An empty set of facets, for a query that asked for none. */
     public static EventFacets none() {
-        return new EventFacets(Map.of(), Map.of(), Map.of(), Map.of(), List.of());
+        return new EventFacets(
+                Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), List.of());
     }
 
     private static Map<String, Long> copy(Map<String, Long> source) {

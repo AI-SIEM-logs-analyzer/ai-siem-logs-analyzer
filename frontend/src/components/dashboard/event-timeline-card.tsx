@@ -1,7 +1,10 @@
-import { lazy, Suspense, useMemo } from 'react';
+import { Suspense, useMemo } from 'react';
 import { RefreshCw } from 'lucide-react';
-import { useEventTimeline } from '@/api/events';
-import { eventTimelineOption, formatEvents } from '@/components/dashboard/event-timeline-option';
+import { useEventOverview } from '@/api/events';
+import { formatEvents } from '@/components/charts/chart-theme';
+import { LazyEChart } from '@/components/charts/lazy-echart';
+import { overviewErrorMessage } from '@/components/dashboard/overview-error';
+import { eventTimelineOption } from '@/components/dashboard/event-timeline-option';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -12,26 +15,13 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ApiError } from '@/lib/api-client';
 import { formatBucket, peakBucket, TIMELINE_RANGES, type TimelineRange } from '@/lib/timeline';
 import { cn } from '@/lib/utils';
-
-// ECharts is about half of the bundle; it loads with the first chart rather than with the app.
-const EChart = lazy(() =>
-  import('@/components/charts/echart').then((module) => ({ default: module.EChart })),
-);
-
-function timelineErrorMessage(error: Error): string {
-  if (error instanceof ApiError && error.status === 503) {
-    return 'The search index is unreachable, so events cannot be counted. Ingestion continues.';
-  }
-  return `Could not load the event timeline: ${error.message}`;
-}
 
 /** Events over time across every source, for the range picked above the dashboard. */
 export function EventTimelineCard({ range }: { range: TimelineRange }) {
   const { data, error, isPending, isFetching, isPlaceholderData, refetch } =
-    useEventTimeline(range);
+    useEventOverview(range);
   const { label, per } = TIMELINE_RANGES[range];
 
   const option = useMemo(
@@ -62,7 +52,7 @@ export function EventTimelineCard({ range }: { range: TimelineRange }) {
           </div>
         ) : !data ? (
           <p role="alert" className="text-destructive text-sm">
-            {timelineErrorMessage(error)}
+            {overviewErrorMessage(error, 'the event timeline')}
           </p>
         ) : data.total === 0 ? (
           <p className="text-muted-foreground flex h-64 items-center justify-center rounded-md border border-dashed text-sm">
@@ -91,11 +81,12 @@ export function EventTimelineCard({ range }: { range: TimelineRange }) {
             </dl>
             {error && (
               <p role="alert" className="text-destructive text-sm">
-                {timelineErrorMessage(error)} Showing the last counts received.
+                {overviewErrorMessage(error, 'the event timeline')} Showing the last counts
+                received.
               </p>
             )}
             <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-              <EChart
+              <LazyEChart
                 option={option!}
                 label={`Column chart of events per ${per}, ${label.toLowerCase()}`}
                 className="h-64 w-full"

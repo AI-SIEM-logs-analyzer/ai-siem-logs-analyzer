@@ -243,6 +243,10 @@ class OpenSearchEventSearchQueryTest {
         assertEquals(1L, page.facets().bySeverity().get("CRITICAL"));
         assertEquals(2L, page.facets().byHost().get("web-01"));
         assertEquals(2, page.facets().bySrcIp().size());
+        assertEquals(Map.of("401", 1L, "200", 1L), page.facets().byStatus());
+        assertEquals(
+                Map.of("failed login for admin", 1L, "disk failure", 1L),
+                page.facets().topErrors());
         assertFalse(page.facets().overTime().isEmpty());
     }
 

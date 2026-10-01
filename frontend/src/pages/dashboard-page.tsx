@@ -1,6 +1,11 @@
 import { RefreshCw } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 import { useBackendHealth, type HealthStatus } from '@/api/health';
+import {
+  StatusCodesCard,
+  TopErrorsCard,
+  TopIpsCard,
+} from '@/components/dashboard/aggregate-widgets';
 import { EventTimelineCard } from '@/components/dashboard/event-timeline-card';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +53,11 @@ export function DashboardPage() {
         }
       />
       <EventTimelineCard range={range} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <TopIpsCard range={range} />
+        <StatusCodesCard range={range} />
+        <TopErrorsCard range={range} className="lg:col-span-2" />
+      </div>
       <BackendHealthCard />
     </>
   );

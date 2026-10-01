@@ -153,7 +153,8 @@ public class EventSearchResource {
                     Long cursorEventId,
             @Parameter(
                             description =
-                                    "Also count severities, sources, hosts, source IPs and events"
+                                    "Also count severities, sources, hosts, source IPs, HTTP status"
+                                            + " codes, the most frequent error messages and events"
                                             + " per hour across the whole match")
                     @QueryParam("facets")
                     boolean facets) {

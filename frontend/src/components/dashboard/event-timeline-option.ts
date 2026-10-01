@@ -1,39 +1,6 @@
+import { chartColors, count, formatEvents } from '@/components/charts/chart-theme';
 import type { EChartOption } from '@/components/charts/echart';
 import { formatBucket, peakBucket, type TimelineBucket, type TimelineWindow } from '@/lib/timeline';
-
-// ECharts paints with concrete colours, not CSS variables, so the theme's tokens are mirrored
-// here: the series is the blue of a single-series chart, everything else the neutral greys of
-// the shadcn/ui theme in index.css.
-const COLORS = {
-  light: {
-    bar: '#2a78d6',
-    barHover: '#256abf',
-    text: '#737373',
-    ink: '#0a0a0a',
-    grid: '#e5e5e5',
-    surface: '#ffffff',
-    pointer: '#a3a3a3',
-  },
-  dark: {
-    bar: '#3987e5',
-    barHover: '#5598e7',
-    text: '#a1a1a1',
-    ink: '#fafafa',
-    grid: '#ffffff1a',
-    surface: '#171717',
-    pointer: '#525252',
-  },
-} as const;
-
-const count = new Intl.NumberFormat();
-
-export function formatEvents(n: number): string {
-  return `${count.format(n)} ${n === 1 ? 'event' : 'events'}`;
-}
-
-function prefersDark(): boolean {
-  return document.documentElement.classList.contains('dark');
-}
 
 /**
  * A column per bucket on a time axis spanning the whole window, so an empty stretch reads as
@@ -43,9 +10,9 @@ function prefersDark(): boolean {
 export function eventTimelineOption(
   buckets: readonly TimelineBucket[],
   window: TimelineWindow,
-  dark = prefersDark(),
+  dark?: boolean,
 ): EChartOption {
-  const colors = dark ? COLORS.dark : COLORS.light;
+  const colors = chartColors(dark);
   const peak = peakBucket(buckets);
   const middle = window.bucketMs / 2;
 

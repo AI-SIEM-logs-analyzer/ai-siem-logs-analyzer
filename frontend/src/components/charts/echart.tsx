@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type CSSProperties } from 'react';
 import { BarChart, type BarSeriesOption } from 'echarts/charts';
 import {
   GridComponent,
@@ -23,10 +23,12 @@ interface EChartProps {
   /** What the chart shows, for screen readers; pair it with a table view of the same data. */
   label: string;
   className?: string;
+  /** For a size that follows the data, such as a height per bar. */
+  style?: CSSProperties;
 }
 
 /** One ECharts instance bound to a div, re-drawn when `option` changes and resized with it. */
-export function EChart({ option, label, className }: EChartProps) {
+export function EChart({ option, label, className, style }: EChartProps) {
   const container = useRef<HTMLDivElement>(null);
   const chart = useRef<echarts.ECharts | null>(null);
 
@@ -49,5 +51,5 @@ export function EChart({ option, label, className }: EChartProps) {
     chart.current?.setOption(option, { notMerge: true });
   }, [option]);
 
-  return <div ref={container} role="img" aria-label={label} className={className} />;
+  return <div ref={container} role="img" aria-label={label} className={className} style={style} />;
 }
