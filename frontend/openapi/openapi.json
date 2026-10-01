@@ -73,6 +73,20 @@
               "format" : "int64"
             }
           },
+          "byStatus" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "integer",
+              "format" : "int64"
+            }
+          },
+          "topErrors" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "integer",
+              "format" : "int64"
+            }
+          },
           "overTime" : {
             "type" : "array",
             "items" : {
@@ -563,7 +577,7 @@
             "type" : "string"
           }
         }, {
-          "description" : "Also count severities, sources, hosts, source IPs and events per hour across the whole match",
+          "description" : "Also count severities, sources, hosts, source IPs, HTTP status codes, the most frequent error messages and events per hour across the whole match",
           "name" : "facets",
           "in" : "query",
           "schema" : {
