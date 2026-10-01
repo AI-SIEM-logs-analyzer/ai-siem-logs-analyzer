@@ -39,6 +39,7 @@ public class AuthBootstrap {
         this.configuredPassword = config.auth().bootstrapPassword();
     }
 
+    @Transactional
     void onStartup(@Observes StartupEvent event) {
         List<User> administrators = users.listByRole(Role.ADMIN);
         configuredPassword.ifPresent(
