@@ -100,6 +100,19 @@ the types do too: read them with `?.` and `??`.
 - Sign-out revokes the tokens on the backend (`POST /api/auth/logout`) and always ends the
   local session; the query cache is cleared whenever a session ends.
 
+## Log uploads
+
+- `/uploads` offers admins and analysts a file picker with drag and drop. The extension, an
+  empty file and the 50 MiB limit are checked before anything is sent (mirroring
+  `app.upload` in the backend's `application.yaml`; the backend still has the final say).
+- [`api/uploads.ts`](src/api/uploads.ts) sends the file with `XMLHttpRequest` rather than
+  `fetch`, which cannot report upload progress. It keeps `authFetch`'s contract by hand: the
+  bearer of a fresh session, one renewal and resend on a `401`. A refusal (`413`, `415`,
+  `429`, …) becomes an `ApiError` and a plain-language message; an upload can be cancelled.
+- Once accepted, `GET /api/logs/uploads/{id}` is polled every 2 seconds until the status is
+  `INGESTED` (with the event count) or `FAILED` (with the backend's error message). The list
+  below polls the same way while any row on it is still `PENDING` or `PROCESSING`.
+
 ### Adding shadcn/ui components
 
 [`components.json`](components.json) is set up for the CLI:
