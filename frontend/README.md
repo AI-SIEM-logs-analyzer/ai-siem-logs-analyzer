@@ -1,8 +1,8 @@
 # Frontend — React + Vite + TypeScript
 
 The analyst UI. Scaffolded: routing, layout, data fetching, sign-in and the component kit
-are in place; the dashboard shows live backend health, and the other pages are placeholders
-until their features land.
+are in place; the dashboard charts events over time and shows live backend health, and the
+other pages are placeholders until their features land.
 
 ## Stack
 
@@ -11,7 +11,8 @@ until their features land.
 - **TanStack Query** — server state; client defaults in
   [`src/app/query-client.ts`](src/app/query-client.ts)
 - **shadcn/ui** + **Tailwind CSS v4** — theme tokens in [`src/index.css`](src/index.css)
-- **Apache ECharts** _(planned)_
+- **Apache ECharts** — tree-shaken, SVG renderer, loaded with the first chart; wrapper in
+  [`src/components/charts/echart.tsx`](src/components/charts/echart.tsx)
 - Type-safe API client generated from the Quarkus **OpenAPI** spec — **openapi-typescript**
   types over **openapi-fetch**
 - **Vitest** + Testing Library (unit) · **Playwright** (e2e, planned)
@@ -112,6 +113,29 @@ the types do too: read them with `?.` and `??`.
 - Once accepted, `GET /api/logs/uploads/{id}` is polled every 2 seconds until the status is
   `INGESTED` (with the event count) or `FAILED` (with the backend's error message). The list
   below polls the same way while any row on it is still `PENDING` or `PROCESSING`.
+
+## Dashboard: event timeline
+
+- The dashboard opens on events over time across every source, as columns. The range picker
+  in the page header offers the last 24 hours (a column per hour), 7 days (per 3 hours) and
+  30 days (per 12 hours); the choice is kept in the URL (`/?range=7d`).
+- [`api/events.ts`](src/api/events.ts) asks `GET /api/events/search` for one hit with
+  `facets=true` and reads the hourly counts (`facets.overTime`) and `totalHits`. The backend
+  leaves out empty hours; [`lib/timeline.ts`](src/lib/timeline.ts) places the window, folds
+  the hours into the coarser columns and fills the gaps with zeros. Column boundaries fall on
+  local multiples of their size (12-hour columns start at midnight and noon) and always on
+  whole UTC hours, so no column splits one of the backend's.
+- The window ends after the current column and slides along: the timeline is fetched again
+  every minute. A different range keeps the previous chart, dimmed, until its counts arrive.
+- The busiest column carries its value; the tooltip gives every column's count and period, and
+  “Show as table” lists them all. An empty range and an unreachable search index (`503`) are
+  explained in place.
+- ECharts paints with concrete colours, so
+  [`event-timeline-option.ts`](src/components/dashboard/event-timeline-option.ts) mirrors the
+  theme's greys and keeps a dark set for when `.dark` is on the root.
+- A new chart: register its series type and components in `echart.tsx` (and in
+  `EChartOption`), build the option in a plain function and render `<EChart>` lazily, as
+  `event-timeline-card.tsx` does, so ECharts stays out of the main bundle.
 
 ### Adding shadcn/ui components
 
