@@ -6,6 +6,7 @@ import { renderRoute } from '@/test/render-route';
 
 const healthy = () => json(200, { status: 'UP', checks: [] });
 const me = () => json(200, { id: 1, username: 'admin', roles: ['ADMIN'] });
+const noEvents = () => json(200, { hits: [], totalHits: 0, facets: { overTime: [] } });
 
 describe('routes', () => {
   it('shows backend health on the dashboard', async () => {
@@ -17,6 +18,7 @@ describe('routes', () => {
           checks: [{ name: 'Database connections health check', status: 'UP' }],
         }),
       'GET /api/auth/me': me,
+      'GET /api/events/search': noEvents,
     });
 
     renderRoute('/');
@@ -32,6 +34,7 @@ describe('routes', () => {
       'GET /q/health': () =>
         json(503, { status: 'DOWN', checks: [{ name: 'OpenSearch', status: 'DOWN' }] }),
       'GET /api/auth/me': me,
+      'GET /api/events/search': noEvents,
     });
 
     renderRoute('/');
@@ -42,7 +45,11 @@ describe('routes', () => {
 
   it('navigates between pages from the sidebar', async () => {
     startTestSession();
-    stubBackend({ 'GET /q/health': healthy, 'GET /api/auth/me': me });
+    stubBackend({
+      'GET /q/health': healthy,
+      'GET /api/auth/me': me,
+      'GET /api/events/search': noEvents,
+    });
     const user = userEvent.setup();
 
     renderRoute('/');

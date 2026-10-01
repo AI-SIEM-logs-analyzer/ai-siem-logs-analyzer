@@ -1,5 +1,7 @@
 import { RefreshCw } from 'lucide-react';
+import { useSearchParams } from 'react-router';
 import { useBackendHealth, type HealthStatus } from '@/api/health';
+import { EventTimelineCard } from '@/components/dashboard/event-timeline-card';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,13 +14,67 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  DEFAULT_TIMELINE_RANGE,
+  isTimelineRange,
+  TIMELINE_RANGES,
+  type TimelineRange,
+} from '@/lib/timeline';
 
 export function DashboardPage() {
+  // The range lives in the URL, so a reload or a shared link shows the same slice.
+  const [params, setParams] = useSearchParams();
+  const requested = params.get('range');
+  const range = isTimelineRange(requested) ? requested : DEFAULT_TIMELINE_RANGE;
+
   return (
     <>
-      <PageHeader title="Dashboard" description="Overview of ingestion, detections and alerts." />
+      <PageHeader
+        title="Dashboard"
+        description="Overview of ingestion, detections and alerts."
+        actions={
+          <RangePicker
+            value={range}
+            onChange={(next) =>
+              setParams(
+                (current) => {
+                  current.set('range', next);
+                  return current;
+                },
+                { replace: true },
+              )
+            }
+          />
+        }
+      />
+      <EventTimelineCard range={range} />
       <BackendHealthCard />
     </>
+  );
+}
+
+function RangePicker({
+  value,
+  onChange,
+}: {
+  value: TimelineRange;
+  onChange: (range: TimelineRange) => void;
+}) {
+  return (
+    <div role="group" aria-label="Time range" className="flex gap-1 rounded-lg border p-1">
+      {(Object.keys(TIMELINE_RANGES) as TimelineRange[]).map((range) => (
+        <Button
+          key={range}
+          size="sm"
+          variant={range === value ? 'secondary' : 'ghost'}
+          aria-pressed={range === value}
+          title={TIMELINE_RANGES[range].label}
+          onClick={() => onChange(range)}
+        >
+          {range}
+        </Button>
+      ))}
+    </div>
   );
 }
 

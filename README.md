@@ -149,5 +149,6 @@ CI enforces the same checks, so nothing depends on the hook being installed.
 > layer (Panache entities and repositories over a Flyway-managed schema); REST resources
 > and ingestion land in later PRs. The frontend is scaffolded — routing, layout, TanStack
 > Query and shadcn/ui are wired up, calls go through a type-safe client generated from the
-> OpenAPI spec, and sign-in keeps the session renewed; the dashboard shows live backend
-> health, and the feature screens land in later PRs.
+> OpenAPI spec, and sign-in keeps the session renewed; the dashboard charts events over
+> time (Apache ECharts) next to live backend health, and the other feature screens land in
+> later PRs.
