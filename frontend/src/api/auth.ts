@@ -3,6 +3,7 @@ import { api } from '@/api/client';
 import type { components } from '@/api/schema';
 import { publicApi, unwrap } from '@/lib/api-client';
 import { freshSession } from '@/lib/auth/auth-fetch';
+import { can, type Permission } from '@/lib/auth/permissions';
 import { endSession, startSession } from '@/lib/auth/session';
 
 // /api/auth: sign-in, sign-out and the signed-in account.
@@ -52,4 +53,13 @@ export function useCurrentUser() {
     queryFn: fetchCurrentUser,
     staleTime: 5 * 60_000,
   });
+}
+
+/**
+ * Whether the signed-in account may do `permission`. False until its roles are known, so an
+ * action never flashes up for someone who turns out not to be allowed it.
+ */
+export function useCan(permission: Permission): boolean {
+  const { data: user } = useCurrentUser();
+  return can(user?.roles, permission);
 }
