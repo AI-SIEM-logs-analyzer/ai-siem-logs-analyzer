@@ -56,7 +56,7 @@ describe('routes', () => {
     const nav = screen.getByRole('navigation', { name: 'Main' });
     await user.click(within(nav).getByRole('link', { name: 'Events' }));
 
-    expect(screen.getByRole('heading', { name: 'Events' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Events' })).toBeInTheDocument();
     expect(within(nav).getByRole('link', { name: 'Events' })).toHaveAttribute(
       'aria-current',
       'page',

@@ -4,7 +4,7 @@ import { RequirePermission } from '@/components/auth/require-permission';
 import { AppLayout } from '@/components/layout/app-layout';
 import { AlertsPage } from '@/pages/alerts-page';
 import { DashboardPage } from '@/pages/dashboard-page';
-import { EventsPage } from '@/pages/events-page';
+import { LazyEventsPage } from '@/pages/lazy-events-page';
 import { LoginPage } from '@/pages/login-page';
 import { NotFoundPage } from '@/pages/not-found-page';
 import { RouteErrorPage } from '@/pages/route-error-page';
@@ -26,7 +26,7 @@ export const routes: RouteObject[] = [
     errorElement: <RouteErrorPage />,
     children: [
       { index: true, element: <DashboardPage /> },
-      { path: 'events', element: <EventsPage /> },
+      { path: 'events', element: <LazyEventsPage /> },
       { path: 'uploads', element: <UploadsPage /> },
       { path: 'alerts', element: <AlertsPage /> },
       {

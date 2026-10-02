@@ -2,8 +2,8 @@
 
 The analyst UI. Scaffolded: routing, layout, data fetching, sign-in and the component kit
 are in place; the dashboard charts events over time, the top source IPs, status codes and
-errors, and shows live backend health, and the other pages are placeholders until their
-features land.
+errors, and shows live backend health; the events page searches, filters and opens single
+events; the other pages are placeholders until their features land.
 
 ## Stack
 
@@ -12,6 +12,8 @@ features land.
 - **TanStack Query** — server state; client defaults in
   [`src/app/query-client.ts`](src/app/query-client.ts)
 - **shadcn/ui** + **Tailwind CSS v4** — theme tokens in [`src/index.css`](src/index.css)
+- **TanStack Table v9** — headless tables (`useTable`), events table in
+  [`src/components/events/events-table.tsx`](src/components/events/events-table.tsx)
 - **Apache ECharts** — tree-shaken, SVG renderer, loaded with the first chart; wrapper in
   [`src/components/charts/echart.tsx`](src/components/charts/echart.tsx)
 - Type-safe API client generated from the Quarkus **OpenAPI** spec — **openapi-typescript**
@@ -169,6 +171,44 @@ The widgets are built from:
   (loading, error and empty states) and the table view
 - [`aggregate-options.ts`](src/components/dashboard/aggregate-options.ts) — the ECharts
   options
+
+## Events: table, filters and drill-down
+
+- `/events` lists the events matching its filters, newest first, 50 per page, from
+  `GET /api/events/search`. The filters live in the URL
+  ([`lib/event-filters.ts`](src/lib/event-filters.ts) reads and writes them), so a reload,
+  the back button or a shared link shows the same search: `/events?range=7d&srcIp=10.0.0.0/8&status=5xx`.
+- Filters: a time range (15 minutes to 30 days, all time, or a custom from/to), full-text
+  search over the message (`q`), a literal substring of the raw line, severities, source IPs
+  or CIDR ranges and HTTP status codes or classes (`404`, `5xx`). The range and severities
+  apply as they are picked, the text boxes together on Enter or **Apply**. A status that is
+  no code is refused before anything is sent; the backend still has the final say (a `400`
+  is explained in place). Every filter in effect is a chip that removes it.
+- **Drill-down:** a severity, source, source IP or status in the table, or in the details
+  panel, adds itself to the filters. A value already filtered on is not offered again.
+- The table is [TanStack Table](https://tanstack.com/table) in manual mode: the backend
+  filters, sorts and pages, the table owns which columns show (**Columns** — source and
+  request are hidden at first) and which way time runs (the **Time** header flips the
+  backend's `order`).
+- Pages chain by cursor (`nextCursorOccurredAt` / `nextCursorEventId`). A relative range
+  ends at the moment the search started and stays there while paging, so every page covers
+  the same window; **Refresh** moves it to now and starts over on page one.
+- **Click on an event → details:** a row (or Enter on a focused row) opens a side panel
+  with everything the hit carries: times, source, severity, the message, every parsed field
+  grouped as origin, HTTP request, location and client (fields the panel does not know land
+  under “Other fields”), the raw line with a copy button and the whole hit as JSON.
+  **Previous** / **Next** step through the rows of the page.
+- The page loads on demand ([`pages/lazy-events-page.tsx`](src/pages/lazy-events-page.tsx)),
+  keeping TanStack Table out of the main bundle.
+
+The page is built from:
+
+- [`events-page.tsx`](src/pages/events-page.tsx) — URL filters, paging and the open event
+- [`event-filter-bar.tsx`](src/components/events/event-filter-bar.tsx) — the filters
+- [`events-table.tsx`](src/components/events/events-table.tsx) — the TanStack table
+- [`event-details.tsx`](src/components/events/event-details.tsx) — the details panel, in a
+  [`Sheet`](src/components/ui/sheet.tsx)
+- [`lib/event-fields.ts`](src/lib/event-fields.ts) — how the parsed fields read and group
 
 ### Adding shadcn/ui components
 
