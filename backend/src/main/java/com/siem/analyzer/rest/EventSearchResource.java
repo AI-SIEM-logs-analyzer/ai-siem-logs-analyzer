@@ -155,7 +155,8 @@ public class EventSearchResource {
                             description =
                                     "Also count severities, sources, hosts, source IPs, HTTP status"
                                             + " codes, the most frequent error messages and events"
-                                            + " per hour across the whole match")
+                                            + " per hour, overall and per source IP, across the"
+                                            + " whole match")
                     @QueryParam("facets")
                     boolean facets) {
 
