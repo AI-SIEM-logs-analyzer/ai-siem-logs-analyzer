@@ -210,7 +210,11 @@ public class OpenSearchEventSearch implements EventSearch {
         aggs.putObject("by_severity").putObject("terms").put("field", "severity").put("size", 10);
         aggs.putObject("by_source").putObject("terms").put("field", "source_id").put("size", 20);
         aggs.putObject("by_host").putObject("terms").put("field", "host").put("size", 20);
-        aggs.putObject("by_src_ip").putObject("terms").put("field", "src_ip").put("size", 20);
+        // Each address also counts its own events per hour, for the activity heatmap: the
+        // histogram rides on the same terms buckets, so it costs no second ranking.
+        ObjectNode bySrcIp = aggs.putObject("by_src_ip");
+        bySrcIp.putObject("terms").put("field", "src_ip").put("size", 20);
+        bySrcIp.putObject("aggs").set("over_time", hourlyHistogram());
         // HTTP defines about sixty codes, so 60 buckets hold every one a log can carry.
         aggs.putObject("by_status").putObject("terms").put("field", "status").put("size", 60);
         // The most frequent error messages, by exact text (message.keyword; a message longer
@@ -229,12 +233,19 @@ public class OpenSearchEventSearch implements EventSearch {
                 .putObject("terms")
                 .put("field", "message.keyword")
                 .put("size", 10);
-        aggs.putObject("over_time")
+        aggs.set("over_time", hourlyHistogram());
+        return aggs;
+    }
+
+    /** Events per hour, the empty hours left out. */
+    private ObjectNode hourlyHistogram() {
+        ObjectNode histogram = objectMapper.createObjectNode();
+        histogram
                 .putObject("date_histogram")
                 .put("field", "occurred_at")
                 .put("calendar_interval", "hour")
                 .put("min_doc_count", 1);
-        return aggs;
+        return histogram;
     }
 
     private SearchPage toPage(JsonNode response, EventQuery query) {
@@ -331,12 +342,9 @@ public class OpenSearchEventSearch implements EventSearch {
     }
 
     private EventFacets toFacets(JsonNode aggregations) {
-        List<EventFacets.TimeBucket> overTime = new ArrayList<>();
-        for (JsonNode bucket : aggregations.path("over_time").path("buckets")) {
-            overTime.add(
-                    new EventFacets.TimeBucket(
-                            Instant.ofEpochMilli(bucket.path("key").asLong()),
-                            bucket.path("doc_count").asLong()));
+        Map<String, List<EventFacets.TimeBucket>> srcIpOverTime = new LinkedHashMap<>();
+        for (JsonNode bucket : aggregations.path("by_src_ip").path("buckets")) {
+            srcIpOverTime.put(bucket.path("key").asText(), histogram(bucket.path("over_time")));
         }
         return new EventFacets(
                 terms(aggregations.path("by_severity")),
@@ -345,7 +353,19 @@ public class OpenSearchEventSearch implements EventSearch {
                 terms(aggregations.path("by_src_ip")),
                 terms(aggregations.path("by_status")),
                 terms(aggregations.path("top_errors").path("messages")),
-                overTime);
+                histogram(aggregations.path("over_time")),
+                srcIpOverTime);
+    }
+
+    private List<EventFacets.TimeBucket> histogram(JsonNode aggregation) {
+        List<EventFacets.TimeBucket> buckets = new ArrayList<>();
+        for (JsonNode bucket : aggregation.path("buckets")) {
+            buckets.add(
+                    new EventFacets.TimeBucket(
+                            Instant.ofEpochMilli(bucket.path("key").asLong()),
+                            bucket.path("doc_count").asLong()));
+        }
+        return buckets;
     }
 
     private Map<String, Long> terms(JsonNode aggregation) {

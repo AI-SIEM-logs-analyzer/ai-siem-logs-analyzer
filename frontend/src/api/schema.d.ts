@@ -919,6 +919,9 @@ export interface components {
                 [key: string]: number;
             };
             overTime?: components["schemas"]["TimeBucket"][];
+            srcIpOverTime?: {
+                [key: string]: components["schemas"]["TimeBucket"][];
+            };
         };
         /** @description One matching event */
         EventHit: {
@@ -1065,7 +1068,7 @@ export interface operations {
                 cursorEventId?: number;
                 /** @description Resume after this event time; send together with cursorEventId */
                 cursorOccurredAt?: string;
-                /** @description Also count severities, sources, hosts, source IPs, HTTP status codes, the most frequent error messages and events per hour across the whole match */
+                /** @description Also count severities, sources, hosts, source IPs, HTTP status codes, the most frequent error messages and events per hour, overall and per source IP, across the whole match */
                 facets?: boolean;
                 /**
                  * @description Earliest event time, inclusive (ISO-8601 instant)

@@ -1,6 +1,7 @@
 import { RefreshCw } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 import { useBackendHealth, type HealthStatus } from '@/api/health';
+import { ActivityHeatmapCard } from '@/components/dashboard/activity-heatmap-card';
 import {
   StatusCodesCard,
   TopErrorsCard,
@@ -53,6 +54,7 @@ export function DashboardPage() {
         }
       />
       <EventTimelineCard range={range} />
+      <ActivityHeatmapCard range={range} />
       <div className="grid gap-6 lg:grid-cols-2">
         <TopIpsCard range={range} />
         <StatusCodesCard range={range} />

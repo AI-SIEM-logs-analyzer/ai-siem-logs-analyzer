@@ -1,8 +1,8 @@
 # Frontend — React + Vite + TypeScript
 
 The analyst UI. Scaffolded: routing, layout, data fetching, sign-in and the component kit
-are in place; the dashboard charts events over time, the top source IPs, status codes and
-errors, and shows live backend health; the events page searches, filters and opens single
+are in place; the dashboard charts events over time, when the busiest source IPs were
+active, the top source IPs, status codes and errors, and shows live backend health; the events page searches, filters and opens single
 events; the other pages are placeholders until their features land.
 
 ## Stack
@@ -141,9 +141,33 @@ the types do too: read them with `?.` and `??`.
   ([`lazy-echart.tsx`](src/components/charts/lazy-echart.tsx)) inside `<Suspense>`, so
   ECharts stays out of the main bundle.
 
+## Dashboard: activity heatmap
+
+- Under the timeline, **Activity by source IP** shows when the busiest addresses were
+  active: a row per address (the top 10 of `facets.bySrcIp`, busiest on top, the same as
+  **Top source IPs**) and a column per period of the timeline. Each cell is coloured by how
+  many events that address sent then, so a scan or a brute force shows as a dark streak and
+  a steady client as an even row.
+- The backend counts each of those addresses per hour (`facets.srcIpOverTime`, a histogram
+  nested in the source IP facet, so it comes with the same request);
+  [`lib/heatmap.ts`](src/lib/heatmap.ts) folds the hours into the timeline's columns and
+  fills the empty ones with zeros.
+- One blue hue, faint to dark (light on dark in dark mode), in up to five bands that grow
+  geometrically and end on round numbers (`1`, `2–9`, `10–49`, …): a handful of addresses
+  usually dwarfs the rest, and on an even scale every other cell would be the palest blue.
+  The legend above the chart names each band; an empty cell is drawn faintly, so the grid
+  stays whole and hovering it says “No events”.
+- The tooltip gives the count, address and period of a cell; clicking one opens `/events`
+  narrowed to that address and period. “Show as table” sums up each address (events, active
+  periods, busiest period), with links to the same searches for the keyboard.
+- On a phone the grid keeps its columns at least 7 px wide and scrolls sideways inside its
+  card. Built from
+  [`activity-heatmap-card.tsx`](src/components/dashboard/activity-heatmap-card.tsx) and
+  [`activity-heatmap-option.ts`](src/components/dashboard/activity-heatmap-option.ts).
+
 ## Dashboard: aggregate widgets
 
-- Under the timeline, for the same range: **Top source IPs**, **Status codes** and **Top
+- Under the heatmap, for the same range: **Top source IPs**, **Status codes** and **Top
   errors**. They read the facets of the timeline's own request (`useEventOverview` in
   [`api/events.ts`](src/api/events.ts)), so the dashboard still costs one search per range
   and refresh, and every card changes range, refreshes and dims together.
