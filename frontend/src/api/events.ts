@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import type { components } from '@/api/schema';
 import { unwrap } from '@/lib/api-client';
+import { eventSearchQuery, type EventFilters } from '@/lib/event-filters';
 import {
   timelineBuckets,
   timelineWindow,
@@ -10,11 +11,13 @@ import {
   type TimelineWindow,
 } from '@/lib/timeline';
 
-// /api/events/search: the event timeline and the aggregate widgets on the dashboard.
+// /api/events/search: the event timeline and the aggregate widgets on the dashboard, and the
+// events page's table.
 
 export type EventSearchResponse = components['schemas']['EventSearchResponse'];
 export type EventFacets = components['schemas']['EventFacets'];
 export type TimeBucket = components['schemas']['TimeBucket'];
+export type EventHit = components['schemas']['EventHit'];
 
 /** How often the dashboard asks again, sliding its window along with the clock. */
 export const OVERVIEW_REFRESH_MS = 60_000;
@@ -22,6 +25,8 @@ export const OVERVIEW_REFRESH_MS = 60_000;
 export const eventKeys = {
   all: ['events'] as const,
   overview: (range: TimelineRange) => ['events', 'overview', range] as const,
+  search: (filters: EventFilters, now: number, cursor: EventCursor | null) =>
+    ['events', 'search', filters, now, cursor] as const,
 };
 
 export interface EventOverview {
@@ -74,5 +79,66 @@ export function useEventOverview(range: TimelineRange) {
     queryFn: () => fetchEventOverview(range),
     placeholderData: keepPreviousData,
     refetchInterval: OVERVIEW_REFRESH_MS,
+  });
+}
+
+/** Where a page of results resumes: the last hit of the page before it. */
+export interface EventCursor {
+  occurredAt: string;
+  eventId: number;
+}
+
+/** Hits per page on the events page. */
+export const EVENT_PAGE_SIZE = 50;
+
+export interface EventPage {
+  hits: EventHit[];
+  /** Events matching the filters across every page. */
+  total: number;
+  /** Where the next page starts; null on the last page. */
+  next: EventCursor | null;
+}
+
+const NO_HITS: EventHit[] = [];
+
+/**
+ * One page of the events matching `filters`, a relative range ending at `now`. Pages are
+ * chained by cursor, and the backend wants the same filters and order with each, so `now`
+ * stays fixed while paging: every page covers the same window.
+ */
+export async function fetchEventPage(
+  filters: EventFilters,
+  now: number,
+  cursor: EventCursor | null,
+  size = EVENT_PAGE_SIZE,
+): Promise<EventPage> {
+  const response = await unwrap(
+    api.GET('/api/events/search', {
+      params: {
+        query: {
+          ...eventSearchQuery(filters, now),
+          size,
+          ...(cursor && { cursorOccurredAt: cursor.occurredAt, cursorEventId: cursor.eventId }),
+        },
+      },
+    }),
+  );
+  const { nextCursorOccurredAt: occurredAt, nextCursorEventId: eventId } = response;
+  return {
+    hits: response.hits ?? NO_HITS,
+    total: response.totalHits ?? 0,
+    next:
+      typeof occurredAt === 'string' && typeof eventId === 'number'
+        ? { occurredAt, eventId }
+        : null,
+  };
+}
+
+/** A page of the events table, kept on screen while the next one (or a new filter) loads. */
+export function useEventPage(filters: EventFilters, now: number, cursor: EventCursor | null) {
+  return useQuery({
+    queryKey: eventKeys.search(filters, now, cursor),
+    queryFn: () => fetchEventPage(filters, now, cursor),
+    placeholderData: keepPreviousData,
   });
 }
