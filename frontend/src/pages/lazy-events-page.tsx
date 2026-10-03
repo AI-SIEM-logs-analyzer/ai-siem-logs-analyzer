@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { PageSkeleton } from '@/components/feedback/skeletons';
 
 // TanStack Table and the details panel load with the events page rather than with the app.
 const EventsPage = lazy(() =>
@@ -8,15 +8,7 @@ const EventsPage = lazy(() =>
 
 export function LazyEventsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="space-y-4" aria-label="Loading events">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-64 w-full" />
-        </div>
-      }
-    >
+    <Suspense fallback={<PageSkeleton label="Loading events" />}>
       <EventsPage />
     </Suspense>
   );

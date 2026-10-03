@@ -5,11 +5,13 @@ import { EVENT_PAGE_SIZE, useEventPage, type EventCursor, type EventHit } from '
 import { EventDetails } from '@/components/events/event-details';
 import { EventFilterBar } from '@/components/events/event-filter-bar';
 import { EventsTable } from '@/components/events/events-table';
+import { ErrorState } from '@/components/feedback/error-state';
+import { TableSkeleton } from '@/components/feedback/skeletons';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api-client';
+import { errorMessage } from '@/lib/errors';
 import {
   eventFiltersToParams,
   parseEventFilters,
@@ -108,15 +110,16 @@ export function EventsPage() {
         </div>
 
         {isPending ? (
-          <div className="space-y-2 p-4" aria-label="Loading events">
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-9 w-full" />
-          </div>
+          <TableSkeleton label="Loading events" columns={5} rows={8} />
         ) : !data ? (
-          <p role="alert" className="text-destructive p-4 text-sm">
-            {searchErrorMessage(error)}
-          </p>
+          <div className="p-4">
+            <ErrorState
+              error={error}
+              message={searchErrorMessage(error)}
+              onRetry={refresh}
+              retrying={isFetching}
+            />
+          </div>
         ) : data.hits.length === 0 ? (
           <p className="text-muted-foreground p-10 text-center text-sm">
             No events match these filters{page > 0 ? ' on this page' : ''}.
@@ -124,9 +127,13 @@ export function EventsPage() {
         ) : (
           <>
             {error && (
-              <p role="alert" className="text-destructive border-b px-4 py-2 text-sm">
-                {searchErrorMessage(error)} Showing the last results.
-              </p>
+              <ErrorState
+                error={error}
+                message={`${searchErrorMessage(error)} Showing the last results.`}
+                onRetry={refresh}
+                retrying={isFetching}
+                className="m-4"
+              />
             )}
             <EventsTable
               hits={data.hits}
@@ -200,5 +207,5 @@ function searchErrorMessage(error: Error | null): string {
   if (error instanceof ApiError && error.status === 400) {
     return 'The backend refused this search: check the source IPs, statuses and time range.';
   }
-  return `Could not load events: ${error?.message ?? 'unknown error'}`;
+  return errorMessage(error, 'the events');
 }

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { ApiError } from '@/lib/api-client';
 import { useSession } from '@/lib/auth/use-session';
+import { errorMessage } from '@/lib/errors';
 
 export function LoginPage() {
   const session = useSession();
@@ -68,14 +69,14 @@ export function LoginPage() {
 }
 
 function signInErrorMessage(error: Error): string {
-  if (!(error instanceof ApiError)) return `Sign-in failed: ${error.message}`;
+  if (!(error instanceof ApiError)) return `Sign-in failed. ${errorMessage(error)}`;
   if (error.status === 401) return 'Invalid username or password.';
   if (error.status === 429) {
     const seconds = Number(error.headers.get('Retry-After'));
     const wait = seconds > 0 ? ` in ${Math.ceil(seconds / 60)} min` : ' later';
     return `Too many sign-in attempts. Try again${wait}.`;
   }
-  return `Sign-in failed: ${error.message}`;
+  return `Sign-in failed. ${errorMessage(error)}`;
 }
 
 /**

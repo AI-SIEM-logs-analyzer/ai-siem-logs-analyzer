@@ -3,6 +3,7 @@ import { api } from '@/api/client';
 import type { components } from '@/api/schema';
 import { ApiError, apiBaseUrl, unwrap } from '@/lib/api-client';
 import { freshSession, refreshSession } from '@/lib/auth/auth-fetch';
+import { backendMessage, errorMessage } from '@/lib/errors';
 import type { Session } from '@/lib/auth/session';
 
 // /api/logs: submitting a log file and following it through parsing.
@@ -153,7 +154,7 @@ function parseHeaders(raw: string): Headers {
 /** What to tell the user about a failed upload request. */
 export function uploadErrorMessage(error: Error): string {
   if (error instanceof DOMException && error.name === 'AbortError') return 'Upload cancelled.';
-  if (!(error instanceof ApiError)) return `Upload failed: ${error.message}`;
+  if (!(error instanceof ApiError)) return `Upload failed. ${errorMessage(error)}`;
   const detail = backendMessage(error.body);
   switch (error.status) {
     case 400:
@@ -176,16 +177,8 @@ export function uploadErrorMessage(error: Error): string {
       return `Too many uploads. Try again${wait}.`;
     }
     default:
-      return `Upload failed with ${error.status}${detail ? `: ${detail}` : '.'}`;
+      return `Upload failed. ${errorMessage(error)}`;
   }
-}
-
-function backendMessage(body: unknown): string | null {
-  if (typeof body === 'string') return body.trim() || null;
-  if (body && typeof body === 'object' && 'message' in body && typeof body.message === 'string') {
-    return body.message;
-  }
-  return null;
 }
 
 export function fetchUpload(id: number): Promise<LogUpload> {

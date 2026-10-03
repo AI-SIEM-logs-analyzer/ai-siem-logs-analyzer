@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { useCurrentUser } from '@/api/auth';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/feedback/error-state';
+import { PageSkeleton } from '@/components/feedback/skeletons';
 import { can, type Permission } from '@/lib/auth/permissions';
+import { errorMessage } from '@/lib/errors';
 import { ForbiddenPage } from '@/pages/forbidden-page';
 
 /**
@@ -16,23 +18,20 @@ export function RequirePermission({
   permission: Permission;
   children: ReactNode;
 }) {
-  const { data: user, error, isPending } = useCurrentUser();
+  const { data: user, error, isPending, isFetching, refetch } = useCurrentUser();
 
-  if (isPending) {
-    return (
-      <div className="space-y-3" aria-label="Checking access">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-full" />
-      </div>
-    );
-  }
+  if (isPending) return <PageSkeleton label="Checking access" />;
   // A 401 that could not be renewed has already ended the session and RequireAuth is leaving;
   // any other failure means the roles are unknown, and unknown is not allowed.
   if (error) {
     return (
-      <p role="alert" className="text-destructive text-sm">
-        Could not check your access: {error.message}
-      </p>
+      <ErrorState
+        error={error}
+        what="your access"
+        message={`Could not check your access. ${errorMessage(error)}`}
+        onRetry={() => void refetch()}
+        retrying={isFetching}
+      />
     );
   }
   return can(user.roles, permission) ? children : <ForbiddenPage />;

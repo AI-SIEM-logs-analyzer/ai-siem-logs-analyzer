@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { formatBytes, useUploads } from '@/api/uploads';
+import { ErrorState } from '@/components/feedback/error-state';
+import { TableSkeleton } from '@/components/feedback/skeletons';
 import { UploadStatusBadge } from '@/components/uploads/upload-status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { errorMessage } from '@/lib/errors';
 
 const PAGE_SIZE = 20;
 
@@ -12,7 +14,10 @@ const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeS
 /** Every upload, newest first; rows still being parsed refresh on their own. */
 export function UploadsTable() {
   const [page, setPage] = useState(0);
-  const { data, error, isPending, isPlaceholderData } = useUploads(page, PAGE_SIZE);
+  const { data, error, isPending, isFetching, isPlaceholderData, refetch } = useUploads(
+    page,
+    PAGE_SIZE,
+  );
 
   return (
     <Card className="gap-0 py-0">
@@ -22,15 +27,28 @@ export function UploadsTable() {
         </CardTitle>
       </CardHeader>
       <CardContent className="overflow-x-auto px-0">
+        {/* A failed refresh keeps the last list on screen and says it may be out of date. */}
+        {data && error && (
+          <ErrorState
+            error={error}
+            what="the uploads"
+            message={`${errorMessage(error, 'the uploads')} Showing the last list received.`}
+            onRetry={() => void refetch()}
+            retrying={isFetching}
+            className="m-4"
+          />
+        )}
         {isPending ? (
-          <div className="space-y-2 p-4" aria-label="Loading uploads">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
+          <TableSkeleton label="Loading uploads" columns={6} rows={4} />
+        ) : !data ? (
+          <div className="p-4">
+            <ErrorState
+              error={error}
+              what="the uploads"
+              onRetry={() => void refetch()}
+              retrying={isFetching}
+            />
           </div>
-        ) : error ? (
-          <p role="alert" className="text-destructive p-4 text-sm">
-            Could not load uploads: {error.message}
-          </p>
         ) : !data.items?.length ? (
           <p className="text-muted-foreground p-4 text-sm">No log files have been uploaded yet.</p>
         ) : (
