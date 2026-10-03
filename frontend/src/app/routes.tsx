@@ -25,19 +25,26 @@ export const routes: RouteObject[] = [
     ),
     errorElement: <RouteErrorPage />,
     children: [
-      { index: true, element: <DashboardPage /> },
-      { path: 'events', element: <LazyEventsPage /> },
-      { path: 'uploads', element: <UploadsPage /> },
-      { path: 'alerts', element: <AlertsPage /> },
       {
-        path: 'users',
-        element: (
-          <RequirePermission permission="users:manage">
-            <UsersPage />
-          </RequirePermission>
-        ),
+        // A page that fails to render keeps the layout around its error, so the sidebar still
+        // leads elsewhere; an error in the layout itself falls through to the boundary above.
+        errorElement: <RouteErrorPage variant="page" />,
+        children: [
+          { index: true, element: <DashboardPage /> },
+          { path: 'events', element: <LazyEventsPage /> },
+          { path: 'uploads', element: <UploadsPage /> },
+          { path: 'alerts', element: <AlertsPage /> },
+          {
+            path: 'users',
+            element: (
+              <RequirePermission permission="users:manage">
+                <UsersPage />
+              </RequirePermission>
+            ),
+          },
+          { path: '*', element: <NotFoundPage /> },
+        ],
       },
-      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ];

@@ -5,6 +5,8 @@ import { formatEvents } from '@/components/charts/chart-theme';
 import { LazyEChart } from '@/components/charts/lazy-echart';
 import { overviewErrorMessage } from '@/components/dashboard/overview-error';
 import { eventTimelineOption } from '@/components/dashboard/event-timeline-option';
+import { ErrorState } from '@/components/feedback/error-state';
+import { ChartSkeleton } from '@/components/feedback/skeletons';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -46,14 +48,14 @@ export function EventTimelineCard({ range }: { range: TimelineRange }) {
       </CardHeader>
       <CardContent>
         {isPending ? (
-          <div className="space-y-3" aria-label="Loading event timeline">
-            <Skeleton className="h-6 w-40" />
-            <Skeleton className="h-64 w-full" />
-          </div>
+          <ChartSkeleton label="Loading event timeline" />
         ) : !data ? (
-          <p role="alert" className="text-destructive text-sm">
-            {overviewErrorMessage(error, 'the event timeline')}
-          </p>
+          <ErrorState
+            error={error}
+            message={overviewErrorMessage(error, 'the event timeline')}
+            onRetry={() => void refetch()}
+            retrying={isFetching}
+          />
         ) : data.total === 0 ? (
           <p className="text-muted-foreground flex h-64 items-center justify-center rounded-md border border-dashed text-sm">
             No events in the {label.toLowerCase()}. They appear here once log files are ingested.
@@ -80,10 +82,12 @@ export function EventTimelineCard({ range }: { range: TimelineRange }) {
               )}
             </dl>
             {error && (
-              <p role="alert" className="text-destructive text-sm">
-                {overviewErrorMessage(error, 'the event timeline')} Showing the last counts
-                received.
-              </p>
+              <ErrorState
+                error={error}
+                message={`${overviewErrorMessage(error, 'the event timeline')} Showing the last counts received.`}
+                onRetry={() => void refetch()}
+                retrying={isFetching}
+              />
             )}
             <Suspense fallback={<Skeleton className="h-64 w-full" />}>
               <LazyEChart

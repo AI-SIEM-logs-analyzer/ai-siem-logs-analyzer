@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { useEventOverview, type EventOverview } from '@/api/events';
 import { overviewErrorMessage } from '@/components/dashboard/overview-error';
+import { ErrorState } from '@/components/feedback/error-state';
+import { LinesSkeleton } from '@/components/feedback/skeletons';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import type { TimelineRange } from '@/lib/timeline';
 import { cn } from '@/lib/utils';
 
@@ -35,7 +36,8 @@ export function AggregateCard({
   children,
   className,
 }: AggregateCardProps) {
-  const { data, error, isPending, isPlaceholderData } = useEventOverview(range);
+  const { data, error, isPending, isFetching, isPlaceholderData, refetch } =
+    useEventOverview(range);
 
   return (
     <Card className={className}>
@@ -45,14 +47,16 @@ export function AggregateCard({
       </CardHeader>
       <CardContent>
         {isPending ? (
-          <div className="space-y-2" aria-label={`Loading ${what}`}>
-            <Skeleton className="h-5 w-full" />
-            <Skeleton className="h-5 w-4/5" />
-            <Skeleton className="h-5 w-3/5" />
-          </div>
+          <LinesSkeleton label={`Loading ${what}`} lines={4} />
         ) : !data ? (
           // Not an alert: the timeline above announces the same failure once for the page.
-          <p className="text-destructive text-sm">{overviewErrorMessage(error, what)}</p>
+          <ErrorState
+            error={error}
+            message={overviewErrorMessage(error, what)}
+            announce={false}
+            onRetry={() => void refetch()}
+            retrying={isFetching}
+          />
         ) : isEmpty(data) ? (
           <p className="text-muted-foreground flex h-40 items-center justify-center rounded-md border border-dashed px-4 text-center text-sm">
             {empty}

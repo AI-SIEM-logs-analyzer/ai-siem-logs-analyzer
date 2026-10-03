@@ -101,7 +101,7 @@ describe('uploadLogFile', () => {
 
     const error = await uploadLogFile(logFile()).catch((e: unknown) => e);
     expect(uploadErrorMessage(error as Error)).toBe(
-      'Upload failed: Network error: the backend could not be reached.',
+      'Upload failed. Could not reach the server. Check your connection and try again.',
     );
   });
 });
@@ -122,6 +122,8 @@ describe('uploadErrorMessage', () => {
     expect(uploadErrorMessage(refusal(403))).toBe(
       'Your account is not allowed to upload log files.',
     );
-    expect(uploadErrorMessage(refusal(500))).toBe('Upload failed with 500.');
+    expect(uploadErrorMessage(refusal(500))).toMatch(
+      /^Upload failed\. The server ran into a problem/,
+    );
   });
 });

@@ -17,6 +17,7 @@ import { UploadStatusBadge } from '@/components/uploads/upload-status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { errorMessage } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 
 /**
@@ -218,7 +219,7 @@ function UploadOutcome({ upload, onAnother }: { upload: LogUpload; onAnother: ()
         )}
         {error && (
           <p role="alert" className="text-destructive">
-            Could not refresh the status: {error.message}
+            Could not refresh the status. {errorMessage(error)}
           </p>
         )}
       </div>

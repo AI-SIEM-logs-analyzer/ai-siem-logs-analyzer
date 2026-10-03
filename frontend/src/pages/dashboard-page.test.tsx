@@ -6,6 +6,12 @@ import { renderRoute } from '@/test/render-route';
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.parse('2026-09-30T14:25:00Z');
 
+// ECharts is lazy-loaded. Importing it once up front keeps the first test that waits for a
+// chart from racing a cold transform of the library against findBy's one-second timeout.
+beforeAll(async () => {
+  await import('@/components/charts/echart');
+});
+
 const me = () => json(200, { id: 1, username: 'analyst', roles: ['ANALYST'] });
 const healthy = () => json(200, { status: 'UP', checks: [] });
 
@@ -22,6 +28,7 @@ function counts(
     bySrcIp?: Counts;
     byStatus?: Counts;
     topErrors?: Counts;
+    srcIpOverTime?: Record<string, { start: string; count: number }[]>;
   } = {},
 ) {
   const total = hourly.reduce((sum, bucket) => sum + bucket.count, 0);
@@ -180,7 +187,7 @@ describe('dashboard event timeline', () => {
 
     // Announced once, by the timeline; the widgets say the same without repeating the alert.
     expect(await screen.findByRole('alert')).toHaveTextContent('The search index is unreachable');
-    expect(screen.getAllByText(/The search index is unreachable/)).toHaveLength(4);
+    expect(screen.getAllByText(/The search index is unreachable/)).toHaveLength(5);
   });
 });
 
@@ -312,5 +319,92 @@ describe('dashboard aggregate widgets', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('No events with an HTTP status in this range.')).toBeInTheDocument();
     expect(screen.getByText('No ERROR or CRITICAL events in this range.')).toBeInTheDocument();
+    expect(
+      screen.getByText('No activity from a source address in this range.'),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('dashboard activity heatmap', () => {
+  const hourly = [
+    { start: '2026-09-30T09:00:00Z', count: 100 },
+    { start: '2026-09-30T13:00:00Z', count: 50 },
+  ];
+
+  beforeEach(() => {
+    vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
+    startTestSession();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const search = counts(hourly, {
+    bySrcIp: { '198.51.100.2': 30, '203.0.113.7': 120 },
+    srcIpOverTime: {
+      '203.0.113.7': [
+        { start: '2026-09-30T09:00:00Z', count: 100 },
+        { start: '2026-09-30T13:00:00Z', count: 20 },
+      ],
+      '198.51.100.2': [{ start: '2026-09-30T13:00:00Z', count: 30 }],
+    },
+  });
+
+  it('places the busiest addresses in time from the same request', async () => {
+    const fetchMock = stubBackend({
+      'GET /api/auth/me': me,
+      'GET /q/health': healthy,
+      'GET /api/events/search': search,
+    });
+
+    renderRoute('/');
+
+    expect(
+      await screen.findByRole('img', {
+        name: 'Heatmap of events per hour for the 2 busiest source IPs, last 24 hours',
+      }),
+    ).toBeInTheDocument();
+    const heatmap = card('Activity by source IP');
+    expect(within(heatmap).getByText('Busiest address and period').nextSibling).toHaveTextContent(
+      '100 events',
+    );
+    const legend = within(within(heatmap).getByRole('list', { name: 'Events per hour, by colour' }))
+      .getAllByRole('listitem')
+      .map((item) => item.textContent);
+    expect(legend[0]).toBe('0');
+    expect(legend.at(-1)).toMatch(/–100$/);
+    expect(callsTo(fetchMock, 'GET /api/events/search')).toHaveLength(1);
+  });
+
+  it('sums up each address in the table view, linking to its events', async () => {
+    stubBackend({
+      'GET /api/auth/me': me,
+      'GET /q/health': healthy,
+      'GET /api/events/search': search,
+    });
+
+    renderRoute('/');
+    await screen.findByRole('img', { name: /Heatmap of events per hour/ });
+    const heatmap = card('Activity by source IP');
+
+    const rows = await tableRows(heatmap);
+    expect(rows.map((row) => [row[0], row[1], row[2], row[4]])).toEqual([
+      ['203.0.113.7', '120', '2 of 24', '100'],
+      ['198.51.100.2', '30', '1 of 24', '30'],
+    ]);
+
+    const link = within(heatmap).getByRole('link', { name: '203.0.113.7' });
+    const target = new URL(link.getAttribute('href')!, 'http://localhost');
+    expect(target.pathname).toBe('/events');
+    expect(target.searchParams.get('range')).toBe('custom');
+    expect(target.searchParams.getAll('srcIp')).toEqual(['203.0.113.7']);
+    expect(target.searchParams.get('from')).toBe('2026-09-29T15:00:00.000Z');
+    expect(target.searchParams.get('to')).toBe('2026-09-30T15:00:00.000Z');
+
+    const busiest = within(heatmap).getAllByRole('link')[1];
+    const period = new URL(busiest.getAttribute('href')!, 'http://localhost').searchParams;
+    expect(period.get('from')).toBe('2026-09-30T09:00:00.000Z');
+    expect(period.get('to')).toBe('2026-09-30T10:00:00.000Z');
   });
 });
