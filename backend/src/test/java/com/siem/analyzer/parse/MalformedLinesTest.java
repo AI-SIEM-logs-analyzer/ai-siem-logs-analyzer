@@ -228,6 +228,11 @@ class MalformedLinesTest {
                         "unterminated SD value",
                         "<13>1 2026-09-14T10:15:30Z h a p m [x a=\"" + "\\\"".repeat(200_000)),
                 Arguments.of(
+                        "sshd user name of 50k fake addresses",
+                        "Dec 10 07:13:43 host sshd[1]: Failed password for invalid user "
+                                + " from 1.2.3.4 port 22 ssh2".repeat(50_000)
+                                + "!"),
+                Arguments.of(
                         "200k escaped quotes in a request",
                         "203.0.113.9 - - [14/Sep/2026:10:15:30 +0000] \""
                                 + "\\\"".repeat(200_000)

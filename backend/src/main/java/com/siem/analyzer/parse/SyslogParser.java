@@ -44,6 +44,10 @@ import java.util.regex.Pattern;
  * structuredData}, {@code sequence} and {@code timezone}. A key is absent when the line has no
  * value for it.
  *
+ * <p>An sshd login attempt ({@code Failed password …}, {@code Accepted …}, {@code Invalid user …})
+ * also gets the client's address, port and user name read out of its message into {@code srcIp},
+ * {@code srcPort} and {@code user}.
+ *
  * <p>A line that does not fit yields an empty result rather than an exception, as in {@link
  * AccessLogParser}. Instances are immutable and safe to share between threads.
  */
@@ -90,6 +94,35 @@ public class SyslogParser {
                             + "(?:(?<tag>[^\\s\\[:]{1,48})(?:\\[(?<pid>[^\\]\\s]{1,128})\\])?:(?: |$))?"
                             + "(?<msg>.*)$",
                     Pattern.DOTALL);
+
+    /**
+     * The sshd authentication outcomes, which name the client only inside the message:
+     *
+     * <pre>
+     * Failed password for [invalid user ]root from 203.0.113.9 port 22 ssh2
+     * Accepted publickey for alice from 203.0.113.9 port 22 ssh2: ED25519 SHA256:…
+     * Invalid user admin from 203.0.113.9 port 22
+     * </pre>
+     *
+     * <p>The user name is whatever the client sent, spaces included, so a client could log in as
+     * {@code root from 198.51.100.1 port 22 ssh2} to put a second "from" in the line. The user
+     * group is greedy and the address is anchored to the end, so it is always the last "from", the
+     * one sshd wrote. The address is IPv4 or IPv6; a host name ({@code UseDNS yes}) is not taken.
+     */
+    private static final Pattern SSHD_LOGIN =
+            Pattern.compile(
+                    "^(?:(?:Failed|Accepted) \\S{1,64} for (?:invalid user )?|Invalid user )"
+                            + "(?<user>.*) from "
+                            // IPv4, or anything hex with a colon in it, which no host name has.
+                            + "(?<ip>\\d{1,3}(?:\\.\\d{1,3}){3}"
+                            + "|(?=[0-9A-Fa-f.]{0,45}:)[0-9A-Fa-f.:]{2,45})"
+                            + "(?: port (?<port>\\d{1,5}))?(?: ssh2(?:: .*)?)?\\z",
+                    Pattern.DOTALL);
+
+    /** The tags sshd logs under; OpenSSH 9.8 moved per-connection work to {@code sshd-session}. */
+    private static final List<String> SSHD_TAGS = List.of("sshd", "sshd-session");
+
+    private static final int MAX_PORT = 65_535;
 
     private static final List<String> MONTHS =
             List.of(
@@ -211,7 +244,7 @@ public class SyslogParser {
             attributes.put("structuredData", freeze(structuredData));
         }
 
-        return Optional.of(
+        NormalizedEvent.Builder event =
                 NormalizedEvent.builder(
                                 // A nil timestamp is legal: the sender had no clock. The time we
                                 // read the line is the closest thing to when it happened.
@@ -223,8 +256,9 @@ public class SyslogParser {
                         .host(header.group("host"))
                         .severity(severity(priority))
                         .message(message)
-                        .attributes(attributes)
-                        .build());
+                        .attributes(attributes);
+        readSshdLogin(event, header.group("app"), message);
+        return Optional.of(event.build());
     }
 
     private Optional<NormalizedEvent> parseBsd(String line) {
@@ -268,13 +302,14 @@ public class SyslogParser {
         putIfPresent(attributes, "appName", match.group("tag"));
         putIfPresent(attributes, "procId", match.group("pid"));
 
-        return Optional.of(
+        NormalizedEvent.Builder event =
                 NormalizedEvent.builder(timestamp, LogFormat.SYSLOG, line)
                         .host(match.group("host"))
                         .severity(severity)
                         .message(match.group("msg"))
-                        .attributes(attributes)
-                        .build());
+                        .attributes(attributes);
+        readSshdLogin(event, match.group("tag"), match.group("msg"));
+        return Optional.of(event.build());
     }
 
     /**
@@ -446,6 +481,27 @@ public class SyslogParser {
             case 5, 6 -> Severity.INFO;
             default -> Severity.DEBUG;
         };
+    }
+
+    /**
+     * Fills the client address, port and user of an sshd login attempt from its message, so
+     * detection and enrichment see them where they see an access log's, in {@code srcIp}, {@code
+     * srcPort} and {@code user}. Any other line is left as it is.
+     */
+    private static void readSshdLogin(NormalizedEvent.Builder event, String tag, String message) {
+        if (message == null || tag == null || !SSHD_TAGS.contains(tag)) {
+            return;
+        }
+        // Stripped as the event's message will be, so a trailing CR or space does not hide it.
+        Matcher login = SSHD_LOGIN.matcher(message.strip());
+        if (!login.matches()) {
+            return;
+        }
+        event.srcIp(login.group("ip")).user(login.group("user"));
+        String port = login.group("port");
+        if (port != null && Integer.parseInt(port) <= MAX_PORT) {
+            event.srcPort(Integer.parseInt(port));
+        }
     }
 
     private static void putIfPresent(Map<String, Object> attributes, String key, String value) {

@@ -232,6 +232,14 @@ runs inline with ingestion or as a separate consumer is **TBD**, so the engine i
 free of persistence and CDI: it takes `NormalizedEvent`s and returns `Detection`s, and the
 caller decides what an alert is.
 
+The first built-in rule is `brute-force-login` (`BruteForceLoginRule`, seeded into
+`alert_rule` by `V8__brute_force_login_rule.sql`): five or more failed logins from one `srcIp`
+within a minute. A failed login is an HTTP 401/403 on a login-like path (`/login`, `/signin`,
+`/auth`, `/session`, `/token`, `wp-login.php`, …) or an sshd `Failed password` /
+`Failed keyboard-interactive/pam` line. For the SSH half, `SyslogParser` reads the client
+address, port and user out of sshd's login messages into `srcIp`, `srcPort` and `user`, taking
+the last `from <address>` so a user name cannot spoof it.
+
 A rule is the text stored in `alert_rule.expression`, parsed by `RuleExpressionParser`:
 
 ```

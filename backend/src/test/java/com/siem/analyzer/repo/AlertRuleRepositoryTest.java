@@ -1,6 +1,7 @@
 package com.siem.analyzer.repo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -9,6 +10,7 @@ import com.siem.analyzer.domain.Severity;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /** Persistence behaviour of {@link AlertRule}. */
@@ -64,7 +66,9 @@ class AlertRuleRepositoryTest {
         repository.persist(disabled);
         repository.flush();
 
-        assertEquals(1, repository.listEnabled().size());
-        assertEquals("enabled-rule", repository.listEnabled().get(0).getName());
+        // V8 seeds the built-in brute-force rule, so the table is not empty to begin with.
+        List<String> names = repository.listEnabled().stream().map(AlertRule::getName).toList();
+        assertTrue(names.contains("enabled-rule"));
+        assertFalse(names.contains("disabled-rule"));
     }
 }
