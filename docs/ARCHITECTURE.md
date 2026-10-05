@@ -14,7 +14,7 @@
 | Backend skeleton, health, OpenAPI         | Shipped     |
 | PostgreSQL schema + Panache repositories  | Shipped     |
 | Ingestion pipeline (Kafka)                | Shipped     |
-| Detection (rules + AI)                    | Planned     |
+| Detection (rules + AI)                    | In progress |
 | Accounts + roles (`app_user`, `user_role`) | Shipped     |
 | REST API surface                          | In progress |
 | Frontend application                      | In progress |
@@ -226,9 +226,33 @@ generically through its `fields` map (`OpenSearchEventSearch.toHit`), converted 
 index's snake_case to the payload's own camelCase key names (`fields.geoCountryIso`,
 `fields.geoAsn`, `fields.uaBot`, …), with numbers and booleans keeping their JSON type. Its contract is documented in `/q/openapi`.
 
-**Detection (Planned).** Rule evaluation over incoming events, plus AI-assisted detection
-through LangChain4j and anomaly scoring with Smile. Whether detection runs inline with
-ingestion or as a separate consumer is **TBD**.
+**Detection (In progress).** The rule engine is in place (`detect` package); AI-assisted
+detection through LangChain4j and anomaly scoring with Smile are planned. Whether detection
+runs inline with ingestion or as a separate consumer is **TBD**, so the engine is deliberately
+free of persistence and CDI: it takes `NormalizedEvent`s and returns `Detection`s, and the
+caller decides what an alert is.
+
+A rule is the text stored in `alert_rule.expression`, parsed by `RuleExpressionParser`:
+
+```
+status in (401, 403) and path startswith "/login" | count by srcIp within 5m >= 10
+status == 404 | distinct(path) by srcIp within 1m > 30
+method == "GET" | sum(bytes) by srcIp within 10m > 500000000
+userAgent matches "(?i)sqlmap|nikto"
+```
+
+Before the `|` is a per-event condition (`== != > >= < <=`, `in`, `exists`, `contains`,
+`startswith`, `endswith`, `matches`, combined with `and`/`or`/`not`) over the standard
+`NormalizedEvent` fields or `attributes.<key>`. String comparisons ignore case, a number
+literal compares numerically even against a quoted number, and an absent field fails every
+comparison. Without a `|` the rule fires on every matching event. After it, `RuleEngine`
+keeps a sliding window per group — `count`, `distinct(field)` or `sum(field)` — and fires
+when the aggregate rises past the threshold, then starts that group's window over, so one
+burst raises one alert rather than one per event. Windows run on event time, never the wall
+clock, so replaying an uploaded file detects what a live feed would have; an event counts
+while it is newer than its group's window start, and groups idle for longer than a window
+are swept. Only `>`/`>=` thresholds exist: an event-driven engine cannot notice a window
+closing empty.
 
 **Triage (Planned).** The SPA reads alerts and events over REST, an analyst changes an
 alert's status, and the transition is audited.

@@ -29,6 +29,7 @@ com.siem.analyzer
 ├── domain    JPA entities and domain enums
 ├── repo      Panache repositories (all queries live here)
 ├── search    the derived OpenSearch index — projection, queries and backfill
+├── detect    rule language and engine — per-event conditions, time-window aggregation
 ├── config    typed configuration mappings
 └── health    custom health checks
 ```
