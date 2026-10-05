@@ -8,6 +8,8 @@ import {
   TopIpsCard,
 } from '@/components/dashboard/aggregate-widgets';
 import { EventTimelineCard } from '@/components/dashboard/event-timeline-card';
+import { ErrorState } from '@/components/feedback/error-state';
+import { LinesSkeleton } from '@/components/feedback/skeletons';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,7 +21,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { errorMessage } from '@/lib/errors';
 import {
   DEFAULT_TIMELINE_RANGE,
   isTimelineRange,
@@ -113,15 +115,15 @@ function BackendHealthCard() {
       </CardHeader>
       <CardContent>
         {isPending ? (
-          <div className="space-y-2" aria-label="Loading health checks">
-            <Skeleton className="h-5 w-24" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-2/3" />
-          </div>
+          <LinesSkeleton label="Loading health checks" lines={3} />
         ) : error ? (
-          <p role="alert" className="text-destructive text-sm">
-            Backend unreachable: {error.message}
-          </p>
+          <ErrorState
+            error={error}
+            what="the health checks"
+            message={`The backend did not answer its health check. ${errorMessage(error)}`}
+            onRetry={() => void refetch()}
+            retrying={isFetching}
+          />
         ) : (
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-sm">

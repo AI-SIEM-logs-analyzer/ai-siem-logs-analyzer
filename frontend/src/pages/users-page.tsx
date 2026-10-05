@@ -1,8 +1,9 @@
 import { useUsers } from '@/api/users';
+import { ErrorState } from '@/components/feedback/error-state';
+import { TableSkeleton } from '@/components/feedback/skeletons';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { roleLabels } from '@/lib/auth/permissions';
 
 /** Account administration. The route is ADMIN only — see `app/routes.tsx`. */
@@ -16,21 +17,23 @@ export function UsersPage() {
 }
 
 function UsersTable() {
-  const { data: users, error, isPending } = useUsers();
+  const { data: users, error, isPending, isFetching, refetch } = useUsers();
 
   if (isPending) {
     return (
-      <div className="space-y-2" aria-label="Loading users">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </div>
+      <Card className="py-0">
+        <TableSkeleton label="Loading users" columns={4} rows={4} />
+      </Card>
     );
   }
   if (error) {
     return (
-      <p role="alert" className="text-destructive text-sm">
-        Could not load users: {error.message}
-      </p>
+      <ErrorState
+        error={error}
+        what="the users"
+        onRetry={() => void refetch()}
+        retrying={isFetching}
+      />
     );
   }
 

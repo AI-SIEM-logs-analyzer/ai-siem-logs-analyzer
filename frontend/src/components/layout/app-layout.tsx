@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { can, primaryRole, roleLabels } from '@/lib/auth/permissions';
 import { cn } from '@/lib/utils';
 import { navItems } from './nav-items';
+import { OfflineBanner } from './offline-banner';
 
 export function AppLayout() {
   const { data: user } = useCurrentUser();
@@ -44,6 +45,7 @@ export function AppLayout() {
         <UserPanel />
       </aside>
       <main className="flex-1 overflow-y-auto">
+        <OfflineBanner />
         <div className="mx-auto flex max-w-6xl flex-col gap-6 p-4 md:p-8">
           <Outlet />
         </div>
