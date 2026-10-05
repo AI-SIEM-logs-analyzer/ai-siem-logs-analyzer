@@ -7,14 +7,16 @@
 --
 -- Seeded as data so it can be tuned or disabled like any other rule. The expression must stay
 -- identical to ScannerUserAgentRule.EXPRESSION, which documents each pattern;
--- FlywayMigrationTest checks that it does. A later change to the rule is a new migration,
--- because this one has already run wherever it was deployed.
+-- FlywayMigrationTest checks that it does. Flyway reads a dollar sign followed by an opening
+-- brace as a placeholder and refuses to migrate, so neither literal may contain that pair; the
+-- regex escapes both characters, which keeps them apart. A later change to the rule is a new
+-- migration, because this one has already run wherever it was deployed.
 INSERT INTO alert_rule (name, description, severity, expression)
 VALUES (
     'scanner-user-agent',
     'Scanner User-Agent: an attack tool such as sqlmap, Nikto or Nmap, an attack payload such as'
-        || ' ${jndi: or () { in the header, or a command-line client such as curl or Wget whose'
-        || ' request was answered with a 4xx or 5xx.',
+        || ' a Log4Shell JNDI lookup or Shellshock in the header, or a command-line client such as'
+        || ' curl or Wget whose request was answered with a 4xx or 5xx.',
     'WARNING',
     'userAgent matches "(?i)\b(?:sqlmap|nikto|nmap|masscan|zgrab|zmap|nuclei|wpscan|joomscan'
         || '|droopescan|dirbuster|dirb|gobuster|feroxbuster|ffuf|fuzz faster u fool|wfuzz|acunetix'
