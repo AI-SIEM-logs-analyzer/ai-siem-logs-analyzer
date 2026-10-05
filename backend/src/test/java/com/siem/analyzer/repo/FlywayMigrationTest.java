@@ -2,6 +2,7 @@ package com.siem.analyzer.repo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.siem.analyzer.detect.BruteForceLoginRule;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -77,6 +78,23 @@ class FlywayMigrationTest {
 
         assertEquals("4", row[0]);
         assertEquals(Boolean.TRUE, row[1]);
+    }
+
+    @Test
+    @TestTransaction
+    void bruteForceLoginRuleIsSeededAsTheEngineDefinesIt() {
+        Object[] row =
+                (Object[])
+                        entityManager
+                                .createNativeQuery(
+                                        "select severity, expression, enabled from alert_rule"
+                                                + " where name = :name")
+                                .setParameter("name", BruteForceLoginRule.NAME)
+                                .getSingleResult();
+
+        assertEquals(BruteForceLoginRule.SEVERITY.name(), row[0]);
+        assertEquals(BruteForceLoginRule.EXPRESSION, row[1]);
+        assertEquals(Boolean.TRUE, row[2]);
     }
 
     @Test

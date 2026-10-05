@@ -301,6 +301,97 @@ class SyslogParserTest {
         assertEquals("%SYS-5-CONFIG_I", event.attributes().get("appName"));
     }
 
+    // --- sshd login attempts ----------------------------------------------------------------
+
+    @Test
+    void sshdFailedPasswordNamesTheClient() {
+        NormalizedEvent event =
+                parse(
+                        "Sep 14 10:15:30 web-01 sshd[4242]: Failed password for root from"
+                                + " 203.0.113.9 port 51022 ssh2");
+
+        assertEquals("203.0.113.9", event.srcIp());
+        assertEquals(51022, event.srcPort());
+        assertEquals("root", event.user());
+    }
+
+    @Test
+    void sshdInvalidUserForms() {
+        NormalizedEvent failed =
+                parse(
+                        "Sep 14 10:15:30 web-01 sshd[7]: Failed password for invalid user admin"
+                                + " from 2001:db8::7 port 22 ssh2");
+        assertEquals("2001:db8::7", failed.srcIp());
+        assertEquals("admin", failed.user());
+
+        // Older sshd writes no port.
+        NormalizedEvent invalid =
+                parse("Sep 14 10:15:30 web-01 sshd[7]: Invalid user oracle from 203.0.113.9");
+        assertEquals("203.0.113.9", invalid.srcIp());
+        assertNull(invalid.srcPort());
+        assertEquals("oracle", invalid.user());
+    }
+
+    @Test
+    void sshdAcceptedKeyWithFingerprint() {
+        NormalizedEvent event =
+                parse(
+                        "<38>1 2026-09-14T10:15:30Z web-01 sshd-session 99 - - Accepted publickey"
+                                + " for alice from 198.51.100.4 port 40000 ssh2: ED25519"
+                                + " SHA256:abc/def");
+
+        assertEquals("198.51.100.4", event.srcIp());
+        assertEquals(40000, event.srcPort());
+        assertEquals("alice", event.user());
+    }
+
+    @Test
+    void sshdUserNameCannotSpoofTheAddress() {
+        // The client chose the user name "root from 198.51.100.1 port 22 ssh2".
+        NormalizedEvent event =
+                parse(
+                        "Sep 14 10:15:30 web-01 sshd[7]: Failed password for invalid user root"
+                                + " from 198.51.100.1 port 22 ssh2 from 203.0.113.9 port 4000"
+                                + " ssh2");
+
+        assertEquals("203.0.113.9", event.srcIp());
+        assertEquals(4000, event.srcPort());
+        assertEquals("root from 198.51.100.1 port 22 ssh2", event.user());
+    }
+
+    @Test
+    void otherSshdLinesAndOtherProgramsAreLeftAlone() {
+        NormalizedEvent session =
+                parse(
+                        "Sep 14 10:15:30 web-01 sshd[7]: pam_unix(sshd:session): session opened"
+                                + " for user alice");
+        assertNull(session.srcIp());
+        assertNull(session.user());
+
+        NormalizedEvent hostName =
+                parse(
+                        "Sep 14 10:15:30 web-01 sshd[7]: Failed password for root from"
+                                + " scanner.example.net port 22 ssh2");
+        assertNull(hostName.srcIp());
+
+        NormalizedEvent notSshd =
+                parse(
+                        "Sep 14 10:15:30 web-01 app[7]: Failed password for root from"
+                                + " 203.0.113.9 port 22 ssh2");
+        assertNull(notSshd.srcIp());
+    }
+
+    @Test
+    void sshdPortOutOfRangeIsDropped() {
+        NormalizedEvent event =
+                parse(
+                        "Sep 14 10:15:30 web-01 sshd[7]: Failed password for root from"
+                                + " 203.0.113.9 port 99999 ssh2");
+
+        assertEquals("203.0.113.9", event.srcIp());
+        assertNull(event.srcPort());
+    }
+
     // --- Rejected lines ---------------------------------------------------------------------
 
     @Test
