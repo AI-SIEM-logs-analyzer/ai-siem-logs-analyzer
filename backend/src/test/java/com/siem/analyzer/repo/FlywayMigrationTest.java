@@ -3,6 +3,7 @@ package com.siem.analyzer.repo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.siem.analyzer.detect.BruteForceLoginRule;
+import com.siem.analyzer.detect.SqlInjectionRule;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -94,6 +95,23 @@ class FlywayMigrationTest {
 
         assertEquals(BruteForceLoginRule.SEVERITY.name(), row[0]);
         assertEquals(BruteForceLoginRule.EXPRESSION, row[1]);
+        assertEquals(Boolean.TRUE, row[2]);
+    }
+
+    @Test
+    @TestTransaction
+    void sqlInjectionRuleIsSeededAsTheEngineDefinesIt() {
+        Object[] row =
+                (Object[])
+                        entityManager
+                                .createNativeQuery(
+                                        "select severity, expression, enabled from alert_rule"
+                                                + " where name = :name")
+                                .setParameter("name", SqlInjectionRule.NAME)
+                                .getSingleResult();
+
+        assertEquals(SqlInjectionRule.SEVERITY.name(), row[0]);
+        assertEquals(SqlInjectionRule.EXPRESSION, row[1]);
         assertEquals(Boolean.TRUE, row[2]);
     }
 
