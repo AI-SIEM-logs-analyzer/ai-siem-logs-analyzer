@@ -250,6 +250,17 @@ times, so double encoding does not hide a quote), and accepts an inline comment 
 allows a space; `path` itself keeps what the server logged. Every gap in the pattern is
 possessive, so a request the client pads to any length is still matched in linear time.
 
+The third is `path-traversal` (`PathTraversalRule`, seeded by `V10__path_traversal_rule.sql`),
+which fires on every request that climbs out of its directory or reaches for a system file: a
+parent segment before a slash (`../`, `..\`, and the filter dodges `....//` and `/static../`),
+one ending a segment or a query value (`/..`, `/..;/`, `?dir=..`), an IIS `%u002e`, a NUL byte,
+or a file such as `/etc/passwd`, `/proc/self/environ`, `.ssh/` or `win.ini`. It reads
+`decodedPath`, so `%2e%2e%2f` and `%252e%252e%252f` count as `../`, and treats the fullwidth and
+division-slash look-alikes some servers fold into `.` and `/` as the real thing. Overlong UTF-8
+(`%c0%af`, `%e0%80%ae`) decodes to U+FFFD, so the rule looks for it in the raw `path` instead,
+encoded once or more. Browsers resolve dot segments before sending, so a `..` in the log was
+sent on purpose.
+
 A rule is the text stored in `alert_rule.expression`, parsed by `RuleExpressionParser`:
 
 ```
