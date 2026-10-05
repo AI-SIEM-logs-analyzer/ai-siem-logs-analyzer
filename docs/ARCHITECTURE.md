@@ -240,6 +240,16 @@ within a minute. A failed login is an HTTP 401/403 on a login-like path (`/login
 address, port and user out of sshd's login messages into `srcIp`, `srcPort` and `user`, taking
 the last `from <address>` so a user name cannot spoof it.
 
+The second is `sql-injection` (`SqlInjectionRule`, seeded by `V9__sql_injection_rule.sql`),
+which fires on every request whose target carries a SQL injection pattern: a quote closed into
+a tautology (`' OR 1=1`, `' or 'a'='a`), `UNION SELECT`, a quote followed by a comment
+(`admin'--`), `' ORDER BY n`, a stacked statement (`; DROP TABLE`), a time delay (`SLEEP(5)`,
+`WAITFOR DELAY`) or a catalogue name (`information_schema`, `@@version`). It reads
+`decodedPath`, a field the engine derives from `path` by percent-decoding it (up to three
+times, so double encoding does not hide a quote), and accepts an inline comment wherever SQL
+allows a space; `path` itself keeps what the server logged. Every gap in the pattern is
+possessive, so a request the client pads to any length is still matched in linear time.
+
 A rule is the text stored in `alert_rule.expression`, parsed by `RuleExpressionParser`:
 
 ```
@@ -251,7 +261,7 @@ userAgent matches "(?i)sqlmap|nikto"
 
 Before the `|` is a per-event condition (`== != > >= < <=`, `in`, `exists`, `contains`,
 `startswith`, `endswith`, `matches`, combined with `and`/`or`/`not`) over the standard
-`NormalizedEvent` fields or `attributes.<key>`. String comparisons ignore case, a number
+`NormalizedEvent` fields, `decodedPath`, or `attributes.<key>`. String comparisons ignore case, a number
 literal compares numerically even against a quoted number, and an absent field fails every
 comparison. Without a `|` the rule fires on every matching event. After it, `RuleEngine`
 keeps a sliding window per group — `count`, `distinct(field)` or `sum(field)` — and fires

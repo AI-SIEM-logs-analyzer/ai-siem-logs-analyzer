@@ -14,6 +14,10 @@ import java.util.function.Function;
  * exactly, as the source wrote it, and dots descend into nested JSON objects. Enums ({@code
  * severity}, {@code format}) read as their constant names.
  *
+ * <p>{@code decodedPath} is the one derived field: {@code path} percent-decoded by {@link
+ * UrlDecoding}, so a rule can match {@code ' OR 1=1} however the client encoded it while {@code
+ * path} keeps what the server logged.
+ *
  * <p>Two fields are equal when their names are, which is what lets a field serve in a group key.
  */
 public final class EventField {
@@ -96,6 +100,7 @@ public final class EventField {
         put(fields, "user", NormalizedEvent::user);
         put(fields, "method", NormalizedEvent::method);
         put(fields, "path", NormalizedEvent::path);
+        put(fields, "decodedPath", event -> UrlDecoding.decode(event.path()));
         put(fields, "protocol", NormalizedEvent::protocol);
         put(fields, "status", NormalizedEvent::status);
         put(fields, "bytes", NormalizedEvent::bytes);

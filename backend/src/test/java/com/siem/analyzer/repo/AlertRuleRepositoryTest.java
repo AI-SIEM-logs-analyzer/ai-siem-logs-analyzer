@@ -66,7 +66,7 @@ class AlertRuleRepositoryTest {
         repository.persist(disabled);
         repository.flush();
 
-        // V8 seeds the built-in brute-force rule, so the table is not empty to begin with.
+        // V8 and V9 seed the built-in rules, so the table is not empty to begin with.
         List<String> names = repository.listEnabled().stream().map(AlertRule::getName).toList();
         assertTrue(names.contains("enabled-rule"));
         assertFalse(names.contains("disabled-rule"));
