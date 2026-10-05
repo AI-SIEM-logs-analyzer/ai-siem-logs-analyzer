@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.siem.analyzer.detect.BruteForceLoginRule;
 import com.siem.analyzer.detect.PathTraversalRule;
+import com.siem.analyzer.detect.ScannerUserAgentRule;
 import com.siem.analyzer.detect.SqlInjectionRule;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -130,6 +131,23 @@ class FlywayMigrationTest {
 
         assertEquals(PathTraversalRule.SEVERITY.name(), row[0]);
         assertEquals(PathTraversalRule.EXPRESSION, row[1]);
+        assertEquals(Boolean.TRUE, row[2]);
+    }
+
+    @Test
+    @TestTransaction
+    void scannerUserAgentRuleIsSeededAsTheEngineDefinesIt() {
+        Object[] row =
+                (Object[])
+                        entityManager
+                                .createNativeQuery(
+                                        "select severity, expression, enabled from alert_rule"
+                                                + " where name = :name")
+                                .setParameter("name", ScannerUserAgentRule.NAME)
+                                .getSingleResult();
+
+        assertEquals(ScannerUserAgentRule.SEVERITY.name(), row[0]);
+        assertEquals(ScannerUserAgentRule.EXPRESSION, row[1]);
         assertEquals(Boolean.TRUE, row[2]);
     }
 

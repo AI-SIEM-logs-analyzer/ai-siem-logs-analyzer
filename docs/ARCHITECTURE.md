@@ -261,6 +261,19 @@ division-slash look-alikes some servers fold into `.` and `/` as the real thing.
 encoded once or more. Browsers resolve dot segments before sending, so a `..` in the log was
 sent on purpose.
 
+The fourth is `scanner-user-agent` (`ScannerUserAgentRule`, seeded by
+`V11__scanner_user_agent_rule.sql`, `WARNING`), which reads `userAgent` and fires on every
+request from an attack tool that names itself (sqlmap, Nikto, the Nmap Scripting Engine,
+masscan, zgrab, Nuclei, WPScan, gobuster, ffuf, Acunetix, Nessus, Hydra, ZmEu, …, as whole
+words), on a header carrying a payload for whatever logs or parses it (Shellshock's `() {`,
+Log4Shell's `${jndi:` and its `${${::-j}` disguises, `<script`, `UNION SELECT`, `SLEEP(5)`,
+`../`), and on a command-line client or bare HTTP library (curl, Wget, python-requests,
+Go-http-client, libwww-perl, PowerShell, `Java/<n>`, …) that the server answered with a 4xx
+or 5xx. Those clients run health checks and scripts all day and get their 2xx, so the client
+alone is not worth an alert; the same client being refused is what a hand-driven probe looks
+like. A tool told to borrow a browser's header passes this rule; the rules that read what it
+requests are the ones left to catch it.
+
 A rule is the text stored in `alert_rule.expression`, parsed by `RuleExpressionParser`:
 
 ```
