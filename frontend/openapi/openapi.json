@@ -92,6 +92,15 @@
             "items" : {
               "$ref" : "#/components/schemas/TimeBucket"
             }
+          },
+          "srcIpOverTime" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/components/schemas/TimeBucket"
+              }
+            }
           }
         }
       },
@@ -577,7 +586,7 @@
             "type" : "string"
           }
         }, {
-          "description" : "Also count severities, sources, hosts, source IPs, HTTP status codes, the most frequent error messages and events per hour across the whole match",
+          "description" : "Also count severities, sources, hosts, source IPs, HTTP status codes, the most frequent error messages and events per hour, overall and per source IP, across the whole match",
           "name" : "facets",
           "in" : "query",
           "schema" : {

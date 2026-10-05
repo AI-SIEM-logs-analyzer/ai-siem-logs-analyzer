@@ -248,6 +248,11 @@ class OpenSearchEventSearchQueryTest {
                 Map.of("failed login for admin", 1L, "disk failure", 1L),
                 page.facets().topErrors());
         assertFalse(page.facets().overTime().isEmpty());
+        // Both events of an address fall in T0's hour, which is the only hour it reports.
+        assertEquals(page.facets().bySrcIp().keySet(), page.facets().srcIpOverTime().keySet());
+        assertEquals(
+                List.of(new EventFacets.TimeBucket(T0, 1L)),
+                page.facets().srcIpOverTime().get("203.0.113.7"));
     }
 
     @Test
@@ -256,6 +261,7 @@ class OpenSearchEventSearchQueryTest {
 
         assertTrue(page.facets().bySeverity().isEmpty());
         assertTrue(page.facets().overTime().isEmpty());
+        assertTrue(page.facets().srcIpOverTime().isEmpty());
     }
 
     @Test

@@ -1,10 +1,17 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
-import { BarChart, type BarSeriesOption } from 'echarts/charts';
+import {
+  BarChart,
+  HeatmapChart,
+  type BarSeriesOption,
+  type HeatmapSeriesOption,
+} from 'echarts/charts';
 import {
   GridComponent,
   TooltipComponent,
+  VisualMapPiecewiseComponent,
   type GridComponentOption,
   type TooltipComponentOption,
+  type VisualMapComponentOption,
 } from 'echarts/components';
 import * as echarts from 'echarts/core';
 import { SVGRenderer } from 'echarts/renderers';
@@ -12,11 +19,25 @@ import { SVGRenderer } from 'echarts/renderers';
 // Apache ECharts, tree-shaken: only the chart types and components registered here end up in
 // the bundle. Add a series type or component to `use` (and to EChartOption) when a chart needs
 // it. The SVG renderer keeps lines crisp at any zoom and the DOM inspectable.
-echarts.use([BarChart, GridComponent, TooltipComponent, SVGRenderer]);
+echarts.use([
+  BarChart,
+  HeatmapChart,
+  GridComponent,
+  TooltipComponent,
+  VisualMapPiecewiseComponent,
+  SVGRenderer,
+]);
 
 export type EChartOption = echarts.ComposeOption<
-  BarSeriesOption | GridComponentOption | TooltipComponentOption
+  | BarSeriesOption
+  | HeatmapSeriesOption
+  | GridComponentOption
+  | TooltipComponentOption
+  | VisualMapComponentOption
 >;
+
+/** What a click on a mark reports: its series, data index and value. */
+export type EChartClick = echarts.ECElementEvent;
 
 interface EChartProps {
   option: EChartOption;
@@ -25,17 +46,26 @@ interface EChartProps {
   className?: string;
   /** For a size that follows the data, such as a height per bar. */
   style?: CSSProperties;
+  /** Called with the mark clicked; pair it with a keyboard path to the same place. */
+  onClick?: (event: EChartClick) => void;
 }
 
 /** One ECharts instance bound to a div, re-drawn when `option` changes and resized with it. */
-export function EChart({ option, label, className, style }: EChartProps) {
+export function EChart({ option, label, className, style, onClick }: EChartProps) {
   const container = useRef<HTMLDivElement>(null);
   const chart = useRef<echarts.ECharts | null>(null);
+  // The latest handler, so a new closure each render does not rebind the chart's listener.
+  const clickHandler = useRef(onClick);
+
+  useEffect(() => {
+    clickHandler.current = onClick;
+  }, [onClick]);
 
   useEffect(() => {
     const element = container.current!;
     const instance = echarts.init(element, null, { renderer: 'svg' });
     chart.current = instance;
+    instance.on('click', (event) => clickHandler.current?.(event));
     const observer =
       typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => instance.resize());
     observer?.observe(element);
