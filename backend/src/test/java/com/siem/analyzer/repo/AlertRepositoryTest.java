@@ -14,8 +14,10 @@ import com.siem.analyzer.domain.Severity;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /** Persistence behaviour of {@link Alert}, including alerts that have no rule behind them. */
@@ -77,8 +79,9 @@ class AlertRepositoryTest {
         assertEquals(event.getId(), found.getLogEvent().getId());
         assertEquals(Severity.CRITICAL, found.getSeverity());
         // Newly raised alerts start in the triage queue.
-        assertEquals(AlertStatus.OPEN, found.getStatus());
+        assertEquals(AlertStatus.NEW, found.getStatus());
         assertNotNull(found.getRaisedAt());
+        assertEquals(found.getRaisedAt(), found.getStatusChangedAt());
         assertNull(found.getResolvedAt());
     }
 
@@ -103,16 +106,59 @@ class AlertRepositoryTest {
         LogEvent event = persistedEvent("endpoint-c");
         Alert open = alert(event, null);
         Alert resolved = alert(event, null);
-        resolved.setStatus(AlertStatus.RESOLVED);
-        resolved.setResolvedAt(Instant.parse("2026-08-18T13:00:00Z"));
+        resolved.changeStatus(AlertStatus.RESOLVED, Instant.parse("2026-08-18T13:00:00Z"));
 
         repository.persist(open);
         repository.persist(resolved);
         repository.flush();
 
-        List<Alert> stillOpen = repository.listByStatus(AlertStatus.OPEN);
+        List<Alert> stillOpen = repository.listByStatus(AlertStatus.NEW);
         assertEquals(1, stillOpen.size());
         assertEquals(open.getId(), stillOpen.get(0).getId());
+        List<Alert> closed = repository.listByStatus(AlertStatus.RESOLVED);
+        assertEquals(1, closed.size());
+        assertEquals(Instant.parse("2026-08-18T13:00:00Z"), closed.get(0).getResolvedAt());
+    }
+
+    @Test
+    @TestTransaction
+    void persistsWhatTheDetectionSaw() {
+        LogEvent event = persistedEvent("endpoint-e");
+        Alert stored = alert(event, null);
+        stored.setGroupKey(Map.of("srcIp", "10.0.0.7", "status", 401));
+        stored.setAggregateValue(new BigDecimal("6"));
+        stored.setEventCount(6);
+        stored.setWindowStart(Instant.parse("2026-08-18T11:59:10Z"));
+        stored.setWindowEnd(Instant.parse("2026-08-18T12:00:00Z"));
+
+        repository.persist(stored);
+        repository.flush();
+        repository.getEntityManager().clear();
+
+        Alert found = repository.findById(stored.getId());
+        assertEquals(Map.of("srcIp", "10.0.0.7", "status", 401), found.getGroupKey());
+        assertEquals(0, new BigDecimal("6").compareTo(found.getAggregateValue()));
+        assertEquals(6, found.getEventCount());
+        assertEquals(Instant.parse("2026-08-18T11:59:10Z"), found.getWindowStart());
+        assertEquals(Instant.parse("2026-08-18T12:00:00Z"), found.getWindowEnd());
+    }
+
+    @Test
+    @TestTransaction
+    void statusChangesSurviveAReload() {
+        LogEvent event = persistedEvent("endpoint-f");
+        Alert stored = alert(event, null);
+        repository.persist(stored);
+        repository.flush();
+
+        stored.changeStatus(AlertStatus.IN_PROGRESS, Instant.parse("2026-08-18T12:05:00Z"));
+        repository.flush();
+        repository.getEntityManager().clear();
+
+        Alert found = repository.findById(stored.getId());
+        assertEquals(AlertStatus.IN_PROGRESS, found.getStatus());
+        assertEquals(Instant.parse("2026-08-18T12:05:00Z"), found.getStatusChangedAt());
+        assertNull(found.getResolvedAt());
     }
 
     @Test
