@@ -14,9 +14,14 @@ import java.util.function.Function;
  * exactly, as the source wrote it, and dots descend into nested JSON objects. Enums ({@code
  * severity}, {@code format}) read as their constant names.
  *
- * <p>{@code decodedPath} is the one derived field: {@code path} percent-decoded by {@link
- * UrlDecoding}, so a rule can match {@code ' OR 1=1} however the client encoded it while {@code
- * path} keeps what the server logged.
+ * <p>Three fields are derived from {@code path}. {@code decodedPath} is {@code path}
+ * percent-decoded by {@link UrlDecoding}, so a rule can match {@code ' OR 1=1} however the client
+ * encoded it while {@code path} keeps what the server logged. {@code uriStem} and {@code uriQuery}
+ * are the parts of {@code path} before and after the first {@code ?}, as logged; {@code uriQuery}
+ * is absent when there is no query string, {@code uriStem} when the target is nothing but one.
+ *
+ * <p>{@code raw} is the line exactly as received, for a search that must not depend on how a parser
+ * split it up.
  *
  * <p>Two fields are equal when their names are, which is what lets a field serve in a group key.
  */
@@ -101,6 +106,8 @@ public final class EventField {
         put(fields, "method", NormalizedEvent::method);
         put(fields, "path", NormalizedEvent::path);
         put(fields, "decodedPath", event -> UrlDecoding.decode(event.path()));
+        put(fields, "uriStem", event -> uriStem(event.path()));
+        put(fields, "uriQuery", event -> uriQuery(event.path()));
         put(fields, "protocol", NormalizedEvent::protocol);
         put(fields, "status", NormalizedEvent::status);
         put(fields, "bytes", NormalizedEvent::bytes);
@@ -109,7 +116,21 @@ public final class EventField {
         put(fields, "severity", event -> event.severity().name());
         put(fields, "format", event -> event.format().name());
         put(fields, "message", NormalizedEvent::message);
+        put(fields, "raw", NormalizedEvent::raw);
         return Map.copyOf(fields);
+    }
+
+    private static String uriStem(String path) {
+        if (path == null) {
+            return null;
+        }
+        int query = path.indexOf('?');
+        return query < 0 ? path : query == 0 ? null : path.substring(0, query);
+    }
+
+    private static String uriQuery(String path) {
+        int query = path == null ? -1 : path.indexOf('?');
+        return query < 0 || query == path.length() - 1 ? null : path.substring(query + 1);
     }
 
     private static void put(

@@ -285,7 +285,8 @@ userAgent matches "(?i)sqlmap|nikto"
 
 Before the `|` is a per-event condition (`== != > >= < <=`, `in`, `exists`, `contains`,
 `startswith`, `endswith`, `matches`, combined with `and`/`or`/`not`) over the standard
-`NormalizedEvent` fields, `decodedPath`, or `attributes.<key>`. String comparisons ignore case, a number
+`NormalizedEvent` fields, the fields derived from `path` (`decodedPath`, and `uriStem` /
+`uriQuery` either side of the first `?`), the `raw` line, or `attributes.<key>`. String comparisons ignore case, a number
 literal compares numerically even against a quoted number, and an absent field fails every
 comparison. Without a `|` the rule fires on every matching event. After it, `RuleEngine`
 keeps a sliding window per group — `count`, `distinct(field)` or `sum(field)` — and fires
@@ -295,6 +296,40 @@ clock, so replaying an uploaded file detects what a live feed would have; an eve
 while it is newer than its group's window start, and groups idle for longer than a window
 are swept. Only `>`/`>=` thresholds exist: an event-driven engine cannot notice a window
 closing empty.
+
+**Sigma import.** Rules written in [Sigma](https://sigmahq.io/) are converted into this rule
+language by `detect.sigma.SigmaConverter`, which reads the YAML through Jackson's YAML module
+(SnakeYAML underneath), and stored by `SigmaRuleImporter` as `alert_rule` rows named
+`sigma-<title>-<first 8 of id>`. Importing a rule again updates its row in place but leaves
+`enabled` alone, so a rule an operator switched off stays off. What a rule means is kept, or the
+rule is skipped with a reason; it is never converted into something that matches less or more:
+
+- *Fields* map through `SigmaFieldMapping`: the Sigma `webserver` taxonomy (`c-ip`, `cs-method`,
+  `cs-uri-stem`, `sc-status`, `cs-user-agent`, …) and common ECS names (`source.ip`,
+  `url.path`, `user_agent.original`, …) onto the standard fields. `cs-uri-query` reads the whole
+  `path`, because SigmaHQ's web rules use it for the full request target. Anything else is read
+  from `attributes.<name>`; a name the rule language cannot spell is refused.
+- *Log sources* become a guard ANDed in front of the rule — `method exists` for `webserver`,
+  `format == "SYSLOG"` (plus the syslog tag for `sshd` and `sudo`) for Linux — so a rule built on
+  a negation cannot fire on events of another kind. Log sources this platform does not ingest
+  (Windows, proxies, cloud audit logs, …) are refused.
+- *Values* follow Sigma: case-insensitive, `*`/`?` wildcards, lists ORed (ANDed under `|all`),
+  `null` for an absent field, and keywords matched anywhere in `raw`. Supported modifiers are
+  `contains`, `startswith`, `endswith`, `all`, `re` (with `i`, `m`, `s`), `cased`, `exists`,
+  `lt`/`lte`/`gt`/`gte`, `base64` and `base64offset`; `cidr`, `windash`, `fieldref` and the
+  UTF-16 encodings are refused.
+- *Conditions* take `and`/`or`/`not`, parentheses and `1 of`/`all of` a pattern or `them`. A
+  Sigma 1 aggregation (`| count() by c-ip > 10` with `timeframe`) and a Sigma 2
+  `event_count`/`value_count`/`value_sum` correlation become the engine's window (`count`,
+  `distinct(field)`, `sum(field)`); thresholds that fall (`<`, `lt`, …), `near` and temporal
+  correlations are refused. Rules a correlation counts are not imported on their own unless it
+  sets `generate: true`.
+- *Metadata*: `level` maps `informational`/`low` → `INFO`, `medium` → `WARNING`, `high` →
+  `ERROR`, `critical` → `CRITICAL`; the description keeps the Sigma id, author, false positives
+  and references. `deprecated` and `unsupported` rules are skipped.
+
+Nothing calls the importer yet: the rule-management API that will hand it a file is still to
+come, as is where detection runs.
 
 **Triage (Planned).** The SPA reads alerts and events over REST, an analyst changes an
 alert's status, and the transition is audited.
@@ -354,6 +389,7 @@ an entry here once decided; substantial ones graduate to an ADR under `docs/adr/
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-10-06 | Sigma rules are imported in the JVM — Jackson YAML (SnakeYAML) into this engine's rule language — not converted offline with pySigma | One converter, in the same build and test suite as the engine, keeps the field mapping and the rule language from drifting apart, and an import needs no Python toolchain. The converter refuses what it cannot express faithfully instead of approximating it. pySigma stays the fallback, as an offline backend that emits this rule language, if rules the importer refuses turn out to matter |
 | 2026-09-25 | The SPA's API client is `openapi-typescript` types over `openapi-fetch`, not a generated per-endpoint SDK (orval); the SPA stores its tokens in `localStorage` and serialises refreshes across tabs with a Web Lock | Types alone keep the generated output to one declaration file and the runtime to a few kilobytes, and TanStack Query hooks stay hand-written next to the screens that use them. `localStorage` is readable by any script on the page, but the backend issues the refresh token in the response body, not as an `HttpOnly` cookie, so no storage the SPA can reach is safer; sharing it across tabs is what keeps two tabs from spending one refresh token twice and tripping reuse detection. An `HttpOnly` refresh cookie is the upgrade path |
 | 2026-09-24 | User-Agent classification uses Yauaa at ingestion time, and counts command-line tools, HTTP libraries, headless browsers and attack payloads as bots | Yauaa's rules ship inside the jar, so it adds no data file to fetch or bundle, and it classifies robots and hacking attempts, not only browsers. For a SIEM, "not a person at a browser" is the useful meaning of bot, and curl or sqlmap in a header is as automated as Googlebot |
 | 2026-09-22 | GeoIP enrichment runs at ingestion time, writing geo fields onto the event payload, rather than at read time; the GeoLite2 databases are bundled into the container image rather than fetched per event | A search hit is read far more often than an event is ingested, so resolving `srcIp` once and storing the result avoids repeating the same MaxMind lookup on every page view; bundling the databases keeps a missing network path to MaxMind from ever being how the search endpoint degrades, at the cost of a larger image and a database that ages until the next deploy |

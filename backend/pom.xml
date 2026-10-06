@@ -157,6 +157,13 @@
             <groupId>org.jboss.logmanager</groupId>
             <artifactId>log4j2-jboss-logmanager</artifactId>
         </dependency>
+        <!-- Reads Sigma rules (detect.sigma). Jackson's YAML module is SnakeYAML underneath, so
+             a rule file is read by the YAML parser the ecosystem uses, into the same Map/List
+             tree Jackson gives for JSON. Both versions come from the Quarkus BOM. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
         <!-- Swaps the logs.ingest outgoing channel for an in-memory sink under %test, so the
              suite exercises the real Emitter and the real serialisation without a broker.
              Kafka Dev Services stays off for the same reason; the Compose stack is where the
