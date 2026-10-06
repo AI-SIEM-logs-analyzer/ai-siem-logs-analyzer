@@ -14,6 +14,7 @@ Shipped today:
 - **SmallRye OpenAPI** — `/q/openapi`, `/q/swagger-ui`
 - **Hibernate Validator**
 - **password4j** — Argon2id password hashing
+- **Jackson YAML** (SnakeYAML underneath) — reading Sigma rules for import
 - **Jib** — container image, same build locally and in CD
 - **Spotless** (google-java-format, AOSP) · **Checkstyle** · **JaCoCo** · **JUnit 5** + RestAssured
 - **Maven** build via the wrapper (`./mvnw`)
@@ -29,7 +30,8 @@ com.siem.analyzer
 ├── domain    JPA entities and domain enums
 ├── repo      Panache repositories (all queries live here)
 ├── search    the derived OpenSearch index — projection, queries and backfill
-├── detect    rule language and engine — per-event conditions, time-window aggregation
+├── detect    rule language and engine — per-event conditions, time-window aggregation;
+│             detect.sigma converts Sigma YAML rules into that language
 ├── config    typed configuration mappings
 └── health    custom health checks
 ```
