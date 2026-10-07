@@ -24,6 +24,7 @@
         <password4j.version>1.8.4</password4j.version>
         <java-grok.version>0.1.9</java-grok.version>
         <yauaa.version>8.2.0</yauaa.version>
+        <smile.version>4.4.2</smile.version>
     </properties>
 
     <dependencyManagement>
@@ -163,6 +164,35 @@
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
+        <!-- Isolation Forest for anomaly scoring (detect.anomaly). 4.4.x is the last line built
+             for Java 21; 5.0 onward needs Java 25. smile-base pulls in JavaCPP with OpenBLAS and
+             ARPACK for four platforms, DuckDB's JDBC driver and two file-format readers. None of
+             them is on the isolation-tree path, which is plain Java, and the natives alone would
+             add hundreds of megabytes to the container image, so they are excluded.
+             Smile is GPL-3.0 (commercial licence available), unlike this project's MIT. -->
+        <dependency>
+            <groupId>com.github.haifengl</groupId>
+            <artifactId>smile-core</artifactId>
+            <version>${smile.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.duckdb</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.epam</groupId>
+                    <artifactId>parso</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-csv</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <!-- Swaps the logs.ingest outgoing channel for an in-memory sink under %test, so the
              suite exercises the real Emitter and the real serialisation without a broker.

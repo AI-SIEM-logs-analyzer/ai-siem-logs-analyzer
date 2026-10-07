@@ -227,7 +227,8 @@ index's snake_case to the payload's own camelCase key names (`fields.geoCountryI
 `fields.geoAsn`, `fields.uaBot`, …), with numbers and booleans keeping their JSON type. Its contract is documented in `/q/openapi`.
 
 **Detection (In progress).** The rule engine is in place (`detect` package); AI-assisted
-detection through LangChain4j and anomaly scoring with Smile are planned. Whether detection
+detection through LangChain4j is planned, and anomaly scoring with Smile is in place
+(`detect.anomaly`, below) but not yet fed by ingestion. Whether detection
 runs inline with ingestion or as a separate consumer is **TBD**, so the engine is deliberately
 free of persistence and CDI: it takes `NormalizedEvent`s and returns `Detection`s, and
 `AlertService.raise` turns one into an `alert` row — the rule's name as the title,
@@ -298,6 +299,37 @@ clock, so replaying an uploaded file detects what a live feed would have; an eve
 while it is newer than its group's window start, and groups idle for longer than a window
 are swept. Only `>`/`>=` thresholds exist: an event-driven engine cannot notice a window
 closing empty.
+
+**Anomaly scoring.** Rules say what an attack looks like; `detect.anomaly` learns what ordinary
+traffic looks like and scores how far an event strays from it, with an Isolation Forest built
+from Smile's isolation trees. Each event with a status code and a source address becomes three
+numbers (`EventFeatures`): `requestRate`, how many requests that address sent within the rate
+window (one minute, on event time, counted per address like a rule's window); `responseBytes`,
+the response size, absent counting as 0; and `status`. Everything else is not scored.
+
+`AnomalyBaseline.train` reads a baseline of events taken to be normal, in time order, and grows
+100 trees, each from its own random sample of 256 events, depth-limited to 8, splitting on one
+feature at a time, as in the original paper. It does not call Smile's `IsolationForest.fit`:
+in Smile 4.4 that grows every tree from the whole data set whatever its `subsample` says, and
+defaults to the extended variant, whose oblique splits mix features of different scales. A
+baseline needs at least 256 usable events, and past 100,000 it is reservoir-sampled, though rates
+are still counted over every event. The threshold is calibrated on the baseline itself: it is
+placed so that at most `contamination` (1%) of baseline events score above it, which means the
+same thing on any feed where a fixed cut-off such as 0.6 would not. A forest cannot tell how far
+past its baseline a value lies, because trees only split between the smallest and largest value
+they saw: a 4 GB response scores just like the baseline's largest one. So the baseline also keeps
+each feature's range, and an event outside it is anomalous whatever its score. For the same
+reason sizes stay linear: on a log scale the largest responses are as dense as typical ones and
+that edge scores as ordinary.
+
+An `AnomalyScorer` scores a stream against one baseline with its own rate window, and
+`AnomalyScore.summary()` sets each feature beside the baseline's median and range, for example
+`score 0.812 (> 0.640) for srcIp=203.0.113.9: requestRate=412 per 1m (baseline median 3, range
+1-9, outside), …`. Like the rule engine it has no persistence, CDI or clock; where the baseline
+comes from, how often it is retrained, and how an anomaly becomes an alert are left to whatever
+feeds it. Training is randomised, so two baselines trained on the same events score slightly
+differently. Smile 4.4 is the last line built for Java 21, and is GPL-3.0; its JavaCPP/OpenBLAS
+natives and DuckDB driver are excluded in `pom.xml`, since the isolation-tree path is plain Java.
 
 **Sigma import.** Rules written in [Sigma](https://sigmahq.io/) are converted into this rule
 language by `detect.sigma.SigmaConverter`, which reads the YAML through Jackson's YAML module
