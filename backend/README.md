@@ -15,11 +15,12 @@ Shipped today:
 - **Hibernate Validator**
 - **password4j** — Argon2id password hashing
 - **Jackson YAML** (SnakeYAML underneath) — reading Sigma rules for import
+- **Smile 4.4** — Isolation Forest anomaly scoring (`detect.anomaly`); GPL-3.0, natives excluded
 - **Jib** — container image, same build locally and in CD
 - **Spotless** (google-java-format, AOSP) · **Checkstyle** · **JaCoCo** · **JUnit 5** + RestAssured
 - **Maven** build via the wrapper (`./mvnw`)
 
-Planned, landing in later PRs: SmallRye JWT (`@RolesAllowed`), SmallRye Reactive Messaging + Kafka, Quarkus Redis, LangChain4j, Smile.
+Planned, landing in later PRs: SmallRye JWT (`@RolesAllowed`), SmallRye Reactive Messaging + Kafka, Quarkus Redis, LangChain4j.
 
 ## Package layout
 
@@ -32,6 +33,7 @@ com.siem.analyzer
 ├── search    the derived OpenSearch index — projection, queries and backfill
 ├── detect    rule language and engine — per-event conditions, time-window aggregation;
 │             detect.sigma converts Sigma YAML rules into that language
+│             detect.anomaly scores events against a learned baseline (Isolation Forest)
 ├── config    typed configuration mappings
 └── health    custom health checks
 ```
