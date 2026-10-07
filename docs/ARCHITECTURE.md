@@ -111,7 +111,7 @@ erDiagram
 | `log_event`  | Normalised events; carries the upstream identifier used to drop replays   |
 | `log_event_index_state` | Which events have reached the search index; absence of a row is the backlog |
 | `alert_rule` | Detection rules                                                           |
-| `alert`      | Raised alerts; the rule is nullable — a model-raised alert has none       |
+| `alert`      | Raised alerts with their triage status and the window the rule fired on; the rule is nullable — a model-raised alert has none |
 | `app_user`   | Accounts; stores an Argon2id hash, never a password                       |
 | `user_role`  | Roles per account (`ADMIN`, `ANALYST`, `VIEWER`); an account may hold several |
 
@@ -229,8 +229,10 @@ index's snake_case to the payload's own camelCase key names (`fields.geoCountryI
 **Detection (In progress).** The rule engine is in place (`detect` package); AI-assisted
 detection through LangChain4j and anomaly scoring with Smile are planned. Whether detection
 runs inline with ingestion or as a separate consumer is **TBD**, so the engine is deliberately
-free of persistence and CDI: it takes `NormalizedEvent`s and returns `Detection`s, and the
-caller decides what an alert is.
+free of persistence and CDI: it takes `NormalizedEvent`s and returns `Detection`s, and
+`AlertService.raise` turns one into an `alert` row — the rule's name as the title,
+`Detection.summary()` as the detail, the rule's severity, and what the window held
+(`group_key`, `aggregate_value`, `event_count`, `window_start`, `window_end`).
 
 The first built-in rule is `brute-force-login` (`BruteForceLoginRule`, seeded into
 `alert_rule` by `V8__brute_force_login_rule.sql`): five or more failed logins from one `srcIp`
@@ -331,8 +333,23 @@ rule is skipped with a reason; it is never converted into something that matches
 Nothing calls the importer yet: the rule-management API that will hand it a file is still to
 come, as is where detection runs.
 
-**Triage (Planned).** The SPA reads alerts and events over REST, an analyst changes an
-alert's status, and the transition is audited.
+**Triage (In progress).** An alert is raised `NEW` and moves through `AlertStatus`
+(`V12__alert_lifecycle.sql` renamed the earlier `OPEN`/`ACKNOWLEDGED`):
+
+| From                          | To                                         |
+|-------------------------------|--------------------------------------------|
+| `NEW`                         | `IN_PROGRESS`, `RESOLVED`, `FALSE_POSITIVE` |
+| `IN_PROGRESS`                 | `NEW`, `RESOLVED`, `FALSE_POSITIVE`         |
+| `RESOLVED`, `FALSE_POSITIVE`  | `IN_PROGRESS` (reopened)                    |
+
+`RESOLVED` and `FALSE_POSITIVE` are both closed but kept apart, because that difference is the
+label a model can later learn from. `resolved_at` is set exactly while an alert is closed —
+reopening clears it, and `ck_alert_resolved_at` refuses a row where the two disagree — and
+`status_changed_at` records the last move. `AlertService.changeStatus` locks the row before
+deciding, and refuses a move the table above does not list, including to the status the alert
+already holds, with `IllegalAlertTransitionException`: of two analysts closing the same alert,
+the second is told rather than silently overwriting the first. Still planned: the REST API the
+SPA reads alerts through and changes their status with, and an audit of who made each move.
 
 ## Cross-cutting concerns
 

@@ -1,6 +1,8 @@
 package com.siem.analyzer.repo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.siem.analyzer.detect.BruteForceLoginRule;
 import com.siem.analyzer.detect.PathTraversalRule;
@@ -10,6 +12,7 @@ import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceException;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -166,5 +169,97 @@ class FlywayMigrationTest {
                                 .getSingleResult();
 
         assertEquals(8L, count);
+    }
+
+    /** Inserts a log event through SQL alone and returns its id. */
+    private Long insertedLogEvent() {
+        Number sourceId =
+                (Number)
+                        entityManager
+                                .createNativeQuery(
+                                        "insert into log_source (name, type)"
+                                                + " values ('flyway-alert-source', 'SYSLOG')"
+                                                + " returning id")
+                                .getSingleResult();
+        Number eventId =
+                (Number)
+                        entityManager
+                                .createNativeQuery(
+                                        "insert into log_event"
+                                                + " (source_id, occurred_at, severity, message, raw)"
+                                                + " values (?1, now(), 'INFO', 'm', 'r')"
+                                                + " returning id")
+                                .setParameter(1, sourceId.longValue())
+                                .getSingleResult();
+        return eventId.longValue();
+    }
+
+    @Test
+    @TestTransaction
+    void anAlertInsertedWithoutAStatusStartsAsNew() {
+        Long eventId = insertedLogEvent();
+
+        Object[] row =
+                (Object[])
+                        entityManager
+                                .createNativeQuery(
+                                        "insert into alert (log_event_id, title, severity)"
+                                                + " values (?1, 't', 'INFO')"
+                                                + " returning status, status_changed_at")
+                                .setParameter(1, eventId)
+                                .getSingleResult();
+
+        assertEquals("NEW", row[0]);
+        assertNotNull(row[1]);
+    }
+
+    @Test
+    @TestTransaction
+    void theStatusConstraintRefusesTheRetiredNames() {
+        Long eventId = insertedLogEvent();
+
+        assertThrows(
+                PersistenceException.class,
+                () ->
+                        entityManager
+                                .createNativeQuery(
+                                        "insert into alert (log_event_id, title, severity, status)"
+                                                + " values (?1, 't', 'INFO', 'OPEN')")
+                                .setParameter(1, eventId)
+                                .executeUpdate());
+    }
+
+    @Test
+    @TestTransaction
+    void aClosedAlertMustCarryItsCloseTime() {
+        Long eventId = insertedLogEvent();
+
+        assertThrows(
+                PersistenceException.class,
+                () ->
+                        entityManager
+                                .createNativeQuery(
+                                        "insert into alert (log_event_id, title, severity, status)"
+                                                + " values (?1, 't', 'INFO', 'RESOLVED')")
+                                .setParameter(1, eventId)
+                                .executeUpdate());
+    }
+
+    @Test
+    @TestTransaction
+    void anOpenAlertMayNotCarryACloseTime() {
+        Long eventId = insertedLogEvent();
+
+        assertThrows(
+                PersistenceException.class,
+                () ->
+                        entityManager
+                                .createNativeQuery(
+                                        "insert into alert"
+                                                + " (log_event_id, title, severity, status,"
+                                                + " resolved_at)"
+                                                + " values (?1, 't', 'INFO', 'IN_PROGRESS', now())")
+                                .setParameter(1, eventId)
+                                .executeUpdate());
     }
 }
