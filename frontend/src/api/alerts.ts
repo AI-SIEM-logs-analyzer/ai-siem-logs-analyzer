@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import type { components } from '@/api/schema';
 import { unwrap } from '@/lib/api-client';
@@ -9,6 +9,8 @@ import type { AlertFilters } from '@/lib/alert-filters';
 export type Alert = components['schemas']['AlertResponse'];
 export type AlertEvent = components['schemas']['AlertEventResponse'];
 export type AlertPage = components['schemas']['PageResponseAlertResponse'];
+export type AlertSummary = components['schemas']['AlertSummaryResponse'];
+export type AttackType = components['schemas']['AttackType'];
 
 /** Alerts per page on the alerts page. */
 export const ALERT_PAGE_SIZE = 25;
@@ -56,5 +58,25 @@ export function useAlert(id: number) {
     queryKey: alertKeys.detail(id),
     queryFn: () => fetchAlert(id),
     enabled: Number.isSafeInteger(id) && id > 0,
+  });
+}
+
+/** Has the backend's LLM summarise alert `id`; resolves to the alert with its new summary. */
+export function summarizeAlert(id: number): Promise<Alert> {
+  return unwrap(api.POST('/api/alerts/{id}/summary', { params: { path: { id } } }));
+}
+
+/**
+ * Asks for a fresh summary of alert `id`. The answer replaces the cached alert, so the page shows
+ * it without a second request, and the list refetches to pick it up too.
+ */
+export function useSummarizeAlert(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => summarizeAlert(id),
+    onSuccess: (alert) => {
+      queryClient.setQueryData(alertKeys.detail(id), alert);
+      void queryClient.invalidateQueries({ queryKey: [...alertKeys.all, 'list'] });
+    },
   });
 }

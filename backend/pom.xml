@@ -36,6 +36,15 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- The platform's own LangChain4j BOM, released with the Quarkus BOM above, so the
+                 extension versions always match the Quarkus they were built against. -->
+            <dependency>
+                <groupId>${quarkus.platform.group-id}</groupId>
+                <artifactId>quarkus-langchain4j-bom</artifactId>
+                <version>${quarkus.platform.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -193,6 +202,21 @@
                     <artifactId>commons-csv</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+        <!-- LLM summaries of alerts (service.ai). One extension per supported provider; which
+             one serves a deployment is chosen at runtime with app.ai.provider, so the same
+             image talks to Anthropic, OpenAI or a local Ollama. -->
+        <dependency>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-anthropic</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-openai</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-ollama</artifactId>
         </dependency>
         <!-- Swaps the logs.ingest outgoing channel for an in-memory sink under %test, so the
              suite exercises the real Emitter and the real serialisation without a broker.

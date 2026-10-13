@@ -8,8 +8,9 @@ import io.restassured.response.ValidatableResponse;
 import org.junit.jupiter.api.Test;
 
 /**
- * Who may read alerts. The detail asks for an alert that does not exist, so a caller let through
- * gets {@code 404} and one turned away gets {@code 401} or {@code 403}, with nothing to seed.
+ * Who may read alerts, and who may have one summarised. Each call names an alert that does not
+ * exist, so a caller let through gets {@code 404} and one turned away gets {@code 401} or {@code
+ * 403}, with nothing to seed and no model asked.
  */
 @QuarkusTest
 class AlertResourceSecurityTest {
@@ -24,31 +25,39 @@ class AlertResourceSecurityTest {
         return given().when().get("/api/alerts/" + MISSING_ID).then();
     }
 
+    private static ValidatableResponse summarize() {
+        return given().when().post("/api/alerts/" + MISSING_ID + "/summary").then();
+    }
+
     @Test
     void refusesAnAnonymousCaller() {
         list().statusCode(401);
         read().statusCode(401);
+        summarize().statusCode(401);
     }
 
     @Test
     @TestSecurity(user = "read.only", roles = "VIEWER")
-    void letsAViewerRead() {
+    void letsAViewerReadButNotSummarise() {
         list().statusCode(200);
         read().statusCode(404);
+        summarize().statusCode(403);
     }
 
     @Test
     @TestSecurity(user = "triage", roles = "ANALYST")
-    void letsAnAnalystRead() {
+    void letsAnAnalystReadAndSummarise() {
         list().statusCode(200);
         read().statusCode(404);
+        summarize().statusCode(404);
     }
 
     @Test
     @TestSecurity(user = "admin", roles = "ADMIN")
-    void letsAnAdministratorRead() {
+    void letsAnAdministratorReadAndSummarise() {
         list().statusCode(200);
         read().statusCode(404);
+        summarize().statusCode(404);
     }
 
     @Test
@@ -56,5 +65,6 @@ class AlertResourceSecurityTest {
     void refusesAnUnknownRole() {
         list().statusCode(403);
         read().statusCode(403);
+        summarize().statusCode(403);
     }
 }

@@ -91,6 +91,28 @@ public class Alert {
     @Column(name = "window_end")
     private Instant windowEnd;
 
+    /** The severity a model gave the alert when it last summarised it; the rule's stays as is. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_severity")
+    private Severity aiSeverity;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_attack_type")
+    private AttackType aiAttackType;
+
+    @Column(name = "ai_summary")
+    private String aiSummary;
+
+    @Column(name = "ai_recommended_action")
+    private String aiRecommendedAction;
+
+    /** Which model wrote the summary, as {@code provider/model}. */
+    @Column(name = "ai_model")
+    private String aiModel;
+
+    @Column(name = "ai_summarized_at")
+    private Instant aiSummarizedAt;
+
     @PrePersist
     void onPersist() {
         if (raisedAt == null) {
@@ -118,6 +140,27 @@ public class Alert {
         status = target;
         statusChangedAt = at;
         resolvedAt = target.isClosed() ? at : null;
+    }
+
+    /**
+     * Records a model's summary of the alert, replacing the previous one.
+     *
+     * <p>All six columns move together; {@code ck_alert_ai_summary} refuses a row where they
+     * disagree.
+     */
+    public void recordAiSummary(
+            Severity severity,
+            AttackType attackType,
+            String summary,
+            String recommendedAction,
+            String model,
+            Instant at) {
+        aiSeverity = Objects.requireNonNull(severity, "severity");
+        aiAttackType = Objects.requireNonNull(attackType, "attackType");
+        aiSummary = Objects.requireNonNull(summary, "summary");
+        aiRecommendedAction = Objects.requireNonNull(recommendedAction, "recommendedAction");
+        aiModel = Objects.requireNonNull(model, "model");
+        aiSummarizedAt = Objects.requireNonNull(at, "at");
     }
 
     public Long getId() {
@@ -218,5 +261,29 @@ public class Alert {
 
     public void setWindowEnd(Instant windowEnd) {
         this.windowEnd = windowEnd;
+    }
+
+    public Severity getAiSeverity() {
+        return aiSeverity;
+    }
+
+    public AttackType getAiAttackType() {
+        return aiAttackType;
+    }
+
+    public String getAiSummary() {
+        return aiSummary;
+    }
+
+    public String getAiRecommendedAction() {
+        return aiRecommendedAction;
+    }
+
+    public String getAiModel() {
+        return aiModel;
+    }
+
+    public Instant getAiSummarizedAt() {
+        return aiSummarizedAt;
     }
 }

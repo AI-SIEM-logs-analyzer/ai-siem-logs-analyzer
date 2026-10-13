@@ -13,6 +13,12 @@ describe('can', () => {
     expect(can(['VIEWER'], 'logs:upload')).toBe(false);
   });
 
+  it('lets an admin or analyst have an alert summarised, not a viewer', () => {
+    expect(can(['ADMIN'], 'alerts:summarize')).toBe(true);
+    expect(can(['ANALYST'], 'alerts:summarize')).toBe(true);
+    expect(can(['VIEWER'], 'alerts:summarize')).toBe(false);
+  });
+
   it('grants what any one of several roles grants', () => {
     expect(can(['VIEWER', 'ADMIN'], 'users:manage')).toBe(true);
   });

@@ -16,11 +16,13 @@ Shipped today:
 - **password4j** — Argon2id password hashing
 - **Jackson YAML** (SnakeYAML underneath) — reading Sigma rules for import
 - **Smile 4.4** — Isolation Forest anomaly scoring (`detect.anomaly`); GPL-3.0, natives excluded
+- **quarkus-langchain4j** (platform BOM) — LLM summaries of alerts with structured output (`ai`);
+  Anthropic, OpenAI or Ollama, chosen at runtime
 - **Jib** — container image, same build locally and in CD
 - **Spotless** (google-java-format, AOSP) · **Checkstyle** · **JaCoCo** · **JUnit 5** + RestAssured
 - **Maven** build via the wrapper (`./mvnw`)
 
-Planned, landing in later PRs: SmallRye JWT (`@RolesAllowed`), SmallRye Reactive Messaging + Kafka, Quarkus Redis, LangChain4j.
+Planned, landing in later PRs: SmallRye JWT (`@RolesAllowed`), SmallRye Reactive Messaging + Kafka, Quarkus Redis.
 
 ## Package layout
 
@@ -34,6 +36,8 @@ com.siem.analyzer
 ├── detect    rule language and engine — per-event conditions, time-window aggregation;
 │             detect.sigma converts Sigma YAML rules into that language
 │             detect.anomaly scores events against a learned baseline (Isolation Forest)
+├── ai        LLM assistance through quarkus-langchain4j — the alert summariser (AI service),
+│             its prompt and the runtime choice of provider
 ├── config    typed configuration mappings
 └── health    custom health checks
 ```
@@ -256,6 +260,31 @@ cp docker/.env.example docker/.env     # backend in the Compose stack
 `/q/health/ready` reports the active `app.environment`, which is the quickest way to
 confirm which configuration a running instance picked up.
 
+### AI provider
+
+Alert summaries (`POST /api/alerts/{id}/summary`) come from the LLM `app.ai.provider` names.
+Every provider is built into the application, so switching is a restart, not a rebuild:
+
+| Variable           | Default                      | What                                                |
+|--------------------|------------------------------|-----------------------------------------------------|
+| `APP_AI_PROVIDER`  | `anthropic`                  | `anthropic`, `openai` or `ollama`                    |
+| `APP_AI_API_KEY`   | — (required under `prod`)    | the provider's key; Ollama ignores it, any value does |
+| `APP_AI_MODEL`     | `claude-opus-5-5` / `gpt-5-mini` | overrides the provider's default model          |
+| `APP_AI_BASE_URL`  | the provider's public API, `http://localhost:11434` for Ollama | a proxy, gateway or remote Ollama |
+
+The answer is structured output: `ai.AlertSummarizer` is a quarkus-langchain4j AI service
+whose return type, the `AlertSummary` record (`severity`, `attackType`, `summary`,
+`recommendedAction`), becomes the JSON schema the provider must answer in — Anthropic through
+`output_config.format`, OpenAI through a strict `json_schema` response format, Ollama natively —
+and is parsed back into the record. Ollama's model (`llama3.2`) is fixed when the application
+is built: change it with `-Dquarkus.langchain4j.ollama.summary-ollama.chat-model.model-id=…` on
+the build. Requests time out after 120 s. Leave `APP_AI_MODEL` and `APP_AI_BASE_URL` unset
+rather than empty: an empty value is refused at start-up instead of falling back to the default.
+
+The suite never calls a provider: `ScriptedChatModel` stands in for the configured model in
+every `@QuarkusTest` and answers with canned JSON, while the AI service, its prompt and the
+parsing stay the real ones.
+
 ## Endpoints
 
 | Endpoint          | What                                        |
@@ -283,6 +312,7 @@ Application endpoints:
 | `DELETE /api/users/{id}`        | delete the account and its roles              |
 | `GET /api/alerts`               | list alerts, newest first; `severity`, `status` (repeatable), `page`, `size` (≤ 100) |
 | `GET /api/alerts/{id}`          | one alert, with the event that raised it      |
+| `POST /api/alerts/{id}/summary` | have the configured LLM summarise the alert (`ADMIN`, `ANALYST`); 502 when the provider fails |
 
 They are **unauthenticated**: nothing issues a token yet, so there is no role to check. Open,
 they are a full compromise — anyone who reaches them can mint an `ADMIN` account or reset any

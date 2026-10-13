@@ -41,6 +41,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/alerts/{id}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Have the configured LLM summarise an alert
+         * @description Asks the AI provider for a structured reading of the alert (severity, attack type, summary, recommended action) and stores it on the alert, replacing any earlier one. Takes as long as the provider does, typically seconds. The alert's own severity is left as the rule set it.
+         */
+        post: operations["summarizeAlert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -964,9 +984,20 @@ export interface components {
             windowStart?: components["schemas"]["Instant"];
             windowEnd?: components["schemas"]["Instant"];
             trigger?: components["schemas"]["AlertEventResponse"];
+            aiSummary?: components["schemas"]["AlertSummaryResponse"];
         };
         /** @enum {string} */
         AlertStatus: "NEW" | "IN_PROGRESS" | "RESOLVED" | "FALSE_POSITIVE";
+        AlertSummaryResponse: {
+            severity?: components["schemas"]["Severity"];
+            attackType?: components["schemas"]["AttackType"];
+            summary?: string;
+            recommendedAction?: string;
+            model?: string;
+            summarizedAt?: components["schemas"]["Instant"];
+        };
+        /** @enum {string} */
+        AttackType: "BRUTE_FORCE" | "CREDENTIAL_STUFFING" | "SQL_INJECTION" | "PATH_TRAVERSAL" | "CROSS_SITE_SCRIPTING" | "COMMAND_INJECTION" | "REMOTE_CODE_EXECUTION" | "RECONNAISSANCE" | "DENIAL_OF_SERVICE" | "PRIVILEGE_ESCALATION" | "DATA_EXFILTRATION" | "MALWARE" | "ANOMALOUS_BEHAVIOUR" | "BENIGN" | "OTHER";
         ChangePasswordRequest: {
             password: string;
         };
@@ -1233,6 +1264,56 @@ export interface operations {
             };
             /** @description No alert has that id */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    summarizeAlert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The alert, with its new summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertResponse"];
+                };
+            };
+            /** @description No valid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The caller's roles do not allow triage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No alert has that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The AI provider failed or gave no usable answer; the alert is unchanged */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

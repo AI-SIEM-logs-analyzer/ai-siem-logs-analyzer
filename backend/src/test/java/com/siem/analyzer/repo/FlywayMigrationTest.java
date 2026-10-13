@@ -8,6 +8,7 @@ import com.siem.analyzer.detect.BruteForceLoginRule;
 import com.siem.analyzer.detect.PathTraversalRule;
 import com.siem.analyzer.detect.ScannerUserAgentRule;
 import com.siem.analyzer.detect.SqlInjectionRule;
+import com.siem.analyzer.domain.AttackType;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -259,6 +260,85 @@ class FlywayMigrationTest {
                                                 + " (log_event_id, title, severity, status,"
                                                 + " resolved_at)"
                                                 + " values (?1, 't', 'INFO', 'IN_PROGRESS', now())")
+                                .setParameter(1, eventId)
+                                .executeUpdate());
+    }
+
+    @Test
+    @TestTransaction
+    void anAlertMayCarryACompleteAiSummary() {
+        Long eventId = insertedLogEvent();
+
+        int inserted =
+                entityManager
+                        .createNativeQuery(
+                                "insert into alert (log_event_id, title, severity, ai_severity,"
+                                        + " ai_attack_type, ai_summary, ai_recommended_action,"
+                                        + " ai_model, ai_summarized_at)"
+                                        + " values (?1, 't', 'INFO', 'ERROR', 'BRUTE_FORCE', 's',"
+                                        + " 'a', 'anthropic/m', now())")
+                        .setParameter(1, eventId)
+                        .executeUpdate();
+
+        assertEquals(1, inserted);
+    }
+
+    @Test
+    @TestTransaction
+    void theAttackTypeConstraintListsEveryAttackType() {
+        // AttackType and ck_alert_ai_attack_type have to name the same values; a constant the
+        // constraint does not know would fail the first summary that uses it, in production.
+        Long eventId = insertedLogEvent();
+
+        for (AttackType type : AttackType.values()) {
+            int inserted =
+                    entityManager
+                            .createNativeQuery(
+                                    "insert into alert (log_event_id, title, severity,"
+                                            + " ai_severity, ai_attack_type, ai_summary,"
+                                            + " ai_recommended_action, ai_model, ai_summarized_at)"
+                                            + " values (?1, 't', 'INFO', 'INFO', ?2, 's', 'a', 'm',"
+                                            + " now())")
+                            .setParameter(1, eventId)
+                            .setParameter(2, type.name())
+                            .executeUpdate();
+            assertEquals(1, inserted, type.name());
+        }
+    }
+
+    @Test
+    @TestTransaction
+    void halfAnAiSummaryIsRefused() {
+        Long eventId = insertedLogEvent();
+
+        assertThrows(
+                PersistenceException.class,
+                () ->
+                        entityManager
+                                .createNativeQuery(
+                                        "insert into alert (log_event_id, title, severity,"
+                                                + " ai_severity, ai_summary)"
+                                                + " values (?1, 't', 'INFO', 'ERROR', 's')")
+                                .setParameter(1, eventId)
+                                .executeUpdate());
+    }
+
+    @Test
+    @TestTransaction
+    void theAttackTypeConstraintRefusesAnUnknownType() {
+        Long eventId = insertedLogEvent();
+
+        assertThrows(
+                PersistenceException.class,
+                () ->
+                        entityManager
+                                .createNativeQuery(
+                                        "insert into alert (log_event_id, title, severity,"
+                                                + " ai_severity, ai_attack_type, ai_summary,"
+                                                + " ai_recommended_action, ai_model,"
+                                                + " ai_summarized_at)"
+                                                + " values (?1, 't', 'INFO', 'ERROR', 'PHISHING',"
+                                                + " 's', 'a', 'm', now())")
                                 .setParameter(1, eventId)
                                 .executeUpdate());
     }
