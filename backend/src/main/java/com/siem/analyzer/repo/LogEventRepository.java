@@ -32,4 +32,22 @@ public class LogEventRepository implements PanacheRepositoryBase<LogEvent, Long>
                         toExclusive)
                 .list();
     }
+
+    /**
+     * The newest {@code limit} events of one source in a closed interval, newest first.
+     *
+     * <p>For the context of an alert, whose window ends on the newest event it counted, so the
+     * upper bound is inclusive here. Matches the {@code (source_id, occurred_at DESC)} index.
+     */
+    public List<LogEvent> listForSourceWithin(
+            Long sourceId, Instant fromInclusive, Instant toInclusive, int limit) {
+        return find(
+                        "source.id = ?1 and occurredAt >= ?2 and occurredAt <= ?3"
+                                + " order by occurredAt desc, id desc",
+                        sourceId,
+                        fromInclusive,
+                        toInclusive)
+                .range(0, limit - 1)
+                .list();
+    }
 }

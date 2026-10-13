@@ -14,6 +14,8 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -106,6 +108,14 @@ public class Alert {
     @Column(name = "ai_recommended_action")
     private String aiRecommendedAction;
 
+    /**
+     * The values from the alert the model rested its summary on, each one checked to be in it;
+     * {@code null} on a summary written before evidence was asked for.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "ai_evidence")
+    private List<String> aiEvidence;
+
     /** Which model wrote the summary, as {@code provider/model}. */
     @Column(name = "ai_model")
     private String aiModel;
@@ -145,20 +155,22 @@ public class Alert {
     /**
      * Records a model's summary of the alert, replacing the previous one.
      *
-     * <p>All six columns move together; {@code ck_alert_ai_summary} refuses a row where they
-     * disagree.
+     * <p>All the columns move together; {@code ck_alert_ai_summary} refuses a row where they
+     * disagree, and {@code ck_alert_ai_evidence} evidence without a summary.
      */
     public void recordAiSummary(
             Severity severity,
             AttackType attackType,
             String summary,
             String recommendedAction,
+            List<String> evidence,
             String model,
             Instant at) {
         aiSeverity = Objects.requireNonNull(severity, "severity");
         aiAttackType = Objects.requireNonNull(attackType, "attackType");
         aiSummary = Objects.requireNonNull(summary, "summary");
         aiRecommendedAction = Objects.requireNonNull(recommendedAction, "recommendedAction");
+        aiEvidence = new ArrayList<>(Objects.requireNonNull(evidence, "evidence"));
         aiModel = Objects.requireNonNull(model, "model");
         aiSummarizedAt = Objects.requireNonNull(at, "at");
     }
@@ -277,6 +289,10 @@ public class Alert {
 
     public String getAiRecommendedAction() {
         return aiRecommendedAction;
+    }
+
+    public List<String> getAiEvidence() {
+        return aiEvidence;
     }
 
     public String getAiModel() {

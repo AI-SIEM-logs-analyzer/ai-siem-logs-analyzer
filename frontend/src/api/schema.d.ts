@@ -993,6 +993,7 @@ export interface components {
             attackType?: components["schemas"]["AttackType"];
             summary?: string;
             recommendedAction?: string;
+            evidence?: string[];
             model?: string;
             summarizedAt?: components["schemas"]["Instant"];
         };

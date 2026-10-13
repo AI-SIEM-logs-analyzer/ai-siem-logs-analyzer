@@ -93,6 +93,23 @@ export function AiSummaryCard({ id, alert }: { id: number; alert: Alert }) {
               <h3 className="font-medium">Recommended action</h3>
               <p className="wrap-anywhere whitespace-pre-wrap">{summary.recommendedAction}</p>
             </section>
+            {summary.evidence && summary.evidence.length > 0 && (
+              <section className="space-y-1">
+                <h3 className="font-medium">Evidence</h3>
+                <p className="text-muted-foreground text-xs">
+                  Values the model quoted from this alert; each was checked to be in it.
+                </p>
+                <ul aria-label="Evidence" className="flex flex-wrap gap-1.5">
+                  {summary.evidence.map((value) => (
+                    <li key={value}>
+                      <code className="bg-muted wrap-anywhere rounded px-1.5 py-0.5 font-mono text-xs">
+                        {value}
+                      </code>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
             <p className="text-muted-foreground text-xs">
               By {summary.model ?? 'an unknown model'}
               {summary.summarizedAt && (

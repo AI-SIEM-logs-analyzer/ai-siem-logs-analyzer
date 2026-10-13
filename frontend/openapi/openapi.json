@@ -116,6 +116,12 @@
           "recommendedAction" : {
             "type" : "string"
           },
+          "evidence" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
           "model" : {
             "type" : "string"
           },

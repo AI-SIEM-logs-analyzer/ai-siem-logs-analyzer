@@ -273,10 +273,13 @@ Every provider is built into the application, so switching is a restart, not a r
 | `APP_AI_BASE_URL`  | the provider's public API, `http://localhost:11434` for Ollama | a proxy, gateway or remote Ollama |
 
 The answer is structured output: `ai.AlertSummarizer` is a quarkus-langchain4j AI service
-whose return type, the `AlertSummary` record (`severity`, `attackType`, `summary`,
+whose return type, the `AlertSummary` record (`evidence`, `severity`, `attackType`, `summary`,
 `recommendedAction`), becomes the JSON schema the provider must answer in — Anthropic through
 `output_config.format`, OpenAI through a strict `json_schema` response format, Ollama natively —
-and is parsed back into the record. Ollama's model (`llama3.2`) is fixed when the application
+and is parsed back into the record. The system message is a constant that holds every
+instruction and no alert data; the alert, with up to 20 other events of its window, goes in the
+user message as escaped JSON. `ai.Grounding` then refuses (502) an answer whose `evidence`
+values, or whose IP addresses in the summary or recommended action, are not in that alert. Ollama's model (`llama3.2`) is fixed when the application
 is built: change it with `-Dquarkus.langchain4j.ollama.summary-ollama.chat-model.model-id=…` on
 the build. Requests time out after 120 s. Leave `APP_AI_MODEL` and `APP_AI_BASE_URL` unset
 rather than empty: an empty value is refused at start-up instead of falling back to the default.
@@ -312,7 +315,7 @@ Application endpoints:
 | `DELETE /api/users/{id}`        | delete the account and its roles              |
 | `GET /api/alerts`               | list alerts, newest first; `severity`, `status` (repeatable), `page`, `size` (≤ 100) |
 | `GET /api/alerts/{id}`          | one alert, with the event that raised it      |
-| `POST /api/alerts/{id}/summary` | have the configured LLM summarise the alert (`ADMIN`, `ANALYST`); 502 when the provider fails |
+| `POST /api/alerts/{id}/summary` | have the configured LLM summarise the alert (`ADMIN`, `ANALYST`); 502 when the provider fails or the answer cites what the alert does not contain |
 
 They are **unauthenticated**: nothing issues a token yet, so there is no role to check. Open,
 they are a full compromise — anyone who reaches them can mint an `ADMIN` account or reset any
