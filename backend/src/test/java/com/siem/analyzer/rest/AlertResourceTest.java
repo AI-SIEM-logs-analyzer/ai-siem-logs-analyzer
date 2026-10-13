@@ -27,12 +27,20 @@ import jakarta.inject.Inject;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** Covers the listing and detail at {@code /api/alerts}. */
+/**
+ * Covers the listing and detail at {@code /api/alerts}.
+ *
+ * <p>The rows are committed, since the request reads them in a transaction of its own, and removed
+ * after each test: an event left behind would sit in the search backlog that {@code
+ * EventIndexerTest} and {@code SearchBackfillJobTest} expect to find empty.
+ */
 @QuarkusTest
 @TestSecurity(user = "triage", roles = "ANALYST")
 class AlertResourceTest {
@@ -46,6 +54,7 @@ class AlertResourceTest {
     private long warning;
     private long eventId;
     private long ruleId;
+    private long sourceId;
 
     @BeforeEach
     void seed() {
@@ -57,6 +66,7 @@ class AlertResourceTest {
                             source.setName("alerts-" + suffix);
                             source.setType(LogSourceType.APPLICATION);
                             sources.persist(source);
+                            sourceId = source.getId();
 
                             LogEvent event = new LogEvent();
                             event.setSource(source);
@@ -107,6 +117,18 @@ class AlertResourceTest {
                             alerts.persist(closed);
                             closed.changeStatus(AlertStatus.RESOLVED, Instant.now());
                             warning = closed.getId();
+                        });
+    }
+
+    @AfterEach
+    void cleanUp() {
+        QuarkusTransaction.requiringNew()
+                .run(
+                        () -> {
+                            alerts.delete("id in ?1", List.of(critical, warning));
+                            rules.deleteById(ruleId);
+                            events.deleteById(eventId);
+                            sources.deleteById(sourceId);
                         });
     }
 
