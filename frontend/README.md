@@ -234,6 +234,31 @@ The page is built from:
   [`Sheet`](src/components/ui/sheet.tsx)
 - [`lib/event-fields.ts`](src/lib/event-fields.ts) — how the parsed fields read and group
 
+## Alerts: list, details and drill-down to events
+
+- `/alerts` lists the alerts from `GET /api/alerts`, newest first, 25 per page, and asks again
+  every 30 seconds. Severity and status toggles filter it (OR within a row, AND across rows);
+  the filters and the page live in the URL (`/alerts?severity=CRITICAL&status=NEW&page=2`),
+  read and written by [`lib/alert-filters.ts`](src/lib/alert-filters.ts).
+- **Click on an alert → `/alerts/:id`:** what fired (rule, window, events in it, the
+  aggregate and the group it fired for, status times) beside the triggering event — message,
+  parsed fields in the same groups as the events panel, and the raw line. **All alerts** goes
+  back to the list with the filters it was opened from.
+- **Drill-down to events:** **View the N events** opens `/events` on the rule's window, oldest
+  first, narrowed to the group key (`srcIp`, `status`, `severity`, `sourceId`). A group field
+  the event search cannot filter on is named under the details instead of being dropped
+  silently. An alert raised on a single event is narrowed to that event's source too. The
+  filter icon beside a source IP or status of the triggering event opens the window narrowed
+  to that value alone.
+
+The pages are built from:
+
+- [`alerts-page.tsx`](src/pages/alerts-page.tsx) and
+  [`alert-details-page.tsx`](src/pages/alert-details-page.tsx)
+- [`alert-filter-bar.tsx`](src/components/alerts/alert-filter-bar.tsx) and
+  [`alert-status-badge.tsx`](src/components/alerts/alert-status-badge.tsx)
+- [`api/alerts.ts`](src/api/alerts.ts) — the list and detail queries
+
 ### Adding shadcn/ui components
 
 [`components.json`](components.json) is set up for the CLI:

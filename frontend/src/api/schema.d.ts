@@ -4,6 +4,43 @@
  */
 
 export interface paths {
+    "/api/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List alerts
+         * @description Newest first. Filters combine with AND; the values of one repeated parameter combine with OR.
+         */
+        get: operations["listAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/alerts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one alert, with the event that raised it */
+        get: operations["getAlert"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -890,6 +927,46 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AlertEventResponse: {
+            /** Format: int64 */
+            eventId?: number;
+            /** Format: int64 */
+            sourceId?: number;
+            sourceName?: string;
+            occurredAt?: components["schemas"]["Instant"];
+            ingestedAt?: components["schemas"]["Instant"];
+            severity?: components["schemas"]["Severity"];
+            message?: string;
+            raw?: string;
+            fields?: {
+                [key: string]: unknown;
+            };
+        };
+        AlertResponse: {
+            /** Format: int64 */
+            id?: number;
+            title?: string;
+            detail?: string;
+            severity?: components["schemas"]["Severity"];
+            status?: components["schemas"]["AlertStatus"];
+            raisedAt?: components["schemas"]["Instant"];
+            statusChangedAt?: components["schemas"]["Instant"];
+            resolvedAt?: components["schemas"]["Instant"];
+            /** Format: int64 */
+            ruleId?: number;
+            ruleName?: string;
+            groupKey?: {
+                [key: string]: unknown;
+            };
+            aggregateValue?: number;
+            /** Format: int32 */
+            eventCount?: number;
+            windowStart?: components["schemas"]["Instant"];
+            windowEnd?: components["schemas"]["Instant"];
+            trigger?: components["schemas"]["AlertEventResponse"];
+        };
+        /** @enum {string} */
+        AlertStatus: "NEW" | "IN_PROGRESS" | "RESOLVED" | "FALSE_POSITIVE";
         ChangePasswordRequest: {
             password: string;
         };
@@ -997,6 +1074,15 @@ export interface components {
             username: string;
             password: string;
         };
+        PageResponseAlertResponse: {
+            items?: components["schemas"]["AlertResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            /** Format: int64 */
+            total?: number;
+        };
         PageResponseLogUploadResponse: {
             items?: components["schemas"]["LogUploadResponse"][];
             /** Format: int32 */
@@ -1061,6 +1147,99 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listAlerts: {
+        parameters: {
+            query?: {
+                /** @description Zero-based page index */
+                page?: number;
+                /** @description Restrict to these severities; repeatable */
+                severity?: components["schemas"]["Severity"][];
+                /** @description Rows per page, at most 100 */
+                size?: number;
+                /** @description Restrict to these triage statuses; repeatable */
+                status?: components["schemas"]["AlertStatus"][];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of matching alerts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponseAlertResponse"];
+                };
+            };
+            /** @description A parameter is malformed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The caller's roles do not allow reading */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getAlert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The alert */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertResponse"];
+                };
+            };
+            /** @description No valid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The caller's roles do not allow reading */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No alert has that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     searchEvents: {
         parameters: {
             query?: {

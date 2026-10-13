@@ -245,6 +245,8 @@ Application endpoints:
 | `PUT /api/users/{id}`           | replace e-mail, roles and enabled state       |
 | `PUT /api/users/{id}/password`  | set the password                              |
 | `DELETE /api/users/{id}`        | delete the account and its roles              |
+| `GET /api/alerts`               | list alerts, newest first; `severity`, `status` (repeatable), `page`, `size` (≤ 100) |
+| `GET /api/alerts/{id}`          | one alert, with the event that raised it      |
 
 They are **unauthenticated**: nothing issues a token yet, so there is no role to check. Open,
 they are a full compromise — anyone who reaches them can mint an `ADMIN` account or reset any

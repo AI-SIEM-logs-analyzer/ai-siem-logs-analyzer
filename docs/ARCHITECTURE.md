@@ -380,8 +380,16 @@ reopening clears it, and `ck_alert_resolved_at` refuses a row where the two disa
 `status_changed_at` records the last move. `AlertService.changeStatus` locks the row before
 deciding, and refuses a move the table above does not list, including to the status the alert
 already holds, with `IllegalAlertTransitionException`: of two analysts closing the same alert,
-the second is told rather than silently overwriting the first. Still planned: the REST API the
-SPA reads alerts through and changes their status with, and an audit of who made each move.
+the second is told rather than silently overwriting the first.
+
+The SPA reads alerts through `GET /api/alerts` (newest first, filtered by repeatable `severity`
+and `status`, paged) and `GET /api/alerts/{id}`, both open to every role. Each alert carries its
+triggering event read from PostgreSQL, so it shows before the search index catches up. The
+alerts page drills down to the events page: the rule's window (its `to` pushed a millisecond
+past the inclusive window end), narrowed to the group key's `srcIp`, `status`, `severity` or
+`sourceId`; a group field the event search cannot filter on is named on the page rather than
+dropped silently. Still planned: the endpoint that changes an alert's status, and an audit of
+who made each move.
 
 ## Cross-cutting concerns
 

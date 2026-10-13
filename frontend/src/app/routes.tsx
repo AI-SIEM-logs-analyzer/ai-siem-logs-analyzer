@@ -2,6 +2,7 @@ import type { RouteObject } from 'react-router';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { RequirePermission } from '@/components/auth/require-permission';
 import { AppLayout } from '@/components/layout/app-layout';
+import { AlertDetailsPage } from '@/pages/alert-details-page';
 import { AlertsPage } from '@/pages/alerts-page';
 import { DashboardPage } from '@/pages/dashboard-page';
 import { LazyEventsPage } from '@/pages/lazy-events-page';
@@ -34,6 +35,7 @@ export const routes: RouteObject[] = [
           { path: 'events', element: <LazyEventsPage /> },
           { path: 'uploads', element: <UploadsPage /> },
           { path: 'alerts', element: <AlertsPage /> },
+          { path: 'alerts/:id', element: <AlertDetailsPage /> },
           {
             path: 'users',
             element: (
