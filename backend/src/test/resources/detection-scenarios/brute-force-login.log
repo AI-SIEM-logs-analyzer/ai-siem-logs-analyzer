@@ -1,0 +1,35 @@
+Sep 14 10:00:00 bastion-01 sshd[4242]: Failed password for root from 203.0.113.10 port 50000 ssh2
+Sep 14 10:00:05 bastion-01 sshd[4242]: Failed password for root from 203.0.113.10 port 50505 ssh2
+Sep 14 10:00:11 bastion-01 sshd[4242]: Failed password for root from 203.0.113.10 port 51111 ssh2
+Sep 14 10:00:18 bastion-01 sshd[4242]: Failed password for root from 203.0.113.10 port 51818 ssh2
+Sep 14 10:00:26 bastion-01 sshd[4242]: Failed password for root from 203.0.113.10 port 52626 ssh2
+<38>1 2026-09-14T10:02:00.000Z bastion-01 sshd 4243 - - Failed password for invalid user admin from 203.0.113.11 port 41000 ssh2
+<38>1 2026-09-14T10:02:03.000Z bastion-01 sshd 4243 - - Failed password for invalid user admin from 203.0.113.11 port 41001 ssh2
+<38>1 2026-09-14T10:02:06.000Z bastion-01 sshd 4243 - - Failed password for invalid user admin from 203.0.113.11 port 41002 ssh2
+<38>1 2026-09-14T10:02:09.000Z bastion-01 sshd 4243 - - Failed password for invalid user admin from 203.0.113.11 port 41003 ssh2
+<38>1 2026-09-14T10:02:12.000Z bastion-01 sshd 4243 - - Failed password for invalid user admin from 203.0.113.11 port 41004 ssh2
+<38>1 2026-09-14T10:02:15.000Z bastion-01 sshd 4243 - - Failed password for invalid user admin from 203.0.113.11 port 41005 ssh2
+<38>1 2026-09-14T10:02:18.000Z bastion-01 sshd 4243 - - Failed password for invalid user admin from 203.0.113.11 port 41006 ssh2
+<38>1 2026-09-14T10:02:21.000Z bastion-01 sshd 4243 - - Failed password for invalid user admin from 203.0.113.11 port 41007 ssh2
+<38>1 2026-09-14T10:02:24.000Z bastion-01 sshd 4243 - - Failed password for invalid user admin from 203.0.113.11 port 41008 ssh2
+<38>1 2026-09-14T10:02:27.000Z bastion-01 sshd 4243 - - Failed password for invalid user admin from 203.0.113.11 port 41009 ssh2
+Sep 14 10:04:00 web-01 sshd-session[5150]: Failed keyboard-interactive/pam for root from 203.0.113.12 port 60000 ssh2
+Sep 14 10:04:04 web-01 sshd-session[5150]: Failed keyboard-interactive/pam for root from 203.0.113.12 port 60404 ssh2
+Sep 14 10:04:09 web-01 sshd-session[5150]: Failed keyboard-interactive/pam for root from 203.0.113.12 port 60909 ssh2
+Sep 14 10:04:13 web-01 sshd-session[5150]: Failed keyboard-interactive/pam for root from 203.0.113.12 port 61313 ssh2
+Sep 14 10:04:20 web-01 sshd-session[5150]: Failed keyboard-interactive/pam for root from 203.0.113.12 port 62020 ssh2
+198.51.100.20 - - [14/Sep/2026:10:06:00 +0000] "POST /login HTTP/1.1" 401 512 "https://shop.example.com/login" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+198.51.100.20 - - [14/Sep/2026:10:06:02 +0000] "POST /login HTTP/1.1" 401 512 "https://shop.example.com/login" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+198.51.100.20 - - [14/Sep/2026:10:06:04 +0000] "POST /login HTTP/1.1" 401 512 "https://shop.example.com/login" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+198.51.100.20 - - [14/Sep/2026:10:06:06 +0000] "POST /login HTTP/1.1" 401 512 "https://shop.example.com/login" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+198.51.100.20 - - [14/Sep/2026:10:06:08 +0000] "POST /login HTTP/1.1" 401 512 "https://shop.example.com/login" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+198.51.100.21 - - [14/Sep/2026:10:08:10 +0000] "POST /wp-login.php HTTP/1.1" 403 230 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+198.51.100.21 - - [14/Sep/2026:10:08:21 +0000] "POST /wp-login.php HTTP/1.1" 403 230 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+198.51.100.21 - - [14/Sep/2026:10:08:33 +0000] "POST /wp-login.php HTTP/1.1" 403 230 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+198.51.100.21 - - [14/Sep/2026:10:08:40 +0000] "POST /wp-login.php HTTP/1.1" 403 230 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+198.51.100.21 - - [14/Sep/2026:10:08:52 +0000] "POST /wp-login.php HTTP/1.1" 403 230 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+{"@timestamp":"2026-09-14T10:10:01.000Z","message":"login failed for admin: invalid password","host":{"name":"app-01"},"event":{"action":"user.login","outcome":"failure"},"source":{"ip":"198.51.100.22"},"user":{"name":"admin"},"http":{"request":{"method":"POST"},"response":{"status_code":401}},"url":{"original":"/api/v1/session"},"user_agent":{"original":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"}}
+{"@timestamp":"2026-09-14T10:10:03.000Z","message":"login failed for admin: invalid password","host":{"name":"app-01"},"event":{"action":"user.login","outcome":"failure"},"source":{"ip":"198.51.100.22"},"user":{"name":"admin"},"http":{"request":{"method":"POST"},"response":{"status_code":401}},"url":{"original":"/api/v1/session"},"user_agent":{"original":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"}}
+{"@timestamp":"2026-09-14T10:10:05.000Z","message":"login failed for admin: invalid password","host":{"name":"app-01"},"event":{"action":"user.login","outcome":"failure"},"source":{"ip":"198.51.100.22"},"user":{"name":"admin"},"http":{"request":{"method":"POST"},"response":{"status_code":401}},"url":{"original":"/api/v1/session"},"user_agent":{"original":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"}}
+{"@timestamp":"2026-09-14T10:10:07.000Z","message":"login failed for admin: invalid password","host":{"name":"app-01"},"event":{"action":"user.login","outcome":"failure"},"source":{"ip":"198.51.100.22"},"user":{"name":"admin"},"http":{"request":{"method":"POST"},"response":{"status_code":401}},"url":{"original":"/api/v1/session"},"user_agent":{"original":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"}}
+{"@timestamp":"2026-09-14T10:10:09.000Z","message":"login failed for admin: invalid password","host":{"name":"app-01"},"event":{"action":"user.login","outcome":"failure"},"source":{"ip":"198.51.100.22"},"user":{"name":"admin"},"http":{"request":{"method":"POST"},"response":{"status_code":401}},"url":{"original":"/api/v1/session"},"user_agent":{"original":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"}}
