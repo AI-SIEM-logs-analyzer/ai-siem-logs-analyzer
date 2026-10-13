@@ -133,6 +133,42 @@ per label.
 accepted by the production parsers and detected as the right format; it also checks that
 injected lines land where `ground-truth.csv` says and keep their relative timing.
 
+### Detection confusion matrix
+
+`DetectionConfusionMatrixTest` scores the built-in rules against that ground truth. It injects
+the scenarios in [`src/test/resources/detection-scenarios`](src/test/resources/detection-scenarios)
+into 100k generated lines, parses everything with the production parsers, feeds it to one
+`RuleEngine` in timestamp order and counts TP / FP / TN / FN per rule, per log line:
+
+| Scenario file              | Lines that should raise |
+|----------------------------|-------------------------|
+| `brute-force-login.log`    | `brute-force-login` — sshd (BSD, RFC 5424, `sshd-session`), web login form, JSON API |
+| `sql-injection.log`        | `sql-injection` — encoded, double-encoded, comment-split and blind payloads |
+| `path-traversal.log`       | `path-traversal` — `../` variants, overlong UTF-8, `%u`, NUL, sensitive files |
+| `scanner-user-agent.log`   | `scanner-user-agent` — tool names, header payloads, refused CLI clients |
+| `benign-lookalikes.log`    | nothing — health-check `curl`, `o'reilly` searches, 4 failed logins, failed public keys |
+
+A scenario file is named after the rule it should raise; generated lines and any other file
+should raise nothing. A windowed rule's hit covers every matching line in the window that
+fired, so all five failed logins of a brute force count, not only the fifth. The test fails on
+any FN or FP and names the offending lines; run it alone to read the matrices:
+
+```bash
+./mvnw test -Dtest=DetectionConfusionMatrixTest
+```
+
+```
+rule                     TP     FP       TN     FN  precision  recall     FPR     F1
+brute-force-login        35      0    99965      0     1.0000  1.0000 0.00000 1.0000
+sql-injection            15      0    99985      0     1.0000  1.0000 0.00000 1.0000
+path-traversal           13      0    99987      0     1.0000  1.0000 0.00000 1.0000
+scanner-user-agent       14      0    99986      0     1.0000  1.0000 0.00000 1.0000
+any rule                 77      0    99923      0     1.0000  1.0000 0.00000 1.0000
+```
+
+A new attack a rule should catch goes into its scenario file; one it should ignore goes into
+`benign-lookalikes.log`.
+
 ## Persistence
 
 - **Flyway owns the schema:** `V1__init.sql` creates the log, rule and alert tables; `V2__users.sql` adds `app_user` and `user_role`; `V8__brute_force_login_rule.sql`, `V9__sql_injection_rule.sql`, `V10__path_traversal_rule.sql` and `V11__scanner_user_agent_rule.sql` seed the built-in `brute-force-login`, `sql-injection`, `path-traversal` and `scanner-user-agent` detection rules. `V12__alert_lifecycle.sql` gives `alert` its triage statuses (`NEW`, `IN_PROGRESS`, `RESOLVED`, `FALSE_POSITIVE`) and the window a detection fired on. Hibernate ORM runs with `quarkus.hibernate-orm.schema-management.strategy=validate` so it never emits DDL.

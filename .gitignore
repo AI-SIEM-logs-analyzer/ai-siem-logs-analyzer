@@ -15,6 +15,7 @@ coverage/
 *.log
 # Real log samples the parser tests read; these are fixtures, not output.
 !backend/src/test/resources/loghub/*.log
+!backend/src/test/resources/detection-scenarios/*.log
 *.tsbuildinfo
 graphify-out
 /.opencode/AGENTS.md
