@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ArrowLeft, Filter, ScrollText } from 'lucide-react';
 import { Link, useLocation, useParams } from 'react-router';
 import { useAlert, type Alert, type AlertEvent } from '@/api/alerts';
+import { AiSummaryCard } from '@/components/alerts/ai-summary-card';
 import { AlertStatusBadge } from '@/components/alerts/alert-status-badge';
 import { SeverityBadge } from '@/components/events/severity-badge';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -53,13 +54,13 @@ export function AlertDetailsPage() {
           retrying={isFetching}
         />
       ) : (
-        <AlertDetails alert={alert} />
+        <AlertDetails id={id} alert={alert} />
       )}
     </>
   );
 }
 
-function AlertDetails({ alert }: { alert: Alert }) {
+function AlertDetails({ id, alert }: { id: number; alert: Alert }) {
   const { filters, unfiltered } = alertEvents(alert);
   const windowed = alert.windowStart !== undefined && alert.windowEnd !== undefined;
   const group = Object.entries(alert.groupKey ?? {});
@@ -89,6 +90,8 @@ function AlertDetails({ alert }: { alert: Alert }) {
           <time dateTime={alert.raisedAt}>{formatEventTime(alert.raisedAt)}</time>
         </span>
       </div>
+
+      <AiSummaryCard id={id} alert={alert} />
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <Card>

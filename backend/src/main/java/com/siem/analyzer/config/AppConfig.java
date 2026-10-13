@@ -1,5 +1,6 @@
 package com.siem.analyzer.config;
 
+import com.siem.analyzer.ai.AiProvider;
 import com.siem.analyzer.parse.JsonFieldMapping;
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
@@ -291,8 +292,20 @@ public interface AppConfig {
         }
     }
 
-    /** Settings for the AI provider used to analyse logs. */
+    /**
+     * Settings for the AI provider used to analyse logs.
+     *
+     * <p>application.yaml feeds these into the named quarkus-langchain4j model of each provider, so
+     * a deployment switches provider, model or endpoint with {@code APP_AI_*} alone.
+     */
     interface Ai {
+
+        /**
+         * Which provider answers: Anthropic, OpenAI or a local Ollama. Read at runtime, so one
+         * image serves any of them.
+         */
+        @WithDefault("anthropic")
+        AiProvider provider();
 
         /**
          * API key for the AI provider.
@@ -300,10 +313,23 @@ public interface AppConfig {
          * <p>Deliberately has no default and no value under the {@code prod} profile: production
          * has to supply {@code APP_AI_API_KEY} through the environment, and the application refuses
          * to start without it. Dev and test carry a placeholder so neither the dev loop nor CI
-         * depends on a real secret.
+         * depends on a real secret. Ollama ignores it, so any non-blank value does there.
          */
         @NotBlank
         String apiKey();
+
+        /**
+         * The model to ask for, overriding the provider's default in application.yaml ({@code
+         * claude-opus-5-5}, {@code gpt-5-mini}). Ollama's model is fixed when the application is
+         * built, so for Ollama this has to be set at build time as well.
+         */
+        Optional<String> model();
+
+        /**
+         * The provider's endpoint, overriding its public API (or {@code http://localhost:11434} for
+         * Ollama): a proxy, an OpenAI-compatible gateway, an Ollama on another host.
+         */
+        Optional<String> baseUrl();
     }
 
     /** Settings that govern how credentials are stored. */

@@ -81,6 +81,62 @@ quarkus:
     health:
       enabled: false
 
+  # --- LLM (quarkus-langchain4j) ---
+  # AI summaries of alerts (ai.AlertSummarizer). The extensions decide at build time which
+  # provider backs a model name, so each provider gets a named model of its own below, and
+  # app.ai.provider picks one of them at runtime (ai.ConfiguredChatModel): one image serves
+  # Anthropic, OpenAI or Ollama. Every value an operator changes comes from app.ai.*, so the
+  # long quarkus.langchain4j.<provider>.<name>.* keys never need setting by hand.
+  # Structured output is enforced by the provider for all three: Anthropic and OpenAI through
+  # their JSON-schema response formats, Ollama natively.
+  langchain4j:
+    # A summary is one request, but the model reads a whole alert and thinks before answering;
+    # the 10 s default cuts it off.
+    timeout: 120s
+    # Never start an Ollama container in dev or test: the suite stubs the model, and the dev loop
+    # talks to whatever app.ai.provider names.
+    devservices:
+      enabled: false
+    summary-anthropic:
+      chat-model:
+        provider: anthropic
+    summary-openai:
+      chat-model:
+        provider: openai
+    summary-ollama:
+      chat-model:
+        provider: ollama
+    anthropic:
+      summary-anthropic:
+        base-url: ${app.ai.base-url:https://api.anthropic.com/v1/}
+        api-key: ${app.ai.api-key}
+        chat-model:
+          model-name: ${app.ai.model:claude-opus-5-5}
+          # Room for adaptive thinking ahead of the JSON answer.
+          max-tokens: 16000
+          response-format: json
+          # Current Claude models think adaptively and refuse top_k; setting the thinking type is
+          # also what stops the extension from sending its default top_k of 40.
+          thinking:
+            type: adaptive
+    openai:
+      summary-openai:
+        base-url: ${app.ai.base-url:https://api.openai.com/v1/}
+        api-key: ${app.ai.api-key}
+        chat-model:
+          model-name: ${app.ai.model:gpt-5-mini}
+          response-format: json_schema
+          strict-json-schema: true
+    ollama:
+      devservices:
+        enabled: false
+      summary-ollama:
+        base-url: ${app.ai.base-url:http://localhost:11434}
+        chat-model:
+          # Fixed at build time by the extension: override it on the build, not the deployment.
+          model-id: llama3.2
+          temperature: 0.2
+
 mp:
   openapi:
     extensions:
@@ -125,6 +181,11 @@ mp:
 # which makes a deployment without APP_AI_API_KEY fail at start-up instead of at runtime.
 app:
   environment: local
+  # Which LLM summarises alerts: anthropic, openai or ollama. app.ai.model and app.ai.base-url
+  # override the provider's default model and endpoint (APP_AI_MODEL, APP_AI_BASE_URL); both
+  # are unset here so each provider keeps its own default in quarkus.langchain4j above.
+  ai:
+    provider: anthropic
   storage:
     upload-dir: data/uploads
   # Limits applied to an uploaded log file. The defaults live in AppConfig.Upload; they are

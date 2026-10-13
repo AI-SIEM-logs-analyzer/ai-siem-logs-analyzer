@@ -19,6 +19,7 @@ import java.util.Map;
  * @param windowStart the time of the oldest event in that window, inclusive
  * @param windowEnd the time of the newest event in that window, inclusive
  * @param trigger the event whose arrival raised the alert
+ * @param aiSummary the latest model summary of the alert; {@code null} until one is requested
  */
 public record AlertResponse(
         Long id,
@@ -36,7 +37,8 @@ public record AlertResponse(
         Integer eventCount,
         Instant windowStart,
         Instant windowEnd,
-        AlertEventResponse trigger) {
+        AlertEventResponse trigger,
+        AlertSummaryResponse aiSummary) {
 
     public static AlertResponse from(Alert alert) {
         return new AlertResponse(
@@ -55,6 +57,7 @@ public record AlertResponse(
                 alert.getEventCount(),
                 alert.getWindowStart(),
                 alert.getWindowEnd(),
-                AlertEventResponse.from(alert.getLogEvent()));
+                AlertEventResponse.from(alert.getLogEvent()),
+                AlertSummaryResponse.from(alert));
     }
 }

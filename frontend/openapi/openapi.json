@@ -91,12 +91,42 @@
           },
           "trigger" : {
             "$ref" : "#/components/schemas/AlertEventResponse"
+          },
+          "aiSummary" : {
+            "$ref" : "#/components/schemas/AlertSummaryResponse"
           }
         }
       },
       "AlertStatus" : {
         "type" : "string",
         "enum" : [ "NEW", "IN_PROGRESS", "RESOLVED", "FALSE_POSITIVE" ]
+      },
+      "AlertSummaryResponse" : {
+        "type" : "object",
+        "properties" : {
+          "severity" : {
+            "$ref" : "#/components/schemas/Severity"
+          },
+          "attackType" : {
+            "$ref" : "#/components/schemas/AttackType"
+          },
+          "summary" : {
+            "type" : "string"
+          },
+          "recommendedAction" : {
+            "type" : "string"
+          },
+          "model" : {
+            "type" : "string"
+          },
+          "summarizedAt" : {
+            "$ref" : "#/components/schemas/Instant"
+          }
+        }
+      },
+      "AttackType" : {
+        "type" : "string",
+        "enum" : [ "BRUTE_FORCE", "CREDENTIAL_STUFFING", "SQL_INJECTION", "PATH_TRAVERSAL", "CROSS_SITE_SCRIPTING", "COMMAND_INJECTION", "REMOTE_CODE_EXECUTION", "RECONNAISSANCE", "DENIAL_OF_SERVICE", "PRIVILEGE_ESCALATION", "DATA_EXFILTRATION", "MALWARE", "ANOMALOUS_BEHAVIOUR", "BENIGN", "OTHER" ]
       },
       "ChangePasswordRequest" : {
         "type" : "object",
@@ -674,6 +704,50 @@
         },
         "security" : [ {
           "SecurityScheme" : [ "ADMIN", "ANALYST", "VIEWER" ]
+        } ]
+      }
+    },
+    "/api/alerts/{id}/summary" : {
+      "post" : {
+        "summary" : "Have the configured LLM summarise an alert",
+        "description" : "Asks the AI provider for a structured reading of the alert (severity, attack type, summary, recommended action) and stores it on the alert, replacing any earlier one. Takes as long as the provider does, typically seconds. The alert's own severity is left as the rule set it.",
+        "operationId" : "summarizeAlert",
+        "tags" : [ "Alerts" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The alert, with its new summary",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "No valid access token"
+          },
+          "403" : {
+            "description" : "The caller's roles do not allow triage"
+          },
+          "404" : {
+            "description" : "No alert has that id"
+          },
+          "502" : {
+            "description" : "The AI provider failed or gave no usable answer; the alert is unchanged"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN", "ANALYST" ]
         } ]
       }
     },

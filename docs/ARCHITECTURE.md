@@ -84,6 +84,7 @@ Mirrors `com.siem.analyzer` — see [backend/README.md](../backend/README.md#pac
 | `domain`  | JPA entities and domain enums                                |
 | `repo`    | Panache repositories — every query lives here                |
 | `search`  | The derived OpenSearch index — projection, queries and backfill |
+| `ai`      | LLM assistance through quarkus-langchain4j: the alert summariser (a declarative AI service with structured output) and the runtime choice of provider |
 | `enrich`  | GeoIP enrichment of a source address (`GeoIpEnricher` seam, MaxMind GeoLite2 lookup) and User-Agent classification (`UserAgentEnricher` seam, Yauaa) |
 | `config`  | Typed `@ConfigMapping` configuration                         |
 | `health`  | Custom health checks                                         |
@@ -111,7 +112,7 @@ erDiagram
 | `log_event`  | Normalised events; carries the upstream identifier used to drop replays   |
 | `log_event_index_state` | Which events have reached the search index; absence of a row is the backlog |
 | `alert_rule` | Detection rules                                                           |
-| `alert`      | Raised alerts with their triage status and the window the rule fired on; the rule is nullable — a model-raised alert has none |
+| `alert`      | Raised alerts with their triage status, the window the rule fired on and the latest model summary (`ai_*`); the rule is nullable — a model-raised alert has none |
 | `app_user`   | Accounts; stores an Argon2id hash, never a password                       |
 | `user_role`  | Roles per account (`ADMIN`, `ANALYST`, `VIEWER`); an account may hold several |
 
@@ -227,7 +228,8 @@ index's snake_case to the payload's own camelCase key names (`fields.geoCountryI
 `fields.geoAsn`, `fields.uaBot`, …), with numbers and booleans keeping their JSON type. Its contract is documented in `/q/openapi`.
 
 **Detection (In progress).** The rule engine is in place (`detect` package); AI-assisted
-detection through LangChain4j is planned, and anomaly scoring with Smile is in place
+detection through LangChain4j is planned (alert summaries through it are in place, see
+**AI summaries** below), and anomaly scoring with Smile is in place
 (`detect.anomaly`, below) but not yet fed by ingestion. Whether detection
 runs inline with ingestion or as a separate consumer is **TBD**, so the engine is deliberately
 free of persistence and CDI: it takes `NormalizedEvent`s and returns `Detection`s, and
@@ -391,6 +393,38 @@ past the inclusive window end), narrowed to the group key's `srcIp`, `status`, `
 dropped silently. Still planned: the endpoint that changes an alert's status, and an audit of
 who made each move.
 
+**AI summaries.** An analyst or administrator can have the configured LLM read an alert:
+`POST /api/alerts/{id}/summary` (`ADMIN`, `ANALYST`; the reads stay open to every role).
+`ai.AlertSummarizer` is a quarkus-langchain4j declarative AI service (`@RegisterAiService`,
+application-scoped, no chat memory, so one alert never leaks into the next) whose return type is
+the `AlertSummary` record — `severity` (`Severity`), `attackType` (`AttackType`, a closed list from
+`BRUTE_FORCE` to `BENIGN` and `OTHER`), `summary` and `recommendedAction`. LangChain4j turns the
+record and its `@Description`s into a JSON schema, sends it as the response format, and parses the
+answer back. All three providers enforce the schema: Anthropic through `output_config.format`
+(with adaptive thinking, which also keeps the extension from sending the `top_k` current Claude
+models refuse), OpenAI through a strict `json_schema` response format, Ollama natively.
+
+The provider is chosen at runtime. The extensions fix which provider backs a model name at
+build time, so `application.yaml` declares one named model per provider (`summary-anthropic`,
+`summary-openai`, `summary-ollama`) and `ai.ConfiguredChatModel` resolves the one
+`app.ai.provider` names; the others are never created, so their missing keys or unreachable
+servers cost nothing. `app.ai.model` and `app.ai.base-url` override the default model
+(`claude-opus-5-5`, `gpt-5-mini`; Ollama's `llama3.2` is fixed at build time) and endpoint.
+
+`ai.AlertPrompt` writes the alert — title, detail, rule, window and group, the triggering event's
+fields and raw line — as a JSON document inside an `<alert>` block. Log content is attacker
+input, so it never becomes structure: `<`, `>` and `&` are written as `\u003C`-style escapes and
+newlines stay `\n`, so no value can close the block or open a new one, and the system message
+tells the model to treat everything inside as evidence, not instructions. Every string is capped
+(the raw line at 4,000 characters, other values at 1,000, maps and lists at 50 entries) with a note
+of what was left out. `service.AlertSummaryService` reads the alert in one transaction, asks the
+model outside any, and writes the answer in another, so a slow provider never holds a connection
+or a row lock; an incomplete answer, a refusal or a provider error is a `502` that leaves the
+alert as it was. The answer lands in the `ai_*` columns of `alert`
+(`V13__alert_ai_summary.sql`): all six or none (`ck_alert_ai_summary`), and the model's severity
+never replaces the rule's. A new summary replaces the last. The alert details page shows it beside
+the rule's verdict, with the model that wrote it, and offers the button to whoever may triage.
+
 ## Cross-cutting concerns
 
 - **AuthN/AuthZ (Shipped).** `POST /api/auth/login` exchanges a username and password for an
@@ -446,6 +480,7 @@ an entry here once decided; substantial ones graduate to an ADR under `docs/adr/
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-10-13 | Alert summaries come from quarkus-langchain4j with all three providers (Anthropic, OpenAI, Ollama) built in and the provider picked at runtime from `app.ai.provider`; the answer is the provider-enforced structured output of a Java record | One image serves a cloud deployment and an air-gapped one with a local Ollama, and switching is a restart. The extensions bind a provider to a model name at build time, so each provider gets a named model and a CDI supplier picks one; the cost is three extensions on the classpath. A record with a closed `AttackType` list is something the UI can badge and a query can count, which free text is not |
 | 2026-10-06 | Sigma rules are imported in the JVM — Jackson YAML (SnakeYAML) into this engine's rule language — not converted offline with pySigma | One converter, in the same build and test suite as the engine, keeps the field mapping and the rule language from drifting apart, and an import needs no Python toolchain. The converter refuses what it cannot express faithfully instead of approximating it. pySigma stays the fallback, as an offline backend that emits this rule language, if rules the importer refuses turn out to matter |
 | 2026-09-25 | The SPA's API client is `openapi-typescript` types over `openapi-fetch`, not a generated per-endpoint SDK (orval); the SPA stores its tokens in `localStorage` and serialises refreshes across tabs with a Web Lock | Types alone keep the generated output to one declaration file and the runtime to a few kilobytes, and TanStack Query hooks stay hand-written next to the screens that use them. `localStorage` is readable by any script on the page, but the backend issues the refresh token in the response body, not as an `HttpOnly` cookie, so no storage the SPA can reach is safer; sharing it across tabs is what keeps two tabs from spending one refresh token twice and tripping reuse detection. An `HttpOnly` refresh cookie is the upgrade path |
 | 2026-09-24 | User-Agent classification uses Yauaa at ingestion time, and counts command-line tools, HTTP libraries, headless browsers and attack payloads as bots | Yauaa's rules ship inside the jar, so it adds no data file to fetch or bundle, and it classifies robots and hacking attempts, not only browsers. For a SIEM, "not a person at a browser" is the useful meaning of bot, and curl or sqlmap in a header is as automated as Googlebot |

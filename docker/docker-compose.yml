@@ -151,6 +151,11 @@ services:
       QUARKUS_PROFILE: prod
       APP_ENVIRONMENT: ${APP_ENVIRONMENT:-local-compose}
       APP_AI_API_KEY: ${APP_AI_API_KEY:?set APP_AI_API_KEY in docker/.env}
+      APP_AI_PROVIDER: ${APP_AI_PROVIDER:-anthropic}
+      # The provider's default model and endpoint apply unless these are added here. Add them
+      # only with a value: an empty APP_AI_MODEL or APP_AI_BASE_URL is refused at start-up.
+      # APP_AI_MODEL: claude-opus-5-5
+      # APP_AI_BASE_URL: http://host.docker.internal:11434
       # The prod profile configures no datasource, so these three are mandatory — the
       # application aborts at start-up without them, the same way it does without
       # APP_AI_API_KEY. Host name `postgres` is the service on this network, not the

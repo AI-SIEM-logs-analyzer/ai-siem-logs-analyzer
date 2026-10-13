@@ -6,10 +6,12 @@ import type { components } from '@/api/schema';
 
 export type Role = components['schemas']['Role'];
 
-export type Permission = 'logs:upload' | 'users:manage';
+export type Permission = 'alerts:summarize' | 'logs:upload' | 'users:manage';
 
 /** The roles each action needs, one entry per backend check the UI has something to show for. */
 const ALLOWED: Record<Permission, readonly Role[]> = {
+  // AlertResource: POST summary, which spends the AI provider's quota.
+  'alerts:summarize': ['ADMIN', 'ANALYST'],
   // LogUploadResource / LogRootUploadResource: POST upload.
   'logs:upload': ['ADMIN', 'ANALYST'],
   // UserResource: create, update, change password, delete.

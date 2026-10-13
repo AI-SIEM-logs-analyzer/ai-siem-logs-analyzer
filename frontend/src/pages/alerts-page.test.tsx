@@ -4,6 +4,16 @@ import { callsTo, json, startTestSession, stubBackend } from '@/test/backend-stu
 import { renderRoute } from '@/test/render-route';
 
 const me = () => json(200, { id: 1, username: 'viewer', roles: ['VIEWER'] });
+const analyst = () => json(200, { id: 2, username: 'triage', roles: ['ANALYST'] });
+
+const aiSummary = {
+  severity: 'ERROR',
+  attackType: 'BRUTE_FORCE',
+  summary: 'Six failed logins from 10.0.0.7 within a minute.',
+  recommendedAction: 'Block 10.0.0.7 and check the targeted account.',
+  model: 'anthropic/claude-opus-5-5',
+  summarizedAt: '2026-10-01T10:05:00Z',
+};
 
 const bruteForce = {
   id: 12,
@@ -209,5 +219,65 @@ describe('alert details', () => {
     renderRoute('/alerts/99');
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not find alert #99.');
+  });
+
+  it('shows the model summary beside the rule severity', async () => {
+    startTestSession();
+    stubBackend({
+      'GET /api/auth/me': me,
+      'GET /api/alerts/12': () => json(200, { ...bruteForce, aiSummary }),
+    });
+
+    renderRoute('/alerts/12');
+
+    const card = (await screen.findByRole('heading', { name: 'AI summary' })).closest(
+      '[data-slot="card"]',
+    ) as HTMLElement;
+    expect(within(card).getByText(aiSummary.summary)).toBeInTheDocument();
+    expect(within(card).getByText(aiSummary.recommendedAction)).toBeInTheDocument();
+    expect(within(card).getByText('Brute force')).toBeInTheDocument();
+    expect(within(card).getByText('ERROR')).toBeInTheDocument();
+    expect(within(card).getByText(/anthropic\/claude-opus-5-5/)).toBeInTheDocument();
+    // A viewer reads the summary but is not offered a new one.
+    expect(within(card).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('lets an analyst have the alert summarised', async () => {
+    startTestSession();
+    const fetchMock = stubBackend({
+      'GET /api/auth/me': analyst,
+      'GET /api/alerts/12': () => json(200, bruteForce),
+      'POST /api/alerts/12/summary': () => json(200, { ...bruteForce, aiSummary }),
+    });
+    const user = userEvent.setup();
+
+    renderRoute('/alerts/12');
+    expect(await screen.findByText('No model has summarised this alert yet.')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Summarise' }));
+
+    expect(await screen.findByText(aiSummary.summary)).toBeInTheDocument();
+    expect(callsTo(fetchMock, 'POST /api/alerts/12/summary')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Summarise again' })).toBeInTheDocument();
+  });
+
+  it('says when the AI provider failed', async () => {
+    startTestSession();
+    stubBackend({
+      'GET /api/auth/me': analyst,
+      'GET /api/alerts/12': () => json(200, bruteForce),
+      'POST /api/alerts/12/summary': () =>
+        json(502, {
+          error: 'ai_summary_failed',
+          message: 'The AI provider could not summarise this alert. The alert is unchanged.',
+        }),
+    });
+    const user = userEvent.setup();
+
+    renderRoute('/alerts/12');
+    await user.click(await screen.findByRole('button', { name: 'Summarise' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The AI provider could not summarise this alert. The alert is unchanged.',
+    );
   });
 });
