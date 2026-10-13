@@ -2,6 +2,102 @@
   "openapi" : "3.1.0",
   "components" : {
     "schemas" : {
+      "AlertEventResponse" : {
+        "type" : "object",
+        "properties" : {
+          "eventId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "sourceId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "sourceName" : {
+            "type" : "string"
+          },
+          "occurredAt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "ingestedAt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "severity" : {
+            "$ref" : "#/components/schemas/Severity"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "raw" : {
+            "type" : "string"
+          },
+          "fields" : {
+            "type" : "object",
+            "additionalProperties" : { }
+          }
+        }
+      },
+      "AlertResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "detail" : {
+            "type" : "string"
+          },
+          "severity" : {
+            "$ref" : "#/components/schemas/Severity"
+          },
+          "status" : {
+            "$ref" : "#/components/schemas/AlertStatus"
+          },
+          "raisedAt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "statusChangedAt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "resolvedAt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "ruleId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "ruleName" : {
+            "type" : "string"
+          },
+          "groupKey" : {
+            "type" : "object",
+            "additionalProperties" : { }
+          },
+          "aggregateValue" : {
+            "type" : "number"
+          },
+          "eventCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "windowStart" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "windowEnd" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "trigger" : {
+            "$ref" : "#/components/schemas/AlertEventResponse"
+          }
+        }
+      },
+      "AlertStatus" : {
+        "type" : "string",
+        "enum" : [ "NEW", "IN_PROGRESS", "RESOLVED", "FALSE_POSITIVE" ]
+      },
       "ChangePasswordRequest" : {
         "type" : "object",
         "required" : [ "password" ],
@@ -270,6 +366,29 @@
           }
         }
       },
+      "PageResponseAlertResponse" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AlertResponse"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "PageResponseLogUploadResponse" : {
         "type" : "object",
         "properties" : {
@@ -436,7 +555,128 @@
       }
     }
   },
+  "tags" : [ {
+    "name" : "Alerts",
+    "description" : "Alerts raised by detection rules and models"
+  }, {
+    "name" : "Events",
+    "description" : "Search over ingested log events"
+  }, {
+    "name" : "MicroProfile Health",
+    "description" : "Check the health of the application"
+  } ],
   "paths" : {
+    "/api/alerts" : {
+      "get" : {
+        "summary" : "List alerts",
+        "description" : "Newest first. Filters combine with AND; the values of one repeated parameter combine with OR.",
+        "operationId" : "listAlerts",
+        "tags" : [ "Alerts" ],
+        "parameters" : [ {
+          "description" : "Zero-based page index",
+          "name" : "page",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "description" : "Restrict to these severities; repeatable",
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Severity"
+            }
+          },
+          "name" : "severity",
+          "in" : "query"
+        }, {
+          "description" : "Rows per page, at most 100",
+          "name" : "size",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 50
+          }
+        }, {
+          "description" : "Restrict to these triage statuses; repeatable",
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AlertStatus"
+            }
+          },
+          "name" : "status",
+          "in" : "query"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "One page of matching alerts",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseAlertResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "A parameter is malformed"
+          },
+          "401" : {
+            "description" : "No valid access token"
+          },
+          "403" : {
+            "description" : "The caller's roles do not allow reading"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN", "ANALYST", "VIEWER" ]
+        } ]
+      }
+    },
+    "/api/alerts/{id}" : {
+      "get" : {
+        "summary" : "Get one alert, with the event that raised it",
+        "operationId" : "getAlert",
+        "tags" : [ "Alerts" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The alert",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "No valid access token"
+          },
+          "403" : {
+            "description" : "The caller's roles do not allow reading"
+          },
+          "404" : {
+            "description" : "No alert has that id"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN", "ANALYST", "VIEWER" ]
+        } ]
+      }
+    },
     "/api/auth/login" : {
       "post" : {
         "requestBody" : {
@@ -1361,13 +1601,6 @@
       }
     }
   },
-  "tags" : [ {
-    "name" : "Events",
-    "description" : "Search over ingested log events"
-  }, {
-    "name" : "MicroProfile Health",
-    "description" : "Check the health of the application"
-  } ],
   "info" : {
     "title" : "SIEM Logs Analyzer API",
     "version" : "0.1.0",
