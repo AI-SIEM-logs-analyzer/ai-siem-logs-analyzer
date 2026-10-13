@@ -35,10 +35,14 @@ import java.util.function.Function;
 @Singleton
 public class ScriptedChatModel extends ConfiguredChatModel {
 
-    /** An answer that parses into a complete summary. */
+    /**
+     * An answer that parses into a complete summary, grounded in an alert about failed logins from
+     * 10.0.0.7.
+     */
     public static final String VALID_ANSWER =
             """
             {
+              "evidence": ["10.0.0.7", "POST /login 401"],
               "severity": "ERROR",
               "attackType": "BRUTE_FORCE",
               "summary": "Six failed logins from 10.0.0.7 within a minute.",

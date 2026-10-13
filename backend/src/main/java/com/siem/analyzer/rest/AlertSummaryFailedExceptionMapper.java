@@ -12,7 +12,8 @@ import org.jboss.logging.Logger;
  *
  * <p>The provider is the upstream that failed, not this server. The message is generic on purpose:
  * a provider's error text can carry request ids, account details or fragments of the prompt, which
- * hold log data. The cause is logged instead.
+ * hold log data. The cause is logged instead. An answer dropped by the grounding check gets a
+ * sentence of its own, so the analyst knows the provider worked and the model made things up.
  */
 @Provider
 public class AlertSummaryFailedExceptionMapper
@@ -29,8 +30,12 @@ public class AlertSummaryFailedExceptionMapper
                                 "error",
                                 "ai_summary_failed",
                                 "message",
-                                "The AI provider could not summarise this alert. The alert is"
-                                        + " unchanged; try again later."))
+                                exception.isUngrounded()
+                                        ? "The model's answer cited details this alert does not"
+                                                + " contain, so it was discarded. The alert is"
+                                                + " unchanged; try again."
+                                        : "The AI provider could not summarise this alert. The"
+                                                + " alert is unchanged; try again later."))
                 .build();
     }
 }

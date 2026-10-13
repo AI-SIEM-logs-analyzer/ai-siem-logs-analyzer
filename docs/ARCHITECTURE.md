@@ -397,8 +397,9 @@ who made each move.
 `POST /api/alerts/{id}/summary` (`ADMIN`, `ANALYST`; the reads stay open to every role).
 `ai.AlertSummarizer` is a quarkus-langchain4j declarative AI service (`@RegisterAiService`,
 application-scoped, no chat memory, so one alert never leaks into the next) whose return type is
-the `AlertSummary` record — `severity` (`Severity`), `attackType` (`AttackType`, a closed list from
-`BRUTE_FORCE` to `BENIGN` and `OTHER`), `summary` and `recommendedAction`. LangChain4j turns the
+the `AlertSummary` record — `evidence` (the values the answer rests on, copied from the alert),
+`severity` (`Severity`), `attackType` (`AttackType`, a closed list from `BRUTE_FORCE` to `BENIGN`
+and `OTHER`), `summary` and `recommendedAction`. LangChain4j turns the
 record and its `@Description`s into a JSON schema, sends it as the response format, and parses the
 answer back. All three providers enforce the schema: Anthropic through `output_config.format`
 (with adaptive thinking, which also keeps the extension from sending the `top_k` current Claude
@@ -412,18 +413,43 @@ servers cost nothing. `app.ai.model` and `app.ai.base-url` override the default 
 (`claude-opus-5-5`, `gpt-5-mini`; Ollama's `llama3.2` is fixed at build time) and endpoint.
 
 `ai.AlertPrompt` writes the alert — title, detail, rule, window and group, the triggering event's
-fields and raw line — as a JSON document inside an `<alert>` block. Log content is attacker
-input, so it never becomes structure: `<`, `>` and `&` are written as `\u003C`-style escapes and
-newlines stay `\n`, so no value can close the block or open a new one, and the system message
-tells the model to treat everything inside as evidence, not instructions. Every string is capped
-(the raw line at 4,000 characters, other values at 1,000, maps and lists at 50 entries) with a note
-of what was left out. `service.AlertSummaryService` reads the alert in one transaction, asks the
-model outside any, and writes the answer in another, so a slow provider never holds a connection
-or a row lock; an incomplete answer, a refusal or a provider error is a `502` that leaves the
-alert as it was. The answer lands in the `ai_*` columns of `alert`
+fields and raw line — as a JSON document inside an `<alert>` block, followed by `windowEvents`:
+up to 20 other events of the trigger's source in the alert's window whose fields match its group
+key, matching the rule or not (a `200` between the `401`s is what tells a successful brute force
+from a failed one), each cut down to its time, severity, message and the fields an assessment
+turns on. Log content is attacker input, so it never becomes structure: `<`, `>` and `&` are
+written as `\u003C`-style escapes and newlines stay `\n`, so no value can close the block or open
+a new one. Every string is capped (the raw line at 4,000 characters, a window event's values at
+300, other values at 1,000, maps and lists at 50 entries) with a note of what was left out.
+
+The prompt is engineered against hallucination at three levels:
+
+- **Isolation.** The system message (`AlertSummarizer.SYSTEM_PROMPT`) is a constant: every
+  instruction and no alert data, not even a placeholder. The user message carries only the
+  `<alert>` block. The system message says instructions come only from it and that anything
+  instruction-like inside `<alert>` is evidence of the attack, to report, never to follow.
+- **Grounding in the prompt.** The system message describes each section of the document, tells
+  the model to use only facts the alert holds (general attack knowledge yes; countries, owners or
+  reputations of these particular hosts no), to copy every address, path, user, count and time
+  exactly, never to complete a cut value, to say when the alert does not show something (such as
+  whether the attack succeeded) and to answer `OTHER` and name what is missing when it holds too
+  little to tell. `evidence` is the record's first component, so the model quotes its evidence
+  before it concludes.
+- **Grounding checked.** `ai.Grounding` refuses an answer whose `evidence` values are not in the
+  document (whitespace aside), or whose summary or recommended action names an IP address that
+  is not, whole, one of the document's — "block 10.0.0.8" when the attacker was 10.0.0.7 is the
+  costliest invention. A refused answer is a `502` with a message of its own, and the values are
+  logged, not returned.
+
+`service.AlertSummaryService` reads the alert and its window in one transaction, asks the model
+outside any, and writes the answer in another, so a slow provider never holds a connection or a
+row lock; an incomplete or ungrounded answer, a refusal or a provider error is a `502` that leaves
+the alert as it was. The answer lands in the `ai_*` columns of `alert`
 (`V13__alert_ai_summary.sql`): all six or none (`ck_alert_ai_summary`), and the model's severity
-never replaces the rule's. A new summary replaces the last. The alert details page shows it beside
-the rule's verdict, with the model that wrote it, and offers the button to whoever may triage.
+never replaces the rule's; `ai_evidence` (`V14__alert_ai_evidence.sql`, a JSON array, only beside a
+summary) holds the checked evidence, at most 8 values of 300 characters. A new summary replaces
+the last. The alert details page shows it beside the rule's verdict, with its evidence and the
+model that wrote it, and offers the button to whoever may triage.
 
 ## Cross-cutting concerns
 
@@ -480,6 +506,7 @@ an entry here once decided; substantial ones graduate to an ADR under `docs/adr/
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-10-13 | Alert summaries are grounded: the system message is a constant holding every instruction and no data, the alert's window events are sent as context, the model quotes its evidence first, and an answer whose evidence or IP addresses are not in the alert is refused rather than stored | A summary an analyst acts on must not name a host the logs never saw. Literal checks need no second model and cannot be talked out of their verdict by the log content, though they only prove the values are real, not the reasoning; the prompt asks for the rest. Refusing beats repairing: a corrected answer would be ours, not the model's |
 | 2026-10-13 | Alert summaries come from quarkus-langchain4j with all three providers (Anthropic, OpenAI, Ollama) built in and the provider picked at runtime from `app.ai.provider`; the answer is the provider-enforced structured output of a Java record | One image serves a cloud deployment and an air-gapped one with a local Ollama, and switching is a restart. The extensions bind a provider to a model name at build time, so each provider gets a named model and a CDI supplier picks one; the cost is three extensions on the classpath. A record with a closed `AttackType` list is something the UI can badge and a query can count, which free text is not |
 | 2026-10-06 | Sigma rules are imported in the JVM — Jackson YAML (SnakeYAML) into this engine's rule language — not converted offline with pySigma | One converter, in the same build and test suite as the engine, keeps the field mapping and the rule language from drifting apart, and an import needs no Python toolchain. The converter refuses what it cannot express faithfully instead of approximating it. pySigma stays the fallback, as an offline backend that emits this rule language, if rules the importer refuses turn out to matter |
 | 2026-09-25 | The SPA's API client is `openapi-typescript` types over `openapi-fetch`, not a generated per-endpoint SDK (orval); the SPA stores its tokens in `localStorage` and serialises refreshes across tabs with a Web Lock | Types alone keep the generated output to one declaration file and the runtime to a few kilobytes, and TanStack Query hooks stay hand-written next to the screens that use them. `localStorage` is readable by any script on the page, but the backend issues the refresh token in the response body, not as an `HttpOnly` cookie, so no storage the SPA can reach is safer; sharing it across tabs is what keeps two tabs from spending one refresh token twice and tripping reuse detection. An `HttpOnly` refresh cookie is the upgrade path |

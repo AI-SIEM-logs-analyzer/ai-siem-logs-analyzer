@@ -11,6 +11,7 @@ const aiSummary = {
   attackType: 'BRUTE_FORCE',
   summary: 'Six failed logins from 10.0.0.7 within a minute.',
   recommendedAction: 'Block 10.0.0.7 and check the targeted account.',
+  evidence: ['10.0.0.7', 'POST /login 401'],
   model: 'anthropic/claude-opus-5-5',
   summarizedAt: '2026-10-01T10:05:00Z',
 };
@@ -238,6 +239,12 @@ describe('alert details', () => {
     expect(within(card).getByText('Brute force')).toBeInTheDocument();
     expect(within(card).getByText('ERROR')).toBeInTheDocument();
     expect(within(card).getByText(/anthropic\/claude-opus-5-5/)).toBeInTheDocument();
+    const evidence = within(card).getByRole('list', { name: 'Evidence' });
+    expect(
+      within(evidence)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(aiSummary.evidence);
     // A viewer reads the summary but is not offered a new one.
     expect(within(card).queryByRole('button')).not.toBeInTheDocument();
   });

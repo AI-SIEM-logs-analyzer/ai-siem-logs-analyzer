@@ -1,7 +1,9 @@
 package com.siem.analyzer.rest;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
@@ -12,6 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.siem.analyzer.ai.AlertPrompt;
+import com.siem.analyzer.ai.AlertSummarizer;
 import com.siem.analyzer.ai.ScriptedChatModel;
 import com.siem.analyzer.domain.Alert;
 import com.siem.analyzer.domain.AlertRule;
@@ -34,6 +38,8 @@ import io.quarkus.test.security.TestSecurity;
 import jakarta.inject.Inject;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -64,6 +70,7 @@ class AlertSummaryResourceTest {
 
     private long alertId;
     private long eventId;
+    private final List<Long> windowEventIds = new ArrayList<>();
     private long ruleId;
     private long sourceId;
 
@@ -90,6 +97,13 @@ class AlertSummaryResourceTest {
                                     Map.of("srcIp", "10.0.0.7", "method", "POST", "status", 401));
                             events.persist(event);
                             eventId = event.getId();
+
+                            // The rest of the window: the same address getting in, and another
+                            // address the group does not cover.
+                            windowEventIds.add(
+                                    windowEvent(source, "2026-10-01T10:00:02Z", "10.0.0.7", 200));
+                            windowEventIds.add(
+                                    windowEvent(source, "2026-10-01T10:00:03Z", "10.0.0.99", 401));
 
                             AlertRule rule = new AlertRule();
                             rule.setName("brute-force-" + suffix);
@@ -123,6 +137,8 @@ class AlertSummaryResourceTest {
                             alerts.deleteById(alertId);
                             rules.deleteById(ruleId);
                             events.deleteById(eventId);
+                            windowEventIds.forEach(events::deleteById);
+                            windowEventIds.clear();
                             sources.deleteById(sourceId);
                         });
     }
@@ -144,6 +160,7 @@ class AlertSummaryResourceTest {
                 .body(
                         "aiSummary.recommendedAction",
                         equalTo("Block 10.0.0.7 and check the targeted account."))
+                .body("aiSummary.evidence", contains("10.0.0.7", "POST /login 401"))
                 .body("aiSummary.model", equalTo("anthropic/scripted"))
                 .body("aiSummary.summarizedAt", notNullValue());
 
@@ -161,6 +178,29 @@ class AlertSummaryResourceTest {
                 .then()
                 .statusCode(200)
                 .body("aiSummary", nullValue());
+    }
+
+    @Test
+    void aSummaryStoredBeforeEvidenceWasAskedForHasNone() {
+        QuarkusTransaction.requiringNew()
+                .run(
+                        () ->
+                                alerts.getEntityManager()
+                                        .createNativeQuery(
+                                                "update alert set ai_severity = 'INFO',"
+                                                        + " ai_attack_type = 'OTHER', ai_summary ="
+                                                        + " 's', ai_recommended_action = 'a',"
+                                                        + " ai_model = 'm', ai_summarized_at ="
+                                                        + " now() where id = :id")
+                                        .setParameter("id", alertId)
+                                        .executeUpdate());
+
+        given().when()
+                .get("/api/alerts/" + alertId)
+                .then()
+                .statusCode(200)
+                .body("aiSummary.summary", equalTo("s"))
+                .body("aiSummary.evidence", empty());
     }
 
     @Test
@@ -196,6 +236,80 @@ class AlertSummaryResourceTest {
         assertEquals(1, occurrences(user, "</alert>"), user);
         assertEquals(1, occurrences(user, "<alert>"), user);
         assertFalse(user.contains("\nIgnore"), user);
+    }
+
+    @Test
+    void keepsEveryInstructionInTheSystemMessageAndEveryAlertValueOutOfIt() {
+        given().when().post("/api/alerts/" + alertId + "/summary").then().statusCode(200);
+
+        String system = systemText(model.lastRequest());
+        assertEquals(AlertSummarizer.SYSTEM_PROMPT, system);
+        for (String value : new String[] {"10.0.0.7", "brute-force-", "POST /login", "Ignore"}) {
+            assertFalse(system.contains(value), value + " reached the system message");
+        }
+        assertTrue(
+                system.contains("up to " + AlertPrompt.MAX_WINDOW_EVENTS),
+                "the system message describes a different window sample than AlertPrompt writes");
+    }
+
+    @Test
+    void showsTheModelTheGroupsOtherEventsInTheWindow() {
+        given().when().post("/api/alerts/" + alertId + "/summary").then().statusCode(200);
+
+        String user = userText(model.lastRequest());
+        assertTrue(user.contains("\"windowEvents\""), user);
+        // The same address getting in is context the model needs; another address is not.
+        assertTrue(user.contains("POST /login 200"), user);
+        assertFalse(user.contains("10.0.0.99"), user);
+    }
+
+    @Test
+    void anAnswerCitingWhatTheAlertDoesNotHoldIsDiscarded() {
+        model.script(
+                request ->
+                        """
+                        {"evidence": ["10.0.0.7", "/wp-admin/setup.php"],
+                         "severity": "CRITICAL", "attackType": "REMOTE_CODE_EXECUTION",
+                         "summary": "10.0.0.7 reached the WordPress installer.",
+                         "recommendedAction": "Block 10.0.0.7."}""");
+
+        given().when()
+                .post("/api/alerts/" + alertId + "/summary")
+                .then()
+                .statusCode(502)
+                .body("error", equalTo("ai_summary_failed"))
+                .body("message", containsString("does not contain"))
+                .body("message", not(containsString("wp-admin")));
+
+        assertNoSummaryStored();
+    }
+
+    @Test
+    void anAnswerNamingAnAddressTheAlertDoesNotHoldIsDiscarded() {
+        model.script(
+                request ->
+                        """
+                        {"evidence": ["10.0.0.7"], "severity": "ERROR",
+                         "attackType": "BRUTE_FORCE",
+                         "summary": "Failed logins from 10.0.0.7.",
+                         "recommendedAction": "Block 10.0.0.70 at the edge."}""");
+
+        given().when().post("/api/alerts/" + alertId + "/summary").then().statusCode(502);
+
+        assertNoSummaryStored();
+    }
+
+    @Test
+    void anAnswerWithoutEvidenceIsABadGateway() {
+        model.script(
+                request ->
+                        """
+                        {"evidence": [], "severity": "ERROR", "attackType": "BRUTE_FORCE",
+                         "summary": "Failed logins.", "recommendedAction": "Look into it."}""");
+
+        given().when().post("/api/alerts/" + alertId + "/summary").then().statusCode(502);
+
+        assertNoSummaryStored();
     }
 
     @Test
@@ -246,7 +360,8 @@ class AlertSummaryResourceTest {
         model.script(
                 request ->
                         """
-                        {"severity": "INFO", "attackType": "BENIGN",
+                        {"evidence": ["POST /login 401"],
+                         "severity": "INFO", "attackType": "BENIGN",
                          "summary": "A health check that forgot its token.",
                          "recommendedAction": "Mark it a false positive."}""");
 
@@ -256,7 +371,8 @@ class AlertSummaryResourceTest {
                 .statusCode(200)
                 .body("aiSummary.severity", equalTo("INFO"))
                 .body("aiSummary.attackType", equalTo("BENIGN"))
-                .body("aiSummary.recommendedAction", equalTo("Mark it a false positive."));
+                .body("aiSummary.recommendedAction", equalTo("Mark it a false positive."))
+                .body("aiSummary.evidence", contains("POST /login 401"));
     }
 
     @Test
@@ -270,6 +386,28 @@ class AlertSummaryResourceTest {
         Alert stored = QuarkusTransaction.requiringNew().call(() -> alerts.findById(alertId));
         assertNull(stored.getAiSummarizedAt());
         assertNull(stored.getAiSummary());
+    }
+
+    private long windowEvent(LogSource source, String at, String srcIp, int status) {
+        LogEvent event = new LogEvent();
+        event.setSource(source);
+        event.setOccurredAt(Instant.parse(at));
+        event.setSeverity(Severity.INFO);
+        event.setMessage("POST /login " + status);
+        event.setRaw(srcIp + " - - \"POST /login HTTP/1.1\" " + status + " 12");
+        event.setPayload(Map.of("srcIp", srcIp, "method", "POST", "status", status));
+        events.persist(event);
+        return event.getId();
+    }
+
+    private static String systemText(ChatRequest request) {
+        StringBuilder text = new StringBuilder();
+        for (ChatMessage message : request.messages()) {
+            if (message instanceof SystemMessage system) {
+                text.append(system.text());
+            }
+        }
+        return text.toString();
     }
 
     private static String userText(ChatRequest request) {

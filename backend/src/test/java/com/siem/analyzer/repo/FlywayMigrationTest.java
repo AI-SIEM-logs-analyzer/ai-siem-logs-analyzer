@@ -342,4 +342,60 @@ class FlywayMigrationTest {
                                 .setParameter(1, eventId)
                                 .executeUpdate());
     }
+
+    @Test
+    @TestTransaction
+    void anAiSummaryMayCarryItsEvidence() {
+        Long eventId = insertedLogEvent();
+
+        int inserted =
+                entityManager
+                        .createNativeQuery(
+                                "insert into alert (log_event_id, title, severity, ai_severity,"
+                                        + " ai_attack_type, ai_summary, ai_recommended_action,"
+                                        + " ai_evidence, ai_model, ai_summarized_at)"
+                                        + " values (?1, 't', 'INFO', 'ERROR', 'BRUTE_FORCE', 's',"
+                                        + " 'a', '[\"10.0.0.7\"]'::jsonb, 'm', now())")
+                        .setParameter(1, eventId)
+                        .executeUpdate();
+
+        assertEquals(1, inserted);
+    }
+
+    @Test
+    @TestTransaction
+    void evidenceWithoutASummaryIsRefused() {
+        Long eventId = insertedLogEvent();
+
+        assertThrows(
+                PersistenceException.class,
+                () ->
+                        entityManager
+                                .createNativeQuery(
+                                        "insert into alert (log_event_id, title, severity,"
+                                                + " ai_evidence)"
+                                                + " values (?1, 't', 'INFO', '[\"x\"]'::jsonb)")
+                                .setParameter(1, eventId)
+                                .executeUpdate());
+    }
+
+    @Test
+    @TestTransaction
+    void evidenceThatIsNotAListIsRefused() {
+        Long eventId = insertedLogEvent();
+
+        assertThrows(
+                PersistenceException.class,
+                () ->
+                        entityManager
+                                .createNativeQuery(
+                                        "insert into alert (log_event_id, title, severity,"
+                                                + " ai_severity, ai_attack_type, ai_summary,"
+                                                + " ai_recommended_action, ai_evidence, ai_model,"
+                                                + " ai_summarized_at)"
+                                                + " values (?1, 't', 'INFO', 'ERROR', 'OTHER', 's',"
+                                                + " 'a', '\"x\"'::jsonb, 'm', now())")
+                                .setParameter(1, eventId)
+                                .executeUpdate());
+    }
 }
