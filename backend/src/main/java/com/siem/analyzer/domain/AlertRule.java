@@ -1,16 +1,24 @@
 package com.siem.analyzer.domain;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * A detection rule evaluated against incoming events.
@@ -41,6 +49,18 @@ public class AlertRule {
 
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;
+
+    /**
+     * The MITRE ATT&CK techniques the rule evidences, by ID ({@code T1110.001}).
+     *
+     * <p>IDs, not references to {@link AttackTechnique}: the ATT&CK dataset is reference data an
+     * import replaces wholesale, so a rule names a technique by value and outlives a release that
+     * retires it. An alert inherits these when it is read.
+     */
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "alert_rule_technique", joinColumns = @JoinColumn(name = "rule_id"))
+    @Column(name = "technique_id", nullable = false)
+    private Set<String> techniqueIds = new HashSet<>();
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -104,6 +124,19 @@ public class AlertRule {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public Set<String> getTechniqueIds() {
+        return Collections.unmodifiableSet(techniqueIds);
+    }
+
+    /**
+     * Replaces the rule's techniques. Clears and refills the collection rather than swapping it, so
+     * Hibernate keeps tracking it and writes only the difference.
+     */
+    public void setTechniqueIds(Collection<String> ids) {
+        techniqueIds.clear();
+        techniqueIds.addAll(ids);
     }
 
     public Instant getCreatedAt() {

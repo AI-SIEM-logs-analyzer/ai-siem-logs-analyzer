@@ -1,5 +1,9 @@
 package com.siem.analyzer.rest;
 
+import com.siem.analyzer.attack.AlertTechniqueResolver;
+import com.siem.analyzer.attack.AttackStixReader;
+import com.siem.analyzer.attack.TechniqueCriteria;
+import com.siem.analyzer.domain.Alert;
 import com.siem.analyzer.domain.AlertStatus;
 import com.siem.analyzer.domain.Severity;
 import com.siem.analyzer.repo.AlertRepository;
@@ -19,7 +23,10 @@ import jakarta.ws.rs.core.MediaType;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Pattern;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
@@ -44,11 +51,19 @@ public class AlertResource {
 
     private final AlertRepository alerts;
     private final AlertSummaryService summaries;
+    private final AlertTechniqueResolver techniques;
+    private final TechniqueCriteria criteria;
 
     @Inject
-    public AlertResource(AlertRepository alerts, AlertSummaryService summaries) {
+    public AlertResource(
+            AlertRepository alerts,
+            AlertSummaryService summaries,
+            AlertTechniqueResolver techniques,
+            TechniqueCriteria criteria) {
         this.alerts = alerts;
         this.summaries = summaries;
+        this.techniques = techniques;
+        this.criteria = criteria;
     }
 
     /**
@@ -86,6 +101,23 @@ public class AlertResource {
                                             implementation = AlertStatus.class))
                     @QueryParam("status")
                     List<String> statuses,
+            @Parameter(
+                            description =
+                                    "Restrict to alerts mapped to these MITRE ATT&CK techniques"
+                                            + " (T1110, T1110.001); a technique also matches its"
+                                            + " sub-techniques; repeatable",
+                            schema =
+                                    @Schema(type = SchemaType.ARRAY, implementation = String.class))
+                    @QueryParam("technique")
+                    List<String> techniqueIds,
+            @Parameter(
+                            description =
+                                    "Restrict to alerts mapped to a technique under these MITRE"
+                                            + " ATT&CK tactics (TA0006); repeatable",
+                            schema =
+                                    @Schema(type = SchemaType.ARRAY, implementation = String.class))
+                    @QueryParam("tactic")
+                    List<String> tacticIds,
             @Parameter(description = "Zero-based page index") @QueryParam("page") @DefaultValue("0")
                     int page,
             @Parameter(description = "Rows per page, at most " + MAX_SIZE)
@@ -96,13 +128,29 @@ public class AlertResource {
             throw new BadRequestException("page must not be negative");
         }
         int boundedSize = Math.clamp(size, 1, MAX_SIZE);
+        Set<String> wantedTechniques =
+                parseIds(techniqueIds, AttackStixReader.TECHNIQUE_ID, "technique");
+        Set<String> wantedTactics = parseIds(tacticIds, AttackStixReader.TACTIC_ID, "tactic");
         AlertRepository.Filter filter =
                 new AlertRepository.Filter(
                         parseAll(severities, Severity.class, "severity"),
-                        parseAll(statuses, AlertStatus.class, "status"));
+                        parseAll(statuses, AlertStatus.class, "status"),
+                        wantedTechniques.isEmpty()
+                                ? null
+                                : criteria.forTechniques(wantedTechniques),
+                        wantedTactics.isEmpty() ? null : criteria.forTactics(wantedTactics));
 
+        List<Alert> rows = alerts.search(filter, page, boundedSize);
+        Map<Long, List<AlertTechniqueResolver.ResolvedTechnique>> byAlert =
+                techniques.resolve(rows);
         List<AlertResponse> items =
-                alerts.search(filter, page, boundedSize).stream().map(AlertResponse::from).toList();
+                rows.stream()
+                        .map(
+                                alert ->
+                                        AlertResponse.from(
+                                                alert,
+                                                byAlert.getOrDefault(alert.getId(), List.of())))
+                        .toList();
         return new PageResponse<>(items, page, boundedSize, alerts.count(filter));
     }
 
@@ -116,7 +164,7 @@ public class AlertResource {
     @APIResponse(responseCode = "404", description = "No alert has that id")
     public AlertResponse get(@PathParam("id") Long id) {
         return alerts.findWithDetails(id)
-                .map(AlertResponse::from)
+                .map(alert -> AlertResponse.from(alert, techniques.resolve(alert)))
                 .orElseThrow(() -> new NotFoundException("no alert with id " + id));
     }
 
@@ -140,7 +188,27 @@ public class AlertResource {
             responseCode = "502",
             description = "The AI provider failed or gave no usable answer; the alert is unchanged")
     public AlertResponse summarize(@PathParam("id") Long id) {
-        return AlertResponse.from(summaries.summarize(id));
+        Alert alert = summaries.summarize(id);
+        return AlertResponse.from(alert, techniques.resolve(alert));
+    }
+
+    /**
+     * Parses a repeated ATT&CK ID parameter: trimmed, upper-cased, then held to {@code format}. A
+     * malformed value is a 400 rather than a filter that silently matches nothing.
+     */
+    private static Set<String> parseIds(List<String> values, Pattern format, String parameter) {
+        Set<String> parsed = new TreeSet<>();
+        if (values == null) {
+            return parsed;
+        }
+        for (String value : values) {
+            String id = value.strip().toUpperCase(Locale.ROOT);
+            if (!format.matcher(id).matches()) {
+                throw new BadRequestException("Malformed " + parameter + ": " + value);
+            }
+            parsed.add(id);
+        }
+        return parsed;
     }
 
     /** Parses a repeated enum parameter case-insensitively; an unknown value is a 400. */

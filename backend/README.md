@@ -313,9 +313,13 @@ Application endpoints:
 | `PUT /api/users/{id}`           | replace e-mail, roles and enabled state       |
 | `PUT /api/users/{id}/password`  | set the password                              |
 | `DELETE /api/users/{id}`        | delete the account and its roles              |
-| `GET /api/alerts`               | list alerts, newest first; `severity`, `status` (repeatable), `page`, `size` (≤ 100) |
+| `GET /api/alerts`               | list alerts, newest first; `severity`, `status`, `technique`, `tactic` (repeatable), `page`, `size` (≤ 100); each alert carries its MITRE ATT&CK `techniques` |
 | `GET /api/alerts/{id}`          | one alert, with the event that raised it      |
 | `POST /api/alerts/{id}/summary` | have the configured LLM summarise the alert (`ADMIN`, `ANALYST`); 502 when the provider fails or the answer cites what the alert does not contain |
+| `GET /api/attack/tactics`       | ATT&CK tactics in matrix order                |
+| `GET /api/attack/techniques`    | ATT&CK techniques; `inUse=true` for those an alert can name |
+| `GET /api/attack/dataset`       | the loaded ATT&CK release; 404 before the first import |
+| `POST /api/attack/dataset`      | replace the dataset with a STIX bundle, JSON or gzip (`ADMIN`); 400 when it is not one, 413 over `app.attack.max-upload-bytes` |
 
 They are **unauthenticated**: nothing issues a token yet, so there is no role to check. Open,
 they are a full compromise — anyone who reaches them can mint an `ADMIN` account or reset any

@@ -31,6 +31,8 @@ export function fetchAlertPage(filters: AlertFilters, size = ALERT_PAGE_SIZE): P
         query: {
           ...(filters.severity.length > 0 && { severity: filters.severity }),
           ...(filters.status.length > 0 && { status: filters.status }),
+          ...(filters.technique.length > 0 && { technique: filters.technique }),
+          ...(filters.tactic.length > 0 && { tactic: filters.tactic }),
           page: filters.page,
           size,
         },

@@ -61,6 +61,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/attack/dataset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which ATT&CK release is loaded */
+        get: operations["getAttackDataset"];
+        put?: never;
+        /**
+         * Replace the ATT&CK dataset
+         * @description Takes an Enterprise ATT&CK STIX 2.1 bundle (enterprise-attack-<version>.json from mitre-attack/attack-stix-data), plain or gzipped, and replaces the loaded tactics and techniques with it whatever its version. Rules keep their technique IDs. Gzip is recommended: the release JSON is close to the upload limit.
+         */
+        post: operations["importAttackDataset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/attack/tactics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the tactics in matrix order */
+        get: operations["listAttackTactics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/attack/techniques": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List techniques
+         * @description Every technique in the loaded dataset, by ID; with inUse=true, only those an alert can name: mapped by an enabled rule or by the AI attack-type fallback. An ID the dataset does not know comes without a name.
+         */
+        get: operations["listAttackTechniques"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -985,6 +1043,7 @@ export interface components {
             windowEnd?: components["schemas"]["Instant"];
             trigger?: components["schemas"]["AlertEventResponse"];
             aiSummary?: components["schemas"]["AlertSummaryResponse"];
+            techniques?: components["schemas"]["AlertTechniqueResponse"][];
         };
         /** @enum {string} */
         AlertStatus: "NEW" | "IN_PROGRESS" | "RESOLVED" | "FALSE_POSITIVE";
@@ -996,6 +1055,37 @@ export interface components {
             evidence?: string[];
             model?: string;
             summarizedAt?: components["schemas"]["Instant"];
+        };
+        AlertTechniqueResponse: {
+            id?: string;
+            name?: string;
+            url?: string;
+            tactics?: components["schemas"]["AttackTacticRefResponse"][];
+            source?: components["schemas"]["TechniqueSource"];
+        };
+        AttackDatasetResponse: {
+            version?: string;
+            sha256?: string;
+            /** Format: int32 */
+            techniqueCount?: number;
+            importedAt?: components["schemas"]["Instant"];
+        };
+        AttackTacticRefResponse: {
+            id?: string;
+            name?: string;
+        };
+        AttackTacticResponse: {
+            id?: string;
+            name?: string;
+            shortname?: string;
+            url?: string;
+        };
+        AttackTechniqueResponse: {
+            id?: string;
+            name?: string;
+            parentId?: string;
+            url?: string;
+            tactics?: components["schemas"]["AttackTacticRefResponse"][];
         };
         /** @enum {string} */
         AttackType: "BRUTE_FORCE" | "CREDENTIAL_STUFFING" | "SQL_INJECTION" | "PATH_TRAVERSAL" | "CROSS_SITE_SCRIPTING" | "COMMAND_INJECTION" | "REMOTE_CODE_EXECUTION" | "RECONNAISSANCE" | "DENIAL_OF_SERVICE" | "PRIVILEGE_ESCALATION" | "DATA_EXFILTRATION" | "MALWARE" | "ANOMALOUS_BEHAVIOUR" | "BENIGN" | "OTHER";
@@ -1131,6 +1221,8 @@ export interface components {
         Role: "ADMIN" | "ANALYST" | "VIEWER";
         /** @enum {string} */
         Severity: "DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL";
+        /** @enum {string} */
+        TechniqueSource: "RULE" | "AI";
         TimeBucket: {
             start?: components["schemas"]["Instant"];
             /** Format: int64 */
@@ -1190,6 +1282,10 @@ export interface operations {
                 size?: number;
                 /** @description Restrict to these triage statuses; repeatable */
                 status?: components["schemas"]["AlertStatus"][];
+                /** @description Restrict to alerts mapped to a technique under these MITRE ATT&CK tactics (TA0006); repeatable */
+                tactic?: string[];
+                /** @description Restrict to alerts mapped to these MITRE ATT&CK techniques (T1110, T1110.001); a technique also matches its sub-techniques; repeatable */
+                technique?: string[];
             };
             header?: never;
             path?: never;
@@ -1315,6 +1411,172 @@ export interface operations {
             };
             /** @description The AI provider failed or gave no usable answer; the alert is unchanged */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getAttackDataset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The loaded release */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttackDatasetResponse"];
+                };
+            };
+            /** @description No valid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The caller's roles do not allow reading */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No release has been imported */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    importAttackDataset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": string;
+                "application/gzip": string;
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description The release now loaded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttackDatasetResponse"];
+                };
+            };
+            /** @description Not an ATT&CK bundle; nothing changed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Only an administrator may import */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Larger than app.attack.max-upload-bytes */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listAttackTactics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every tactic in the loaded dataset */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttackTacticResponse"][];
+                };
+            };
+            /** @description No valid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The caller's roles do not allow reading */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listAttackTechniques: {
+        parameters: {
+            query?: {
+                /** @description Only the techniques an alert can name */
+                inUse?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The techniques */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttackTechniqueResponse"][];
+                };
+            };
+            /** @description No valid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The caller's roles do not allow reading */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

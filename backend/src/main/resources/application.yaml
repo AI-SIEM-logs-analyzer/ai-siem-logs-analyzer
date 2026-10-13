@@ -233,6 +233,15 @@ app:
       enabled: true
       interval: PT30S
       batch-size: 1000
+  # MITRE ATT&CK Enterprise. The release in the jar is imported at start-up when the stored one
+  # is missing or older; an administrator loads a newer one with POST /api/attack/dataset. The
+  # defaults live in AppConfig.Attack; they are repeated here so the knobs are discoverable.
+  attack:
+    import-on-start: true
+    bundled-resource: mitre/enterprise-attack-19.2.json.gz
+    bundled-version: "19.2"
+    max-upload-bytes: 58720256
+    max-bundle-bytes: 268435456
   security:
     # Argon2id cost, applied to every password this application hashes. The defaults live in
     # AppConfig; they are repeated here so the knobs are discoverable, and each one can be
@@ -328,6 +337,12 @@ app:
     # classifier is exercised by its own unit test, which builds it once.
     user-agent:
       enabled: false
+    # Parsing the 54 MB release would cost every @QuarkusTest boot a few seconds, so the suite
+    # imports a small hand-written bundle of the same shape instead. BundledAttackDatasetTest
+    # reads the real file once, outside Quarkus.
+    attack:
+      bundled-resource: mitre/test-enterprise-attack.json
+      bundled-version: "0.1"
   quarkus:
     # Deliberately no JDBC URL: with none configured, Dev Services starts a throwaway
     # PostgreSQL container through Testcontainers, lets Flyway migrate it, and tears it down

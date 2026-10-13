@@ -32,11 +32,42 @@ export const ALERT_STATUS_LABELS: Record<AlertStatus, string> = {
 export interface AlertFilters {
   severity: Severity[];
   status: AlertStatus[];
+  /** MITRE ATT&CK technique IDs; a base technique also matches its sub-techniques. */
+  technique: string[];
+  /** MITRE ATT&CK tactic IDs. */
+  tactic: string[];
   /** Zero-based page of the listing. */
   page: number;
 }
 
-export const NO_ALERT_FILTERS: AlertFilters = { severity: [], status: [], page: 0 };
+export const NO_ALERT_FILTERS: AlertFilters = {
+  severity: [],
+  status: [],
+  technique: [],
+  tactic: [],
+  page: 0,
+};
+
+/** The formats the backend holds `technique` and `tactic` to; anything else would be a 400. */
+const TECHNIQUE_ID = /^T\d{4}(\.\d{3})?$/;
+const TACTIC_ID = /^TA\d{4}$/;
+
+/** The distinct values of `name`, upper-cased, that match `format`. */
+function attackIds(params: URLSearchParams, name: string, format: RegExp): string[] {
+  return [...new Set(params.getAll(name).map((v) => v.trim().toUpperCase()))].filter((v) =>
+    format.test(v),
+  );
+}
+
+/** Whether `filters` narrows the list at all; the page alone does not. */
+export function hasAlertFilters(filters: AlertFilters): boolean {
+  return (
+    filters.severity.length > 0 ||
+    filters.status.length > 0 ||
+    filters.technique.length > 0 ||
+    filters.tactic.length > 0
+  );
+}
 
 function isSeverity(value: string): value is Severity {
   return (SEVERITIES as readonly string[]).includes(value);
@@ -54,6 +85,8 @@ export function parseAlertFilters(params: URLSearchParams): AlertFilters {
       isSeverity,
     ),
     status: [...new Set(params.getAll('status').map((s) => s.toUpperCase()))].filter(isAlertStatus),
+    technique: attackIds(params, 'technique', TECHNIQUE_ID),
+    tactic: attackIds(params, 'tactic', TACTIC_ID),
     page: Number.isSafeInteger(page) && page > 0 ? page : 0,
   };
 }
@@ -63,6 +96,8 @@ export function alertFiltersToParams(filters: AlertFilters): URLSearchParams {
   const params = new URLSearchParams();
   for (const severity of filters.severity) params.append('severity', severity);
   for (const status of filters.status) params.append('status', status);
+  for (const technique of filters.technique) params.append('technique', technique);
+  for (const tactic of filters.tactic) params.append('tactic', tactic);
   if (filters.page > 0) params.set('page', String(filters.page + 1));
   return params;
 }

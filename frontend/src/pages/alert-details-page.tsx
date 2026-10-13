@@ -4,6 +4,7 @@ import { Link, useLocation, useParams } from 'react-router';
 import { useAlert, type Alert, type AlertEvent } from '@/api/alerts';
 import { AiSummaryCard } from '@/components/alerts/ai-summary-card';
 import { AlertStatusBadge } from '@/components/alerts/alert-status-badge';
+import { AttackCard } from '@/components/alerts/attack-card';
 import { SeverityBadge } from '@/components/events/severity-badge';
 import { ErrorState } from '@/components/feedback/error-state';
 import { LinesSkeleton } from '@/components/feedback/skeletons';
@@ -92,6 +93,8 @@ function AlertDetails({ id, alert }: { id: number; alert: Alert }) {
       </div>
 
       <AiSummaryCard id={id} alert={alert} />
+
+      <AttackCard techniques={alert.techniques ?? []} />
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <Card>

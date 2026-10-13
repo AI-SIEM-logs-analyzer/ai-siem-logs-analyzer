@@ -1,6 +1,7 @@
 package com.siem.analyzer.rest;
 
 import static io.restassured.RestAssured.given;
+import static io.restassured.RestAssured.withArgs;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
@@ -12,6 +13,7 @@ import static org.hamcrest.Matchers.oneOf;
 import com.siem.analyzer.domain.Alert;
 import com.siem.analyzer.domain.AlertRule;
 import com.siem.analyzer.domain.AlertStatus;
+import com.siem.analyzer.domain.AttackType;
 import com.siem.analyzer.domain.LogEvent;
 import com.siem.analyzer.domain.LogSource;
 import com.siem.analyzer.domain.LogSourceType;
@@ -91,6 +93,7 @@ class AlertResourceTest {
                             rule.setName("brute-force-" + suffix);
                             rule.setSeverity(Severity.CRITICAL);
                             rule.setExpression("status = 401");
+                            rule.setTechniqueIds(List.of("T1110.001"));
                             rules.persist(rule);
                             ruleId = rule.getId();
 
@@ -114,6 +117,15 @@ class AlertResourceTest {
                             closed.setLogEvent(event);
                             closed.setTitle("model-" + suffix);
                             closed.setSeverity(Severity.WARNING);
+                            // No rule fired; the model read it as credential stuffing.
+                            closed.recordAiSummary(
+                                    Severity.WARNING,
+                                    AttackType.CREDENTIAL_STUFFING,
+                                    "Logins with leaked pairs",
+                                    "Reset the accounts",
+                                    List.of(),
+                                    "test/model",
+                                    Instant.parse("2026-10-01T10:01:00Z"));
                             alerts.persist(closed);
                             closed.changeStatus(AlertStatus.RESOLVED, Instant.now());
                             warning = closed.getId();
@@ -230,5 +242,125 @@ class AlertResourceTest {
     @Test
     void answers404ForAMissingAlert() {
         given().when().get("/api/alerts/9999999").then().statusCode(404);
+    }
+
+    @Test
+    void showsTheTechniquesOfTheRuleThatFired() {
+        given().when()
+                .get("/api/alerts/" + critical)
+                .then()
+                .statusCode(200)
+                .body("techniques.size()", equalTo(1))
+                .body("techniques[0].id", equalTo("T1110.001"))
+                .body("techniques[0].name", equalTo("Password Guessing"))
+                .body("techniques[0].url", equalTo("https://attack.mitre.org/techniques/T1110/001"))
+                .body("techniques[0].tactics[0].id", equalTo("TA0006"))
+                .body("techniques[0].tactics[0].name", equalTo("Credential Access"))
+                .body("techniques[0].source", equalTo("RULE"));
+    }
+
+    @Test
+    void derivesTechniquesFromTheModelsAttackTypeWhenNoRuleFired() {
+        given().when()
+                .get("/api/alerts/" + warning)
+                .then()
+                .statusCode(200)
+                .body("techniques.id", equalTo(List.of("T1110.004")))
+                .body("techniques[0].source", equalTo("AI"));
+    }
+
+    @Test
+    void listsTheTechniquesOnEveryRow() {
+        given().when()
+                .get("/api/alerts?size=100")
+                .then()
+                .statusCode(200)
+                .body(
+                        "items.find { it.id == %s }.techniques.id",
+                        withArgs((int) critical), equalTo(List.of("T1110.001")))
+                .body(
+                        "items.find { it.id == %s }.techniques.id",
+                        withArgs((int) warning), equalTo(List.of("T1110.004")));
+    }
+
+    @Test
+    void aBaseTechniqueFilterMatchesItsSubTechniquesFromRulesAndModels() {
+        given().when()
+                .get("/api/alerts?technique=T1110&size=100")
+                .then()
+                .statusCode(200)
+                .body("items.id", hasItem((int) critical))
+                .body("items.id", hasItem((int) warning));
+    }
+
+    @Test
+    void aSubTechniqueFilterMatchesOnlyThatSubTechnique() {
+        given().when()
+                .get("/api/alerts?technique=T1110.001&size=100")
+                .then()
+                .statusCode(200)
+                .body("items.id", hasItem((int) critical))
+                .body("items.id", not(hasItem((int) warning)));
+    }
+
+    @Test
+    void filtersByTactic() {
+        given().when()
+                .get("/api/alerts?tactic=TA0006&size=100")
+                .then()
+                .statusCode(200)
+                .body("items.id", hasItem((int) critical))
+                .body("items.id", hasItem((int) warning));
+        given().when()
+                .get("/api/alerts?tactic=TA0043&size=100")
+                .then()
+                .statusCode(200)
+                .body("items.id", not(hasItem((int) critical)))
+                .body("items.id", not(hasItem((int) warning)));
+    }
+
+    @Test
+    void aTacticWithNoMappedTechniqueMatchesNothing() {
+        given().when()
+                .get("/api/alerts?tactic=TA9999")
+                .then()
+                .statusCode(200)
+                .body("total", equalTo(0))
+                .body("items.size()", equalTo(0));
+    }
+
+    @Test
+    void attackFiltersCombineWithTheOthersByAnd() {
+        given().when()
+                .get("/api/alerts?technique=T1110&severity=CRITICAL&size=100")
+                .then()
+                .statusCode(200)
+                .body("items.id", hasItem((int) critical))
+                .body("items.id", not(hasItem((int) warning)));
+    }
+
+    @Test
+    void acceptsLowerCaseAndPaddedIds() {
+        given().when()
+                .get("/api/alerts?technique=t1110.004&size=100")
+                .then()
+                .statusCode(200)
+                .body("items.id", hasItem((int) warning))
+                .body("items.id", not(hasItem((int) critical)));
+        given().queryParam("tactic", " ta0006 ")
+                .queryParam("size", 100)
+                .when()
+                .get("/api/alerts")
+                .then()
+                .statusCode(200)
+                .body("items.id", hasItem((int) critical));
+    }
+
+    @Test
+    void refusesAMalformedTechniqueOrTactic() {
+        given().when().get("/api/alerts?technique=T110").then().statusCode(400);
+        given().when().get("/api/alerts?technique=T1110.1").then().statusCode(400);
+        given().when().get("/api/alerts?tactic=TA6").then().statusCode(400);
+        given().when().get("/api/alerts?tactic=T1110").then().statusCode(400);
     }
 }

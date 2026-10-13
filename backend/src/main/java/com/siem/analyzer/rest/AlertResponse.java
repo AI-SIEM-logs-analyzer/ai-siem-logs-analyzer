@@ -1,10 +1,12 @@
 package com.siem.analyzer.rest;
 
+import com.siem.analyzer.attack.AlertTechniqueResolver;
 import com.siem.analyzer.domain.Alert;
 import com.siem.analyzer.domain.AlertStatus;
 import com.siem.analyzer.domain.Severity;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -20,6 +22,8 @@ import java.util.Map;
  * @param windowEnd the time of the newest event in that window, inclusive
  * @param trigger the event whose arrival raised the alert
  * @param aiSummary the latest model summary of the alert; {@code null} until one is requested
+ * @param techniques the MITRE ATT&CK techniques the alert evidences, by ID; empty when neither its
+ *     rule nor a model summary names one
  */
 public record AlertResponse(
         Long id,
@@ -38,9 +42,11 @@ public record AlertResponse(
         Instant windowStart,
         Instant windowEnd,
         AlertEventResponse trigger,
-        AlertSummaryResponse aiSummary) {
+        AlertSummaryResponse aiSummary,
+        List<AlertTechniqueResponse> techniques) {
 
-    public static AlertResponse from(Alert alert) {
+    public static AlertResponse from(
+            Alert alert, List<AlertTechniqueResolver.ResolvedTechnique> techniques) {
         return new AlertResponse(
                 alert.getId(),
                 alert.getTitle(),
@@ -58,6 +64,7 @@ public record AlertResponse(
                 alert.getWindowStart(),
                 alert.getWindowEnd(),
                 AlertEventResponse.from(alert.getLogEvent()),
-                AlertSummaryResponse.from(alert));
+                AlertSummaryResponse.from(alert),
+                techniques.stream().map(AlertTechniqueResponse::from).toList());
     }
 }

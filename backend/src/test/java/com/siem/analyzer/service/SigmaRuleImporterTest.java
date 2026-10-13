@@ -11,6 +11,7 @@ import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /** Sigma rules stored as {@code alert_rule} rows. */
@@ -102,5 +103,38 @@ class SigmaRuleImporterTest {
         assertEquals(1, result.skipped().size());
         assertEquals("Windows only", result.skipped().get(0).title());
         assertEquals(before + 1, repository.count());
+    }
+
+    @Test
+    @TestTransaction
+    void mapsTheRulesAttackTechniqueTagsAndIgnoresTheOthers() {
+        importer.importRules(
+                RULE
+                        + """
+                        tags:
+                            - attack.discovery
+                            - attack.t1083
+                            - attack.T1595.003
+                            - attack.g0007
+                            - attack.s0002
+                            - cve.2021-44228
+                        """);
+
+        assertEquals(
+                Set.of("T1083", "T1595.003"),
+                repository.findByName(NAME).orElseThrow().getTechniqueIds());
+    }
+
+    @Test
+    @TestTransaction
+    void aRevisedTagListReplacesTheRulesTechniques() {
+        importer.importRules(RULE + "tags:\n    - attack.t1083\n");
+
+        SigmaRuleImporter.Result revised =
+                importer.importRules(RULE + "tags:\n    - attack.t1595.003\n");
+
+        assertEquals(List.of(NAME), revised.updated());
+        assertEquals(
+                Set.of("T1595.003"), repository.findByName(NAME).orElseThrow().getTechniqueIds());
     }
 }
