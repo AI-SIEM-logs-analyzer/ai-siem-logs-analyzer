@@ -58,6 +58,10 @@ public interface AppConfig {
     @Valid
     UserAgent userAgent();
 
+    /** MITRE ATT&CK dataset import. */
+    @Valid
+    Attack attack();
+
     /** Settings for the line parsers in {@code com.siem.analyzer.parse}. */
     interface Parse {
 
@@ -222,6 +226,52 @@ public interface AppConfig {
         @WithDefault("10000")
         @Min(0)
         int cacheSize();
+    }
+
+    /**
+     * The MITRE ATT&CK Enterprise dataset: the release bundled in the jar, and the limits on an
+     * administrator's upload of a newer one.
+     */
+    interface Attack {
+
+        /**
+         * Whether the bundled release is imported at start-up when the stored one is missing or
+         * older. A deployment that manages the dataset only through uploads turns this off.
+         */
+        @WithDefault("true")
+        boolean importOnStart();
+
+        /** Classpath location of the bundled STIX bundle, gzipped or plain JSON. */
+        @WithDefault("mitre/enterprise-attack-19.2.json.gz")
+        String bundledResource();
+
+        /**
+         * The release of the bundled file. Start-up compares it with the stored release without
+         * reading the 50 MB file, so a restart on the same release costs one query.
+         */
+        @WithDefault("19.2")
+        @NotBlank
+        String bundledVersion();
+
+        /**
+         * Largest upload accepted, in bytes as sent, compressed or not.
+         *
+         * <p>Kept under {@code quarkus.http.limits.max-body-size} (60M) on purpose, as {@code
+         * app.upload.max-file-size-bytes} is: the HTTP limit cuts a runaway body off, this one
+         * answers an oversized bundle with a 413 that names it. The 19.2 release is 51 MiB of JSON
+         * and 5.5 MiB gzipped, so a gzipped upload leaves room for many releases to come.
+         */
+        @WithDefault("58720256")
+        @Min(1)
+        long maxUploadBytes();
+
+        /**
+         * Largest bundle accepted once decompressed, in bytes. A gzip of a few megabytes can expand
+         * to gigabytes; this caps what a crafted upload can make the reader parse.
+         */
+        @WithDefault("268435456")
+        @Min(1)
+        long maxBundleBytes();
     }
 
     /** Settings for log file upload storage. */

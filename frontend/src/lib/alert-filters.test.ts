@@ -3,6 +3,7 @@ import {
   alertFiltersToParams,
   alertWindowFilters,
   groupValueText,
+  hasAlertFilters,
   NO_ALERT_FILTERS,
   parseAlertFilters,
   toggle,
@@ -22,7 +23,13 @@ describe('alert filters', () => {
     const filters = parseAlertFilters(
       new URLSearchParams('severity=critical&severity=CRITICAL&status=new&page=3'),
     );
-    expect(filters).toEqual({ severity: ['CRITICAL'], status: ['NEW'], page: 2 });
+    expect(filters).toEqual({
+      severity: ['CRITICAL'],
+      status: ['NEW'],
+      technique: [],
+      tactic: [],
+      page: 2,
+    });
   });
 
   it('drops what the backend would refuse', () => {
@@ -37,14 +44,45 @@ describe('alert filters', () => {
     const params = alertFiltersToParams({
       severity: ['CRITICAL', 'ERROR'],
       status: ['IN_PROGRESS'],
+      technique: [],
+      tactic: [],
       page: 1,
     });
     expect(params.toString()).toBe('severity=CRITICAL&severity=ERROR&status=IN_PROGRESS&page=2');
     expect(parseAlertFilters(params)).toEqual({
       severity: ['CRITICAL', 'ERROR'],
       status: ['IN_PROGRESS'],
+      technique: [],
+      tactic: [],
       page: 1,
     });
+  });
+
+  it('reads ATT&CK techniques and tactics, upper-cased, and drops malformed ones', () => {
+    const filters = parseAlertFilters(
+      new URLSearchParams(
+        'technique=t1110&technique=T1110.001&technique=T1110&technique=T12&tactic=ta0006&tactic=TA6',
+      ),
+    );
+    expect(filters.technique).toEqual(['T1110', 'T1110.001']);
+    expect(filters.tactic).toEqual(['TA0006']);
+  });
+
+  it('writes ATT&CK filters back before the page', () => {
+    expect(
+      alertFiltersToParams({
+        ...NO_ALERT_FILTERS,
+        technique: ['T1110'],
+        tactic: ['TA0006'],
+        page: 1,
+      }).toString(),
+    ).toBe('technique=T1110&tactic=TA0006&page=2');
+  });
+
+  it('tells a filtered list from the plain one', () => {
+    expect(hasAlertFilters(NO_ALERT_FILTERS)).toBe(false);
+    expect(hasAlertFilters({ ...NO_ALERT_FILTERS, page: 3 })).toBe(false);
+    expect(hasAlertFilters({ ...NO_ALERT_FILTERS, tactic: ['TA0006'] })).toBe(true);
   });
 
   it('toggles a value in and out', () => {

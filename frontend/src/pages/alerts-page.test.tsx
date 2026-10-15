@@ -42,6 +42,15 @@ const bruteForce = {
     raw: '10.0.0.7 - - "POST /login HTTP/1.1" 401 12',
     fields: { srcIp: '10.0.0.7', method: 'POST', status: 401 },
   },
+  techniques: [
+    {
+      id: 'T1110.001',
+      name: 'Password Guessing',
+      url: 'https://attack.mitre.org/techniques/T1110/001',
+      tactics: [{ id: 'TA0006', name: 'Credential Access' }],
+      source: 'RULE',
+    },
+  ],
 };
 
 const scanner = {
@@ -54,6 +63,39 @@ const scanner = {
   groupKey: undefined,
   eventCount: 1,
 };
+
+const modelled = {
+  ...bruteForce,
+  id: 13,
+  title: 'model-anomaly',
+  ruleId: undefined,
+  ruleName: undefined,
+  techniques: [
+    {
+      id: 'T1110.004',
+      name: 'Credential Stuffing',
+      url: 'https://attack.mitre.org/techniques/T1110/004',
+      tactics: [{ id: 'TA0006', name: 'Credential Access' }],
+      source: 'AI',
+    },
+  ],
+};
+
+const tactics = () =>
+  json(200, [
+    { id: 'TA0001', name: 'Initial Access', shortname: 'initial-access' },
+    { id: 'TA0006', name: 'Credential Access', shortname: 'credential-access' },
+  ]);
+
+const techniquesInUse = () =>
+  json(200, [
+    {
+      id: 'T1110.001',
+      name: 'Password Guessing',
+      parentId: 'T1110',
+      tactics: [{ id: 'TA0006', name: 'Credential Access' }],
+    },
+  ]);
 
 const list = (items: unknown[], total = items.length) =>
   json(200, { items, page: 0, size: 25, total });
@@ -158,6 +200,49 @@ describe('alerts page', () => {
     await user.click(screen.getByRole('link', { name: 'All alerts' }));
     expect(router.state.location.pathname).toBe('/alerts');
     expect(router.state.location.search).toBe('?severity=CRITICAL');
+  });
+
+  it("shows each alert's ATT&CK techniques, marking those the AI derived", async () => {
+    startTestSession();
+    stubBackend({ 'GET /api/auth/me': me, 'GET /api/alerts': () => list([bruteForce, modelled]) });
+
+    renderRoute('/alerts');
+
+    const table = await screen.findByRole('table');
+    expect(within(table).getByRole('columnheader', { name: 'ATT&CK' })).toBeInTheDocument();
+    const rows = within(table).getAllByRole('row').slice(1);
+    expect(within(rows[0]).getByText('T1110.001')).toBeInTheDocument();
+    expect(within(rows[0]).queryByText('AI')).not.toBeInTheDocument();
+    expect(within(rows[1]).getByText('T1110.004')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('AI')).toBeInTheDocument();
+  });
+
+  it('filters on ATT&CK technique and tactic, through the URL', async () => {
+    startTestSession();
+    const fetchMock = stubBackend({
+      'GET /api/auth/me': me,
+      'GET /api/alerts': () => list([bruteForce]),
+      'GET /api/attack/tactics': tactics,
+      'GET /api/attack/techniques': techniquesInUse,
+    });
+    const user = userEvent.setup();
+
+    const { router } = renderRoute('/alerts');
+    await screen.findByRole('table');
+    const technique = await screen.findByRole('group', { name: 'Technique' });
+    await user.click(within(technique).getByRole('button', { name: 'T1110.001' }));
+
+    await waitFor(() => expect(router.state.location.search).toBe('?technique=T1110.001'));
+    await waitFor(() => expect(listQuery(fetchMock, 1).getAll('technique')).toEqual(['T1110.001']));
+
+    // Only tactics an in-use technique serves are offered.
+    const tactic = screen.getByRole('group', { name: 'Tactic' });
+    expect(within(tactic).queryByRole('button', { name: 'Initial Access' })).toBeNull();
+    await user.click(within(tactic).getByRole('button', { name: 'Credential Access' }));
+
+    await waitFor(() =>
+      expect(router.state.location.search).toBe('?technique=T1110.001&tactic=TA0006'),
+    );
   });
 });
 
@@ -286,5 +371,30 @@ describe('alert details', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'The AI provider could not summarise this alert. The alert is unchanged.',
     );
+  });
+
+  it('names the ATT&CK techniques with a link to MITRE', async () => {
+    startTestSession();
+    stubBackend({ 'GET /api/auth/me': me, 'GET /api/alerts/12': () => json(200, bruteForce) });
+
+    renderRoute('/alerts/12');
+
+    expect(await screen.findByRole('heading', { name: 'MITRE ATT&CK' })).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /Password Guessing/ });
+    expect(link).toHaveAttribute('href', 'https://attack.mitre.org/techniques/T1110/001');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByText('Credential Access')).toBeInTheDocument();
+  });
+
+  it('says when the AI classification is where the technique comes from', async () => {
+    startTestSession();
+    stubBackend({ 'GET /api/auth/me': me, 'GET /api/alerts/13': () => json(200, modelled) });
+
+    renderRoute('/alerts/13');
+
+    expect(
+      await screen.findByText('Derived from the AI classification; no rule fired.'),
+    ).toBeInTheDocument();
   });
 });

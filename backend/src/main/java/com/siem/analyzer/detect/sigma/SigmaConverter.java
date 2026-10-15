@@ -15,6 +15,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -57,6 +59,14 @@ public final class SigmaConverter {
     private static final String REGEX_META = "\\.[]{}()*+?^$|";
 
     private static final Set<String> SKIPPED_STATUSES = Set.of("deprecated", "unsupported");
+
+    /**
+     * A Sigma tag naming an ATT&CK technique: {@code attack.t1110} or {@code attack.t1110.001}.
+     * Tactic ({@code attack.credential_access}), group ({@code attack.g0007}) and software ({@code
+     * attack.s0002}) tags share the prefix but are not techniques.
+     */
+    private static final Pattern ATTACK_TECHNIQUE_TAG =
+            Pattern.compile("(?i)attack\\.(t\\d{4}(?:\\.\\d{3})?)");
 
     private static final int MAX_SLUG_LENGTH = 60;
 
@@ -367,7 +377,20 @@ public final class SigmaConverter {
                 meta.id(),
                 severity(meta.level()),
                 description(meta),
-                expression);
+                expression,
+                attackTechniques(meta.tags()));
+    }
+
+    /** The ATT&CK technique IDs among a rule's tags, upper-cased. */
+    static Set<String> attackTechniques(List<String> tags) {
+        Set<String> ids = new TreeSet<>();
+        for (String tag : tags) {
+            Matcher matcher = ATTACK_TECHNIQUE_TAG.matcher(tag.strip());
+            if (matcher.matches()) {
+                ids.add(matcher.group(1).toUpperCase(Locale.ROOT));
+            }
+        }
+        return ids;
     }
 
     /** {@code sigma-<title>-<first 8 of id>}: readable, and stable across re-imports. */

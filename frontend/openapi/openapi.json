@@ -94,6 +94,12 @@
           },
           "aiSummary" : {
             "$ref" : "#/components/schemas/AlertSummaryResponse"
+          },
+          "techniques" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AlertTechniqueResponse"
+            }
           }
         }
       },
@@ -127,6 +133,98 @@
           },
           "summarizedAt" : {
             "$ref" : "#/components/schemas/Instant"
+          }
+        }
+      },
+      "AlertTechniqueResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "url" : {
+            "type" : "string"
+          },
+          "tactics" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AttackTacticRefResponse"
+            }
+          },
+          "source" : {
+            "$ref" : "#/components/schemas/TechniqueSource"
+          }
+        }
+      },
+      "AttackDatasetResponse" : {
+        "type" : "object",
+        "properties" : {
+          "version" : {
+            "type" : "string"
+          },
+          "sha256" : {
+            "type" : "string"
+          },
+          "techniqueCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "importedAt" : {
+            "$ref" : "#/components/schemas/Instant"
+          }
+        }
+      },
+      "AttackTacticRefResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        }
+      },
+      "AttackTacticResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "shortname" : {
+            "type" : "string"
+          },
+          "url" : {
+            "type" : "string"
+          }
+        }
+      },
+      "AttackTechniqueResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "parentId" : {
+            "type" : "string"
+          },
+          "url" : {
+            "type" : "string"
+          },
+          "tactics" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AttackTacticRefResponse"
+            }
           }
         }
       },
@@ -466,6 +564,10 @@
         "type" : "string",
         "enum" : [ "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL" ]
       },
+      "TechniqueSource" : {
+        "type" : "string",
+        "enum" : [ "RULE", "AI" ]
+      },
       "TimeBucket" : {
         "type" : "object",
         "properties" : {
@@ -598,6 +700,9 @@
     "name" : "Events",
     "description" : "Search over ingested log events"
   }, {
+    "name" : "MITRE ATT&CK",
+    "description" : "The ATT&CK techniques and tactics alerts are mapped to"
+  }, {
     "name" : "MicroProfile Health",
     "description" : "Check the health of the application"
   } ],
@@ -645,6 +750,26 @@
             }
           },
           "name" : "status",
+          "in" : "query"
+        }, {
+          "description" : "Restrict to alerts mapped to a technique under these MITRE ATT&CK tactics (TA0006); repeatable",
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "name" : "tactic",
+          "in" : "query"
+        }, {
+          "description" : "Restrict to alerts mapped to these MITRE ATT&CK techniques (T1110, T1110.001); a technique also matches its sub-techniques; repeatable",
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "name" : "technique",
           "in" : "query"
         } ],
         "responses" : {
@@ -754,6 +879,165 @@
         },
         "security" : [ {
           "SecurityScheme" : [ "ADMIN", "ANALYST" ]
+        } ]
+      }
+    },
+    "/api/attack/dataset" : {
+      "post" : {
+        "summary" : "Replace the ATT&CK dataset",
+        "description" : "Takes an Enterprise ATT&CK STIX 2.1 bundle (enterprise-attack-<version>.json from mitre-attack/attack-stix-data), plain or gzipped, and replaces the loaded tactics and techniques with it whatever its version. Rules keep their technique IDs. Gzip is recommended: the release JSON is close to the upload limit.",
+        "operationId" : "importAttackDataset",
+        "tags" : [ "MITRE ATT&CK" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            },
+            "application/gzip" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            },
+            "application/octet-stream" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "The release now loaded",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AttackDatasetResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Not an ATT&CK bundle; nothing changed"
+          },
+          "401" : {
+            "description" : "No valid access token"
+          },
+          "403" : {
+            "description" : "Only an administrator may import"
+          },
+          "413" : {
+            "description" : "Larger than app.attack.max-upload-bytes"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN" ]
+        } ]
+      },
+      "get" : {
+        "summary" : "Which ATT&CK release is loaded",
+        "operationId" : "getAttackDataset",
+        "tags" : [ "MITRE ATT&CK" ],
+        "responses" : {
+          "200" : {
+            "description" : "The loaded release",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AttackDatasetResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "No valid access token"
+          },
+          "403" : {
+            "description" : "The caller's roles do not allow reading"
+          },
+          "404" : {
+            "description" : "No release has been imported"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN", "ANALYST", "VIEWER" ]
+        } ]
+      }
+    },
+    "/api/attack/tactics" : {
+      "get" : {
+        "summary" : "List the tactics in matrix order",
+        "operationId" : "listAttackTactics",
+        "tags" : [ "MITRE ATT&CK" ],
+        "responses" : {
+          "200" : {
+            "description" : "Every tactic in the loaded dataset",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/AttackTacticResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "No valid access token"
+          },
+          "403" : {
+            "description" : "The caller's roles do not allow reading"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN", "ANALYST", "VIEWER" ]
+        } ]
+      }
+    },
+    "/api/attack/techniques" : {
+      "get" : {
+        "summary" : "List techniques",
+        "description" : "Every technique in the loaded dataset, by ID; with inUse=true, only those an alert can name: mapped by an enabled rule or by the AI attack-type fallback. An ID the dataset does not know comes without a name.",
+        "operationId" : "listAttackTechniques",
+        "tags" : [ "MITRE ATT&CK" ],
+        "parameters" : [ {
+          "description" : "Only the techniques an alert can name",
+          "name" : "inUse",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The techniques",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/AttackTechniqueResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "No valid access token"
+          },
+          "403" : {
+            "description" : "The caller's roles do not allow reading"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "ADMIN", "ANALYST", "VIEWER" ]
         } ]
       }
     },

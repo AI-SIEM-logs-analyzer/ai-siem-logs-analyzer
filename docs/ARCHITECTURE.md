@@ -85,6 +85,7 @@ Mirrors `com.siem.analyzer` — see [backend/README.md](../backend/README.md#pac
 | `repo`    | Panache repositories — every query lives here                |
 | `search`  | The derived OpenSearch index — projection, queries and backfill |
 | `ai`      | LLM assistance through quarkus-langchain4j: the alert summariser (a declarative AI service with structured output) and the runtime choice of provider |
+| `attack`  | MITRE ATT&CK mapping: the streaming STIX reader and the dataset import (bundled release at start-up, ADMIN upload), the attack-type fallback, and the resolution of an alert's techniques |
 | `enrich`  | GeoIP enrichment of a source address (`GeoIpEnricher` seam, MaxMind GeoLite2 lookup) and User-Agent classification (`UserAgentEnricher` seam, Yauaa) |
 | `config`  | Typed `@ConfigMapping` configuration                         |
 | `health`  | Custom health checks                                         |
@@ -393,6 +394,26 @@ past the inclusive window end), narrowed to the group key's `srcIp`, `status`, `
 dropped silently. Still planned: the endpoint that changes an alert's status, and an audit of
 who made each move.
 
+**MITRE ATT&CK mapping.** Every alert names the ATT&CK Enterprise techniques it evidences. The
+mapping lives on the rule: `alert_rule_technique` holds technique IDs by value (`T1110.001`), and
+an alert inherits its rule's when it is read, so mapping a rule changes every alert it raised.
+V15 maps the built-in rules (brute force `T1110.001`/`T1110.003`, SQL injection `T1190`, path
+traversal `T1190`/`T1083`, scanner User-Agent `T1595.002`/`T1595.003`), and the Sigma importer
+maps an imported rule's `attack.t…` tags. An alert without a rule falls back to
+`attack.AttackTypeTechniques`, a fixed mapping of the model's `AttackType`; those techniques are
+marked `source: AI`. `attack.AlertTechniqueResolver` resolves a page of alerts in two queries.
+
+Names, tactics and links come from the official STIX 2.1 bundle, read by
+`attack.AttackStixReader` one object at a time (the release is over 50 MB of JSON) into four
+`attack_*` tables. The jar carries a pinned release (`mitre/enterprise-attack-19.2.json.gz`),
+imported at start-up when the stored one is missing or older, so an air-gapped deployment has
+names without network access; `POST /api/attack/dataset` (`ADMIN`) loads a newer one. An import
+replaces the tables in one transaction under an advisory lock, after the bundle has been read
+and validated, so a refused bundle changes nothing. Rules reference techniques without a foreign
+key: a technique the dataset does not know is shown as its bare ID. A failed import is logged and
+never blocks start-up or detection. `GET /api/alerts` filters by repeatable `technique` (a base
+technique also matches its sub-techniques) and `tactic`.
+
 **AI summaries.** An analyst or administrator can have the configured LLM read an alert:
 `POST /api/alerts/{id}/summary` (`ADMIN`, `ANALYST`; the reads stay open to every role).
 `ai.AlertSummarizer` is a quarkus-langchain4j declarative AI service (`@RegisterAiService`,
@@ -506,6 +527,7 @@ an entry here once decided; substantial ones graduate to an ADR under `docs/adr/
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-10-13 | Alerts are mapped to MITRE ATT&CK through their rule (technique IDs by value, no foreign key), with the LLM's attack type as the fallback for rule-less alerts; the Enterprise STIX bundle is pinned and bundled gzipped in the jar, imported at start-up when newer, and replaceable by an ADMIN upload | Rule-level mapping keeps one place to change and makes every past alert follow it. A soft reference lets Flyway seed mappings before any dataset exists and survives a release that retires a technique. Bundling costs ~6 MB of jar but keeps an air-gapped deployment complete, as the GeoLite2 decision did; the upload path avoids a redeploy per ATT&CK release. AI-derived techniques are labelled as such, since no rule vouches for them |
 | 2026-10-13 | Alert summaries are grounded: the system message is a constant holding every instruction and no data, the alert's window events are sent as context, the model quotes its evidence first, and an answer whose evidence or IP addresses are not in the alert is refused rather than stored | A summary an analyst acts on must not name a host the logs never saw. Literal checks need no second model and cannot be talked out of their verdict by the log content, though they only prove the values are real, not the reasoning; the prompt asks for the rest. Refusing beats repairing: a corrected answer would be ours, not the model's |
 | 2026-10-13 | Alert summaries come from quarkus-langchain4j with all three providers (Anthropic, OpenAI, Ollama) built in and the provider picked at runtime from `app.ai.provider`; the answer is the provider-enforced structured output of a Java record | One image serves a cloud deployment and an air-gapped one with a local Ollama, and switching is a restart. The extensions bind a provider to a model name at build time, so each provider gets a named model and a CDI supplier picks one; the cost is three extensions on the classpath. A record with a closed `AttackType` list is something the UI can badge and a query can count, which free text is not |
 | 2026-10-06 | Sigma rules are imported in the JVM — Jackson YAML (SnakeYAML) into this engine's rule language — not converted offline with pySigma | One converter, in the same build and test suite as the engine, keeps the field mapping and the rule language from drifting apart, and an import needs no Python toolchain. The converter refuses what it cannot express faithfully instead of approximating it. pySigma stays the fallback, as an offline backend that emits this rule language, if rules the importer refuses turn out to matter |

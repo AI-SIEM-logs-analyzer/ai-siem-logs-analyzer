@@ -44,8 +44,8 @@ public record SigmaRule(
      * @param name the handle a correlation refers to the rule by; {@code null} when absent
      * @param status {@code stable}, {@code test}, {@code experimental}, {@code deprecated} or
      *     {@code unsupported}; {@code null} when absent
-     * @param level {@code informational}, {@code low}, {@code medium}, {@code high} or {@code
-     *     critical}; {@code null} when absent
+     * @param falsepositives known benign causes of the match
+     * @param tags free-form labels; {@code attack.t1110.001} names an ATT&CK technique
      */
     public record Meta(
             String title,
@@ -56,12 +56,14 @@ public record SigmaRule(
             String level,
             String author,
             List<String> references,
-            List<String> falsepositives) {
+            List<String> falsepositives,
+            List<String> tags) {
 
         public Meta {
             Objects.requireNonNull(title, "title");
             references = List.copyOf(references);
             falsepositives = List.copyOf(falsepositives);
+            tags = List.copyOf(tags);
         }
 
         static Meta from(Map<String, Object> document) {
@@ -78,7 +80,8 @@ public record SigmaRule(
                     text(document, "level"),
                     text(document, "author"),
                     texts(document, "references"),
-                    texts(document, "falsepositives"));
+                    texts(document, "falsepositives"),
+                    texts(document, "tags"));
         }
     }
 

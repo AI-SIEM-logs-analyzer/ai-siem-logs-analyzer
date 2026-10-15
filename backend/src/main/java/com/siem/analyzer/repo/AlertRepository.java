@@ -2,6 +2,7 @@ package com.siem.analyzer.repo;
 
 import com.siem.analyzer.domain.Alert;
 import com.siem.analyzer.domain.AlertStatus;
+import com.siem.analyzer.domain.AttackType;
 import com.siem.analyzer.domain.Severity;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import io.quarkus.panache.common.Page;
@@ -25,16 +26,49 @@ public class AlertRepository implements PanacheRepositoryBase<Alert, Long> {
             "from Alert a left join fetch a.rule join fetch a.logEvent e join fetch e.source";
 
     /**
-     * Criteria for the alert listing. An empty set means "do not filter on this".
+     * Which alerts an ATT&CK filter keeps: those whose rule maps a technique in {@code ids} or a
+     * sub-technique of one of {@code bases}, and those without a rule whose model-assigned attack
+     * type is in {@code attackTypes}. All three empty matches nothing: a filter on a tactic no
+     * technique serves has no alert to show.
+     *
+     * @param ids technique IDs matched exactly
+     * @param bases base technique IDs whose sub-techniques match too ({@code T1110} takes {@code
+     *     T1110.001})
+     * @param attackTypes the attack types of rule-less alerts that match
+     */
+    public record TechniqueCriterion(
+            Set<String> ids, Set<String> bases, Set<AttackType> attackTypes) {
+
+        public TechniqueCriterion {
+            ids = Set.copyOf(ids);
+            bases = Set.copyOf(bases);
+            attackTypes = Set.copyOf(attackTypes);
+        }
+    }
+
+    /**
+     * Criteria for the alert listing. An empty set or a {@code null} criterion means "do not filter
+     * on this".
      *
      * @param severities keep only alerts of one of these severities
      * @param statuses keep only alerts in one of these statuses
+     * @param technique keep only alerts mapped to one of these ATT&CK techniques
+     * @param tactic keep only alerts mapped to a technique under one of these ATT&CK tactics
      */
-    public record Filter(Set<Severity> severities, Set<AlertStatus> statuses) {
+    public record Filter(
+            Set<Severity> severities,
+            Set<AlertStatus> statuses,
+            TechniqueCriterion technique,
+            TechniqueCriterion tactic) {
 
         public Filter {
             severities = severities == null ? Set.of() : Set.copyOf(severities);
             statuses = statuses == null ? Set.of() : Set.copyOf(statuses);
+        }
+
+        /** A filter on severity and status alone. */
+        public Filter(Set<Severity> severities, Set<AlertStatus> statuses) {
+            this(severities, statuses, null, null);
         }
     }
 
@@ -100,6 +134,44 @@ public class AlertRepository implements PanacheRepositoryBase<Alert, Long> {
             clauses.add("a.status in :statuses");
             parameters.and("statuses", filter.statuses());
         }
+        if (filter.technique() != null) {
+            clauses.add(techniqueClause(filter.technique(), "technique", parameters));
+        }
+        if (filter.tactic() != null) {
+            clauses.add(techniqueClause(filter.tactic(), "tactic", parameters));
+        }
         return clauses.isEmpty() ? "" : " where " + String.join(" and ", clauses);
+    }
+
+    /**
+     * One ATT&CK criterion as HQL. The rule branch is a correlated {@code exists} over the rule's
+     * technique IDs; {@code substring(t, 1, 5)} is a sub-technique's base ({@code T1110} of {@code
+     * T1110.001}). Each part is left out when its set is empty, since {@code in ()} is not valid
+     * SQL; with nothing left, {@code a.id is null}, which no row satisfies, keeps the query valid.
+     */
+    private static String techniqueClause(
+            TechniqueCriterion criterion, String name, Parameters parameters) {
+        List<String> ruleMatches = new ArrayList<>();
+        if (!criterion.ids().isEmpty()) {
+            ruleMatches.add("t in :" + name + "Ids");
+            parameters.and(name + "Ids", criterion.ids());
+        }
+        if (!criterion.bases().isEmpty()) {
+            ruleMatches.add("substring(t, 1, 5) in :" + name + "Bases");
+            parameters.and(name + "Bases", criterion.bases());
+        }
+        List<String> branches = new ArrayList<>();
+        if (!ruleMatches.isEmpty()) {
+            branches.add(
+                    "exists (select 1 from AlertRule r join r.techniqueIds t"
+                            + " where r.id = a.rule.id and ("
+                            + String.join(" or ", ruleMatches)
+                            + "))");
+        }
+        if (!criterion.attackTypes().isEmpty()) {
+            branches.add("(a.rule is null and a.aiAttackType in :" + name + "AttackTypes)");
+            parameters.and(name + "AttackTypes", criterion.attackTypes());
+        }
+        return branches.isEmpty() ? "a.id is null" : "(" + String.join(" or ", branches) + ")";
     }
 }

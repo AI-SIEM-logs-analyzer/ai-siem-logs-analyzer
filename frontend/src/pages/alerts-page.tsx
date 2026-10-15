@@ -4,13 +4,19 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ALERT_PAGE_SIZE, useAlertPage, type Alert } from '@/api/alerts';
 import { AlertFilterBar } from '@/components/alerts/alert-filter-bar';
 import { AlertStatusBadge } from '@/components/alerts/alert-status-badge';
+import { TechniqueBadges } from '@/components/alerts/technique-badges';
 import { SeverityBadge } from '@/components/events/severity-badge';
 import { ErrorState } from '@/components/feedback/error-state';
 import { TableSkeleton } from '@/components/feedback/skeletons';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { alertFiltersToParams, parseAlertFilters, type AlertFilters } from '@/lib/alert-filters';
+import {
+  alertFiltersToParams,
+  hasAlertFilters,
+  parseAlertFilters,
+  type AlertFilters,
+} from '@/lib/alert-filters';
 import { formatEventTime } from '@/lib/event-fields';
 import { errorMessage } from '@/lib/errors';
 import { cn } from '@/lib/utils';
@@ -31,7 +37,7 @@ export function AlertsPage() {
 
   const total = data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / ALERT_PAGE_SIZE));
-  const filtered = filters.severity.length > 0 || filters.status.length > 0;
+  const filtered = hasAlertFilters(filters);
 
   return (
     <>
@@ -70,7 +76,7 @@ export function AlertsPage() {
           />
         )}
         {isPending ? (
-          <TableSkeleton label="Loading alerts" columns={5} rows={6} />
+          <TableSkeleton label="Loading alerts" columns={6} rows={6} />
         ) : !data ? (
           <div className="p-4">
             <ErrorState
@@ -123,16 +129,12 @@ export function AlertsPage() {
   );
 }
 
-/**
- * One row per alert; the title links to its details, and a click anywhere else on the row goes
- * there too. `search` is the list's query string, handed on so the details page leads back to it.
- */
 function AlertsTable({
   alerts,
   stale,
   search,
 }: {
-  alerts: Alert[];
+  alerts: readonly Alert[];
   stale: boolean;
   search: string;
 }) {
@@ -146,6 +148,7 @@ function AlertsTable({
           <tr>
             <th className="px-4 py-3 font-medium">Severity</th>
             <th className="px-4 py-3 font-medium">Alert</th>
+            <th className="px-4 py-3 font-medium">ATT&amp;CK</th>
             <th className="px-4 py-3 font-medium">Status</th>
             <th className="px-4 py-3 text-right font-medium">Events</th>
             <th className="px-4 py-3 font-medium">Raised</th>
@@ -176,6 +179,9 @@ function AlertsTable({
                     {alert.detail}
                   </div>
                 )}
+              </td>
+              <td className="px-4 py-3">
+                <TechniqueBadges techniques={alert.techniques ?? []} />
               </td>
               <td className="px-4 py-3">
                 <AlertStatusBadge status={alert.status} />

@@ -14,6 +14,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceException;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -396,6 +397,67 @@ class FlywayMigrationTest {
                                                 + " values (?1, 't', 'INFO', 'ERROR', 'OTHER', 's',"
                                                 + " 'a', '\"x\"'::jsonb, 'm', now())")
                                 .setParameter(1, eventId)
+                                .executeUpdate());
+    }
+
+    @Test
+    @TestTransaction
+    void theBuiltInRulesMapToTheirAttackTechniques() {
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows =
+                entityManager
+                        .createNativeQuery(
+                                "select r.name, t.technique_id from alert_rule_technique t"
+                                        + " join alert_rule r on r.id = t.rule_id"
+                                        + " where r.name in ('brute-force-login', 'sql-injection',"
+                                        + " 'path-traversal', 'scanner-user-agent')"
+                                        + " order by r.name, t.technique_id")
+                        .getResultList();
+
+        assertEquals(
+                List.of(
+                        "brute-force-login T1110.001",
+                        "brute-force-login T1110.003",
+                        "path-traversal T1083",
+                        "path-traversal T1190",
+                        "scanner-user-agent T1595.002",
+                        "scanner-user-agent T1595.003",
+                        "sql-injection T1190"),
+                rows.stream().map(row -> row[0] + " " + row[1]).toList());
+    }
+
+    @Test
+    @TestTransaction
+    void aMalformedTechniqueIdIsRefused() {
+        Number ruleId =
+                (Number)
+                        entityManager
+                                .createNativeQuery(
+                                        "select id from alert_rule where name = 'sql-injection'")
+                                .getSingleResult();
+
+        assertThrows(
+                PersistenceException.class,
+                () ->
+                        entityManager
+                                .createNativeQuery(
+                                        "insert into alert_rule_technique (rule_id, technique_id)"
+                                                + " values (?1, 'T110')")
+                                .setParameter(1, ruleId.longValue())
+                                .executeUpdate());
+    }
+
+    @Test
+    @TestTransaction
+    void theAttackDatasetTableHoldsOneRowAtMost() {
+        assertThrows(
+                PersistenceException.class,
+                () ->
+                        entityManager
+                                .createNativeQuery(
+                                        "insert into attack_dataset"
+                                                + " (id, version, sha256, technique_count,"
+                                                + " imported_at) values (2, '1', 'x', 0, now())")
                                 .executeUpdate());
     }
 }
