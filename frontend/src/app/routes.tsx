@@ -4,6 +4,7 @@ import { RequirePermission } from '@/components/auth/require-permission';
 import { AppLayout } from '@/components/layout/app-layout';
 import { AlertDetailsPage } from '@/pages/alert-details-page';
 import { AlertsPage } from '@/pages/alerts-page';
+import { AttackMatrixPage } from '@/pages/attack-matrix-page';
 import { DashboardPage } from '@/pages/dashboard-page';
 import { LazyEventsPage } from '@/pages/lazy-events-page';
 import { LoginPage } from '@/pages/login-page';
@@ -36,6 +37,7 @@ export const routes: RouteObject[] = [
           { path: 'uploads', element: <UploadsPage /> },
           { path: 'alerts', element: <AlertsPage /> },
           { path: 'alerts/:id', element: <AlertDetailsPage /> },
+          { path: 'attack', element: <AttackMatrixPage /> },
           {
             path: 'users',
             element: (

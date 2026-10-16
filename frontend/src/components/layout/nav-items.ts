@@ -1,4 +1,5 @@
 import {
+  Grid3x3,
   LayoutDashboard,
   ScrollText,
   ShieldAlert,
@@ -21,5 +22,6 @@ export const navItems: readonly NavItem[] = [
   { to: '/events', label: 'Events', icon: ScrollText },
   { to: '/uploads', label: 'Uploads', icon: Upload },
   { to: '/alerts', label: 'Alerts', icon: ShieldAlert },
+  { to: '/attack', label: 'ATT&CK Matrix', icon: Grid3x3 },
   { to: '/users', label: 'Users', icon: Users, permission: 'users:manage' },
 ];

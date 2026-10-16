@@ -259,6 +259,30 @@ The pages are built from:
   [`alert-status-badge.tsx`](src/components/alerts/alert-status-badge.tsx)
 - [`api/alerts.ts`](src/api/alerts.ts) — the list and detail queries
 
+## MITRE ATT&CK Navigator Matrix
+
+- `/attack` renders the Enterprise ATT&CK tactic-by-technique detection and coverage matrix on
+  an ECharts heatmap. By default (`scope=active`), only rule-covered (`inUse`) and actively
+  detected parent techniques are shown; toggling **Full Enterprise matrix** (`scope=all`) shows
+  the entire Enterprise ATT&CK catalog.
+- Sub-techniques roll up into their parent technique cell per tactic column while preserving
+  per-sub-technique alert counts in the tooltip. Severity and alert status filters live in the
+  URL (`/attack?severity=HIGH&status=NEW&scope=all`), read and written by
+  [`lib/attack-matrix.ts`](src/lib/attack-matrix.ts).
+- Clicking any matrix cell navigates to `/alerts` pre-filtered by that cell's `technique` and
+  `tactic` (carrying over any active `severity` and `status` filters).
+
+The matrix is built from:
+
+- [`attack-matrix-page.tsx`](src/pages/attack-matrix-page.tsx) — URL filters, summary header and
+  chart container
+- [`attack-matrix-option.ts`](src/components/attack/attack-matrix-option.ts) — ECharts heatmap
+  option, tooltip formatter and light/dark palettes
+- [`lib/attack-matrix.ts`](src/lib/attack-matrix.ts) — matrix aggregation, sub-technique rollup
+  and URL filter helpers
+- [`api/attack.ts`](src/api/attack.ts) and [`api/alerts.ts`](src/api/alerts.ts) — ATT&CK catalog
+  and multi-page alert queries
+
 ### Adding shadcn/ui components
 
 [`components.json`](components.json) is set up for the CLI:
