@@ -31,7 +31,7 @@ BUILDER_RUN_TESTS := docker run --rm \
 	-w /work/backend \
 	$(BUILDER_IMAGE)
 
-.PHONY: up up-app down stop logs ps reset tools help builder image verify hooks \
+.PHONY: up up-app down stop logs ps reset tools help builder image image-frontend verify hooks \
 	format format-backend format-frontend lint lint-backend lint-frontend synth-logs api-client
 
 ## Start the dev stack (creates docker/.env from the example on first run)
@@ -58,6 +58,10 @@ builder:
 ## Build the backend container image with Jib, into the local Docker daemon
 image: builder
 	$(BUILDER_RUN_DOCKER) ./mvnw -B package -DskipTests -Dquarkus.container-image.build=true
+
+## Build the frontend container image
+image-frontend:
+	docker build -t siem/security-log-analyzer-frontend:latest frontend/
 
 ## Run the backend exactly as CI does (Temurin 21): Spotless, Checkstyle, build + tests
 verify: builder

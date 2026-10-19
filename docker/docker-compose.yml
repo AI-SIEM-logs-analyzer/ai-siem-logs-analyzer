@@ -184,6 +184,17 @@ services:
       retries: 10
       start_period: 20s
 
+  frontend:
+    image: ${FRONTEND_IMAGE:-siem/security-log-analyzer-frontend}:${FRONTEND_TAG:-latest}
+    container_name: siem-frontend
+    restart: unless-stopped
+    profiles: ["app"]
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
 volumes:
   pgdata:
   redisdata:
