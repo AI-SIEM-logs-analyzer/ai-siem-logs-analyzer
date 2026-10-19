@@ -42,30 +42,52 @@ export type EChartClick = echarts.ECElementEvent;
 interface EChartProps {
   option: EChartOption;
   /** What the chart shows, for screen readers; pair it with a table view of the same data. */
-  label: string;
+  label?: string;
+  ariaLabel?: string;
+  height?: number;
   className?: string;
   /** For a size that follows the data, such as a height per bar. */
   style?: CSSProperties;
   /** Called with the mark clicked; pair it with a keyboard path to the same place. */
   onClick?: (event: EChartClick) => void;
+  onCellClick?: (coords: { colIndex: number; rowIndex: number }) => void;
 }
 
 /** One ECharts instance bound to a div, re-drawn when `option` changes and resized with it. */
-export function EChart({ option, label, className, style, onClick }: EChartProps) {
+export function EChart({
+  option,
+  label,
+  ariaLabel,
+  height,
+  className,
+  style,
+  onClick,
+  onCellClick,
+}: EChartProps) {
   const container = useRef<HTMLDivElement>(null);
   const chart = useRef<echarts.ECharts | null>(null);
   // The latest handler, so a new closure each render does not rebind the chart's listener.
   const clickHandler = useRef(onClick);
+  const cellClickHandler = useRef(onCellClick);
 
   useEffect(() => {
     clickHandler.current = onClick;
-  }, [onClick]);
+    cellClickHandler.current = onCellClick;
+  }, [onClick, onCellClick]);
 
   useEffect(() => {
     const element = container.current!;
     const instance = echarts.init(element, null, { renderer: 'svg' });
     chart.current = instance;
-    instance.on('click', (event) => clickHandler.current?.(event));
+    instance.on('click', (event) => {
+      clickHandler.current?.(event);
+      if (cellClickHandler.current && Array.isArray(event.value)) {
+        const [colIndex, rowIndex] = event.value as number[];
+        if (typeof colIndex === 'number' && typeof rowIndex === 'number') {
+          cellClickHandler.current({ colIndex, rowIndex });
+        }
+      }
+    });
     const observer =
       typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => instance.resize());
     observer?.observe(element);
@@ -81,5 +103,15 @@ export function EChart({ option, label, className, style, onClick }: EChartProps
     chart.current?.setOption(option, { notMerge: true });
   }, [option]);
 
-  return <div ref={container} role="img" aria-label={label} className={className} style={style} />;
+  const mergedStyle = height !== undefined ? { height, ...style } : style;
+
+  return (
+    <div
+      ref={container}
+      role="img"
+      aria-label={label ?? ariaLabel}
+      className={className}
+      style={mergedStyle}
+    />
+  );
 }
