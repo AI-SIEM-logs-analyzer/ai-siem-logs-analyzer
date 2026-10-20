@@ -231,10 +231,14 @@ index's snake_case to the payload's own camelCase key names (`fields.geoCountryI
 **Detection (In progress).** The rule engine is in place (`detect` package); AI-assisted
 detection through LangChain4j is planned (alert summaries through it are in place, see
 **AI summaries** below), and anomaly scoring with Smile is in place
-(`detect.anomaly`, below) but not yet fed by ingestion. Whether detection
-runs inline with ingestion or as a separate consumer is **TBD**, so the engine is deliberately
-free of persistence and CDI: it takes `NormalizedEvent`s and returns `Detection`s, and
-`AlertService.raise` turns one into an `alert` row — the rule's name as the title,
+(`detect.anomaly`, below) but not yet fed by ingestion. Rule detection runs inline with
+ingestion: `DefaultLogFileParser` builds one `RuleEngine` per upload from the enabled
+`alert_rule` rows (a rule that no longer parses is skipped and logged), evaluates every parsed
+line, and raises each detection in the same transaction as the batch holding its trigger
+event. One engine per upload, because windows run on event time and two files whose clocks
+are far apart would make the older one look late; a window therefore never spans two uploads.
+The engine itself stays free of persistence and CDI: it takes `NormalizedEvent`s and returns
+`Detection`s, and `AlertService.raise` turns one into an `alert` row — the rule's name as the title,
 `Detection.summary()` as the detail, the rule's severity, and what the window held
 (`group_key`, `aggregate_value`, `event_count`, `window_start`, `window_end`).
 

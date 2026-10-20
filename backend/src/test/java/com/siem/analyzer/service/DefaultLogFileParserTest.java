@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.siem.analyzer.domain.Alert;
 import com.siem.analyzer.domain.LogEvent;
 import com.siem.analyzer.domain.LogFormat;
 import com.siem.analyzer.domain.LogIngestEvent;
@@ -18,6 +19,7 @@ import com.siem.analyzer.enrich.GeoEnrichment;
 import com.siem.analyzer.enrich.StubGeoIpEnricher;
 import com.siem.analyzer.enrich.StubUserAgentEnricher;
 import com.siem.analyzer.enrich.UserAgentEnrichment;
+import com.siem.analyzer.repo.AlertRepository;
 import com.siem.analyzer.repo.LogEventIndexStateRepository;
 import com.siem.analyzer.repo.LogEventRepository;
 import com.siem.analyzer.repo.LogSourceRepository;
@@ -48,6 +50,7 @@ class DefaultLogFileParserTest {
     @Inject LogSourceRepository sourceRepository;
     @Inject LogEventRepository eventRepository;
     @Inject LogEventIndexStateRepository indexStateRepository;
+    @Inject AlertRepository alertRepository;
     @Inject RecordingEventSearch search;
     @Inject StubGeoIpEnricher geo;
     @Inject StubUserAgentEnricher userAgents;
@@ -451,6 +454,81 @@ class DefaultLogFileParserTest {
         return events.stream().filter(e -> raw.equals(e.getRaw())).findFirst().orElseThrow();
     }
 
+    /**
+     * The Kafka consumer calls the parser on a worker thread with neither a transaction nor a CDI
+     * request context. A test method has a request context of its own, which hides the case, so
+     * this one runs the parse on a plain thread the way the consumer does.
+     */
+    @Test
+    void parsesOnAThreadWithNoRequestContext() throws Exception {
+        String content =
+                "203.0.113.9 - - [14/Sep/2026:10:15:30 +0000] \"GET / HTTP/1.1\" 200 512"
+                        + " \"-\" \"Mozilla/5.0\"\n";
+        Path file = write("worker-thread.log", content);
+        Long uploadId = createUpload(file, LogFormat.ACCESS_LOG);
+        LogIngestEvent ingestEvent = createIngestEvent(uploadId, file);
+
+        Throwable[] failure = new Throwable[1];
+        Thread worker =
+                new Thread(
+                        () -> {
+                            try {
+                                parser.parse(ingestEvent);
+                            } catch (Throwable t) {
+                                failure[0] = t;
+                            }
+                        });
+        worker.start();
+        worker.join();
+
+        if (failure[0] != null) {
+            throw new AssertionError("parse failed off the request context", failure[0]);
+        }
+        LogUpload upload = readUpload(uploadId);
+        assertEquals(LogUploadStatus.INGESTED, upload.getStatus());
+        assertEquals(1L, upload.getEventCount());
+    }
+
+    @Test
+    void raisesAnAlertWhenAStoredRuleFires() throws IOException {
+        StringBuilder content = new StringBuilder();
+        for (int i = 0; i < 5; i++) {
+            content.append("Sep 14 10:00:0")
+                    .append(i)
+                    .append(
+                            " bastion-01 sshd[4242]: Failed password for root from 192.0.2.77 port ")
+                    .append(50000 + i)
+                    .append(" ssh2\n");
+        }
+        Path file = write("brute-force.log", content.toString());
+        Long uploadId = createUpload(file, LogFormat.SYSLOG);
+
+        parser.parse(createIngestEvent(uploadId, file));
+
+        List<Alert> raised = listAlerts(source.getId());
+        assertEquals(1, raised.size());
+        Alert alert = raised.get(0);
+        assertEquals("brute-force-login", alert.getTitle());
+        assertNotNull(alert.getRule());
+        assertEquals(Map.of("srcIp", "192.0.2.77"), alert.getGroupKey());
+        assertEquals(5, alert.getEventCount());
+        assertTrue(alert.getLogEvent().getRaw().contains("port 50004"));
+    }
+
+    @Test
+    void benignLinesRaiseNoAlert() throws IOException {
+        Path file =
+                write(
+                        "benign.log",
+                        "Sep 14 10:00:00 bastion-01 sshd[4242]: Accepted publickey for deploy from"
+                                + " 192.0.2.78 port 50000 ssh2\n");
+        Long uploadId = createUpload(file, LogFormat.SYSLOG);
+
+        parser.parse(createIngestEvent(uploadId, file));
+
+        assertTrue(listAlerts(source.getId()).isEmpty());
+    }
+
     private Path write(String name, String content) throws IOException {
         Path file = tempDir.resolve(name);
         Files.write(file, content.getBytes(StandardCharsets.UTF_8));
@@ -493,6 +571,25 @@ class DefaultLogFileParserTest {
 
     private LogUpload readUpload(Long uploadId) {
         return QuarkusTransaction.requiringNew().call(() -> uploadRepository.findById(uploadId));
+    }
+
+    private List<Alert> listAlerts(Long sourceId) {
+        return QuarkusTransaction.requiringNew()
+                .call(
+                        () -> {
+                            List<Alert> found =
+                                    alertRepository.list(
+                                            "logEvent.source.id = ?1 order by id", sourceId);
+                            // Touch what the assertions read while the session is still open.
+                            found.forEach(
+                                    a -> {
+                                        a.getLogEvent().getRaw();
+                                        if (a.getRule() != null) {
+                                            a.getRule().getName();
+                                        }
+                                    });
+                            return found;
+                        });
     }
 
     private List<LogEvent> listEvents(Long sourceId) {

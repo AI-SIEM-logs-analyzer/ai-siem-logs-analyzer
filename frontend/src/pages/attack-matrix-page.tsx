@@ -35,6 +35,9 @@ import {
 import { SEVERITIES } from '@/lib/event-filters';
 import { formatLevel } from '@/lib/heatmap';
 
+// Narrowest a tactic column gets before its two-line label and cell names stop fitting.
+const MATRIX_COLUMN_MIN_WIDTH = 116;
+
 const SEVERITY_LABELS: Record<Severity, string> = {
   CRITICAL: 'Critical',
   HIGH: 'High',
@@ -324,7 +327,8 @@ export function AttackMatrixPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <div className="min-w-[1120px]">
+                {/* Wide enough for every column's label; the full matrix scrolls sideways. */}
+                <div style={{ minWidth: matrix.tactics.length * MATRIX_COLUMN_MIN_WIDTH }}>
                   <Suspense
                     fallback={<Skeleton className="w-full" style={{ height: chartHeight }} />}
                   >
