@@ -1,6 +1,11 @@
 package com.siem.analyzer.service;
 
 import com.siem.analyzer.config.AppConfig;
+import com.siem.analyzer.detect.Detection;
+import com.siem.analyzer.detect.DetectionRule;
+import com.siem.analyzer.detect.RuleEngine;
+import com.siem.analyzer.detect.RuleSyntaxException;
+import com.siem.analyzer.domain.AlertRule;
 import com.siem.analyzer.domain.LogEvent;
 import com.siem.analyzer.domain.LogFormat;
 import com.siem.analyzer.domain.LogIngestEvent;
@@ -14,12 +19,14 @@ import com.siem.analyzer.enrich.UserAgentEnricher;
 import com.siem.analyzer.parse.AccessLogParser;
 import com.siem.analyzer.parse.JsonLogParser;
 import com.siem.analyzer.parse.SyslogParser;
+import com.siem.analyzer.repo.AlertRuleRepository;
 import com.siem.analyzer.repo.LogEventRepository;
 import com.siem.analyzer.repo.LogSourceRepository;
 import com.siem.analyzer.repo.LogUploadRepository;
 import com.siem.analyzer.search.EventIndexer;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.NotFoundException;
 import java.io.BufferedReader;
@@ -40,6 +47,11 @@ import org.jboss.logging.Logger;
 /**
  * Parses uploaded log files line by line, persists normalized events into PostgreSQL, indexes them
  * into the search store via {@link EventIndexer}, and marks the upload as ingested.
+ *
+ * <p>Detection runs inline: every parsed event goes through a {@link RuleEngine} built from the
+ * enabled stored rules, and each {@link Detection} becomes an alert in the same transaction as the
+ * batch holding its trigger event. Each upload gets an engine of its own, because windows run on
+ * event time and two files whose clocks are far apart would make the older one look late.
  */
 @ApplicationScoped
 public class DefaultLogFileParser implements LogFileParser {
@@ -58,6 +70,8 @@ public class DefaultLogFileParser implements LogFileParser {
     private final AppConfig appConfig;
     private final GeoIpEnricher geoIpEnricher;
     private final UserAgentEnricher userAgentEnricher;
+    private final AlertRuleRepository ruleRepository;
+    private final AlertService alertService;
 
     @Inject
     public DefaultLogFileParser(
@@ -72,7 +86,9 @@ public class DefaultLogFileParser implements LogFileParser {
             JsonLogParser jsonLogParser,
             AppConfig appConfig,
             GeoIpEnricher geoIpEnricher,
-            UserAgentEnricher userAgentEnricher) {
+            UserAgentEnricher userAgentEnricher,
+            AlertRuleRepository ruleRepository,
+            AlertService alertService) {
         this.uploadService = uploadService;
         this.uploadRepository = uploadRepository;
         this.sourceRepository = sourceRepository;
@@ -85,9 +101,20 @@ public class DefaultLogFileParser implements LogFileParser {
         this.appConfig = appConfig;
         this.geoIpEnricher = geoIpEnricher;
         this.userAgentEnricher = userAgentEnricher;
+        this.ruleRepository = ruleRepository;
+        this.alertService = alertService;
     }
 
+    /**
+     * Parses the file the event names.
+     *
+     * <p>The Kafka consumer calls this on a worker thread with neither a transaction nor a request
+     * context, and the reads here (the upload, its source, the external-id lookups) run outside the
+     * short write transactions on purpose. The request context gives those reads a session for the
+     * length of the parse.
+     */
     @Override
+    @ActivateRequestContext
     public void parse(LogIngestEvent event) {
         Objects.requireNonNull(event, "event");
         if (event.uploadId() == null) {
@@ -116,10 +143,12 @@ public class DefaultLogFileParser implements LogFileParser {
         }
 
         LogSource source = resolveSource(upload, event);
+        RuleEngine engine = new RuleEngine(enabledRules());
 
         int batchSize = appConfig.search().bulkSize();
         long totalEvents = 0;
         List<LogEvent> batch = new ArrayList<>(batchSize);
+        List<RaisedDetection> detections = new ArrayList<>();
 
         try (BufferedReader reader = Files.newBufferedReader(filePath, StandardCharsets.UTF_8)) {
             String line;
@@ -134,16 +163,21 @@ public class DefaultLogFileParser implements LogFileParser {
                     continue;
                 }
                 batch.add(logEvent);
+                for (Detection detection : engine.evaluate(normalized)) {
+                    detections.add(new RaisedDetection(detection, logEvent));
+                }
                 if (batch.size() >= batchSize) {
-                    persistAndIndexBatch(batch);
+                    persistAndIndexBatch(batch, detections);
                     totalEvents += batch.size();
                     batch.clear();
+                    detections.clear();
                 }
             }
             if (!batch.isEmpty()) {
-                persistAndIndexBatch(batch);
+                persistAndIndexBatch(batch, detections);
                 totalEvents += batch.size();
                 batch.clear();
+                detections.clear();
             }
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read uploaded log file at " + filePath, e);
@@ -155,7 +189,7 @@ public class DefaultLogFileParser implements LogFileParser {
                 totalEvents, event.uploadId(), event.fileName());
     }
 
-    private void persistAndIndexBatch(List<LogEvent> batch) {
+    private void persistAndIndexBatch(List<LogEvent> batch, List<RaisedDetection> detections) {
         if (batch.isEmpty()) {
             return;
         }
@@ -166,9 +200,34 @@ public class DefaultLogFileParser implements LogFileParser {
                                 eventRepository.persist(logEvent);
                             }
                             eventRepository.flush();
+                            // The trigger of a detection is always an event of this batch: the
+                            // engine fires on the event being added, never on an earlier one.
+                            for (RaisedDetection raised : detections) {
+                                alertService.raise(raised.detection(), raised.trigger());
+                            }
                             eventIndexer.indexAfterCommit(batch);
                         });
     }
+
+    /**
+     * The enabled stored rules, compiled. A rule whose expression no longer parses is left out and
+     * logged rather than failing the upload: the other rules, and the events, are still worth
+     * having.
+     */
+    private List<DetectionRule> enabledRules() {
+        List<DetectionRule> compiled = new ArrayList<>();
+        for (AlertRule rule : ruleRepository.listEnabled()) {
+            try {
+                compiled.add(DetectionRule.compile(rule));
+            } catch (RuleSyntaxException e) {
+                LOG.errorf(e, "Skipping rule '%s': its expression does not parse", rule.getName());
+            }
+        }
+        return compiled;
+    }
+
+    /** A detection and the stored event its trigger was read from. */
+    private record RaisedDetection(Detection detection, LogEvent trigger) {}
 
     private LogSource resolveSource(LogUpload upload, LogIngestEvent event) {
         LogSource source = upload.getSource();

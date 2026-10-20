@@ -366,6 +366,12 @@ export function buildAttackMatrix(
     const tactic = orderedTactics[i];
     const tacticId = tactic.id ?? '';
     const col = columns[i];
+    // "Covered & active" shows only what the rules reach: a tactic with nothing in it would be
+    // an empty column squeezing the others. The full matrix keeps every tactic.
+    if (scope === 'active' && col.length === 0) {
+      continue;
+    }
+    const columnIndex = tacticSummaries.length;
     if (col.length > maxColumnDepth) {
       maxColumnDepth = col.length;
     }
@@ -374,6 +380,7 @@ export function buildAttackMatrix(
     let colAlerts = 0;
 
     for (const cell of col) {
+      cell.tacticIndex = columnIndex;
       cell.level = bandForCount(cell.alertCount, levels);
       if (cell.inUse) {
         colCovered++;

@@ -87,7 +87,8 @@ function cellColors(cell: MatrixCell, palette: ReturnType<typeof attackMatrixCol
 }
 
 export interface AttackMatrixSeriesItem {
-  value: [number, number, number, number];
+  // tactic column, row, alert count, level, and the index of the cell's fill in the visualMap.
+  value: [number, number, number, number, number];
   cell: MatrixCell;
   itemStyle: {
     color: string;
@@ -105,10 +106,21 @@ export function attackMatrixOption(matrix: AttackMatrix, isDark: boolean): EChar
   const palette = attackMatrixColors(isDark);
   const rowCount = Math.max(1, matrix.maxColumnDepth);
 
+  // ECharts refuses to draw a cartesian heatmap without a visualMap, and the visualMap's colour
+  // wins over a cell's own itemStyle. So every distinct fill gets an index, the cell carries that
+  // index as its fifth value, and a hidden piecewise visualMap maps the index back to the fill.
+  const fills: string[] = [];
+  const fillIndex = (fill: string) => {
+    const found = fills.indexOf(fill);
+    if (found >= 0) return found;
+    fills.push(fill);
+    return fills.length - 1;
+  };
+
   const data: AttackMatrixSeriesItem[] = matrix.cells.map((cell) => {
     const style = cellColors(cell, palette);
     return {
-      value: [cell.tacticIndex, cell.rowIndex, cell.alertCount, cell.level],
+      value: [cell.tacticIndex, cell.rowIndex, cell.alertCount, cell.level, fillIndex(style.fill)],
       cell,
       itemStyle: {
         color: style.fill,
@@ -184,6 +196,13 @@ export function attackMatrixOption(matrix: AttackMatrix, isDark: boolean): EChar
           `</div>`
         );
       },
+    },
+    visualMap: {
+      type: 'piecewise',
+      show: false,
+      dimension: 4,
+      seriesIndex: 0,
+      pieces: fills.map((color, value) => ({ value, color })),
     },
     xAxis: {
       type: 'category',
