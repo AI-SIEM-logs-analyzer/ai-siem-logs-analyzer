@@ -25,10 +25,6 @@ import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * Proves that every line the synthetic generator writes is accepted by the production parsers, so a
- * load test measures ingestion rather than the fallback path for unparsed lines.
- */
 class SyntheticLogsParseTest {
 
     private static final Instant START = Instant.parse("2026-09-24T00:00:00Z");
@@ -85,7 +81,7 @@ class SyntheticLogsParseTest {
             assertTrue(!at.isBefore(START) && at.isBefore(START.plus(Duration.ofDays(1))), row);
             landedAt.put(marker, at);
         }
-        // The file is moved as a whole: lines keep their distance from each other.
+
         assertEquals(
                 Duration.ofSeconds(90),
                 Duration.between(landedAt.get("marker-1"), landedAt.get("marker-3")));
@@ -169,10 +165,6 @@ class SyntheticLogsParseTest {
         }
     }
 
-    /**
-     * Two small files, one per label, in every shape the injector reads, from years before the
-     * span. Each line carries a marker so the ground truth can be checked against the output.
-     */
     private static Path sampleScenarios(Path dir) throws IOException {
         Files.createDirectories(dir);
         Files.writeString(
@@ -194,7 +186,7 @@ class SyntheticLogsParseTest {
                         "Mar  3 10:00:00 lab-01 maintenance[7]: marker-4 window opened",
                         "<14>1 2020-03-03T10:00:05Z lab-01 maintenance 7 - - marker-5 done",
                         "{\"message\":\"marker-6 without a timestamp\",\"host\":{\"name\":\"lab-01\"}}"));
-        // The label comes from the file name, whatever the extension says about the format.
+
         Files.move(dir.resolve("sample-host.ndjson"), dir.resolve("sample-host.txt"));
         return dir;
     }

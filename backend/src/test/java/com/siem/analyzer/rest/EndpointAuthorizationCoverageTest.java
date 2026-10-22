@@ -19,21 +19,8 @@ import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
-/**
- * Every endpoint states who may call it.
- *
- * <p>{@code quarkus.security.jaxrs.deny-unannotated-endpoints} already refuses an endpoint that
- * says nothing, so an omission here is not an open door. It is a door that closes silently: the
- * endpoint answers {@code 403} to everyone, including the caller it was written for, and the
- * mistake surfaces as a puzzling bug report rather than a build failure. This test moves that
- * discovery to compile-and-test time.
- *
- * <p>The scan reads the compiled classes rather than a hard-coded list, so a resource added in a
- * new package is covered the day it is written.
- */
 class EndpointAuthorizationCoverageTest {
 
-    /** Surefire runs with the module directory as its working directory. */
     private static final java.nio.file.Path COMPILED_CLASSES =
             java.nio.file.Path.of("target", "classes", "com", "siem", "analyzer");
 
@@ -44,7 +31,6 @@ class EndpointAuthorizationCoverageTest {
     void everyEndpointCarriesAnAuthorizationAnnotation() {
         List<Class<?>> resources = resourceClasses();
 
-        // A scan that found nothing would pass this test while proving nothing at all.
         assertFalse(resources.isEmpty(), "no @Path classes found under " + COMPILED_CLASSES);
 
         List<String> unguarded = new ArrayList<>();
@@ -63,7 +49,6 @@ class EndpointAuthorizationCoverageTest {
                         + unguarded);
     }
 
-    /** Every compiled class under the application package that JAX-RS would publish. */
     private static List<Class<?>> resourceClasses() {
         assertTrue(
                 Files.isDirectory(COMPILED_CLASSES),
@@ -86,8 +71,7 @@ class EndpointAuthorizationCoverageTest {
                 relative.substring(0, relative.length() - ".class".length())
                         .replace(java.io.File.separatorChar, '.');
         try {
-            // Resolution only: running the initialisers of a CDI bean outside the container
-            // would fail for reasons that have nothing to do with what is being asserted.
+
             return Class.forName(
                     className, false, EndpointAuthorizationCoverageTest.class.getClassLoader());
         } catch (ClassNotFoundException e) {
@@ -95,7 +79,6 @@ class EndpointAuthorizationCoverageTest {
         }
     }
 
-    /** True for a method JAX-RS serves — one carrying {@code @GET}, {@code @POST} and so on. */
     private static boolean isEndpoint(Method method) {
         return Stream.of(method.getAnnotations())
                 .anyMatch(a -> a.annotationType().isAnnotationPresent(HttpMethod.class));

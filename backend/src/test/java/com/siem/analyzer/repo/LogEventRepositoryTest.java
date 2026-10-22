@@ -19,9 +19,6 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/**
- * Persistence behaviour of {@link LogEvent}, including the JSONB payload and the two timestamps.
- */
 @QuarkusTest
 class LogEventRepositoryTest {
 
@@ -60,8 +57,7 @@ class LogEventRepositoryTest {
 
         repository.persist(stored);
         repository.flush();
-        // Read through a fresh query rather than the persistence context, so the assertions
-        // reflect what PostgreSQL actually stored.
+
         repository.getEntityManager().clear();
 
         LogEvent found = repository.findById(stored.getId());
@@ -71,8 +67,7 @@ class LogEventRepositoryTest {
         assertEquals(Severity.WARNING, found.getSeverity());
         assertTrue(found.getRaw().startsWith("Aug 18 12:00:00 host sshd"));
         assertEquals("admin", found.getPayload().get("user"));
-        // Ingestion time is assigned by the application, and is a different instant from the
-        // moment the event was reported to have happened.
+
         assertNotNull(found.getIngestedAt());
     }
 

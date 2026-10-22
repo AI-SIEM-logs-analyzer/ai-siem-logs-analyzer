@@ -7,7 +7,7 @@ export function UploadsPage() {
   return (
     <>
       <PageHeader title="Uploads" description="Log files submitted for ingestion." />
-      {/* Viewers follow uploads but cannot submit one: POST /api/logs/upload is ADMIN, ANALYST. */}
+
       <Can permission="logs:upload">
         <UploadForm />
       </Can>

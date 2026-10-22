@@ -83,8 +83,6 @@ class EventIndexerTest {
         persistEvent("engine down");
         search.failNextWrites(true);
 
-        // No assertion of exception thrown: an ingestion path that fails because search is down
-        // would trade a stale index for lost data, which is the whole point of the derived design.
         assertEquals(0, indexer.indexNow(List.of(persistEvent("another"))));
     }
 

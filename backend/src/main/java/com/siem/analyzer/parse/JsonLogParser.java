@@ -41,50 +41,11 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
-/**
- * Parses structured JSON log lines: one JSON object per line, as NDJSON files, Filebeat, nginx
- * {@code escape=json}, pino, bunyan and Python's JSON loggers write them.
- *
- * <p>Which key feeds which field is not fixed but comes from a {@link JsonFieldMapping}, so a
- * source with its own vocabulary is onboarded with configuration instead of code. For each field
- * the first candidate path holding a value of a usable type wins. A value that cannot be used — a
- * {@code "status":"success"}, a port above 65535, an object where text is expected — is skipped
- * rather than failing the line, and the next candidate is tried.
- *
- * <p>Values that fed a field are taken out of the object, objects left empty by that are pruned,
- * and everything else becomes the event's attributes with its nesting, key order, {@code null}s and
- * number precision intact: integers as {@code Integer}, {@code Long} or {@code BigInteger},
- * decimals as {@code BigDecimal}. Nested maps and lists are read-only.
- *
- * <p>A line with no usable timestamp is still an event and is stamped with the time it was read, as
- * {@link SyslogParser} does for a nil RFC 5424 timestamp. Numeric timestamps are Unix epoch, in
- * seconds, milliseconds, microseconds or nanoseconds depending on their magnitude; text timestamps
- * are ISO 8601 in its common variants, RFC 1123 or Apache's {@code 14/Sep/2026:10:15:30 +0000}.
- *
- * <p>A line that is not exactly one JSON object yields an empty result rather than an exception, as
- * in the other parsers. So does a line with a repeated key or more than {@value #MAX_NESTING_DEPTH}
- * levels of nesting. A single JSON array spanning a whole file is not a line format and has to be
- * split by whoever reads the file. Instances are immutable and safe to share between threads.
- */
 @ApplicationScoped
 public class JsonLogParser {
 
-    /**
-     * Deeper than any log schema in use; ECS tops out around five. The limit is enforced while
-     * reading, so a hostile line is refused before a tree of it is ever built.
-     */
     static final int MAX_NESTING_DEPTH = 64;
 
-    /**
-     * A private mapper rather than the application's: a module or feature registered for the REST
-     * layer must not change what a log line means.
-     *
-     * <p>Duplicate keys are an error because JSON leaves their meaning open, and a SIEM that reads
-     * the last value while the application that wrote the line acted on the first can be told a
-     * different user than the one that logged in. Trailing tokens are an error because {@code
-     * {...}{...}} is two events, or a corrupt line, but not one event. Floats are read as {@code
-     * BigDecimal} so that an epoch timestamp with microseconds survives to the last digit.
-     */
     private static final ObjectMapper MAPPER =
             JsonMapper.builder(
                             JsonFactory.builder()
@@ -98,11 +59,6 @@ public class JsonLogParser {
                     .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
                     .build();
 
-    /**
-     * {@code 2026-09-14T10:15:30Z} and the variants loggers actually write: a space instead of the
-     * {@code T}, a comma before the fraction (Python's {@code asctime}), an offset with or without
-     * its colon, or no offset at all.
-     */
     private static final DateTimeFormatter ISO_LIKE =
             new DateTimeFormatterBuilder()
                     .parseCaseInsensitive()
@@ -133,33 +89,22 @@ public class JsonLogParser {
                     .optionalEnd()
                     .toFormatter(Locale.ROOT);
 
-    /** Apache's and nginx's {@code $time_local}, which nginx JSON log formats often reuse. */
     private static final DateTimeFormatter APACHE =
             DateTimeFormatter.ofPattern("dd/MMM/yyyy:HH:mm:ss Z", Locale.ENGLISH);
 
     private static final List<DateTimeFormatter> TEXT_TIMESTAMPS =
             List.of(ISO_LIKE, DateTimeFormatter.RFC_1123_DATE_TIME, APACHE);
 
-    /** An epoch written as a JSON string. Bounded so the pattern alone rules out absurd values. */
     private static final Pattern EPOCH_TEXT = Pattern.compile("-?\\d{1,20}(?:\\.\\d{1,9})?");
 
     private static final Pattern DIGITS = Pattern.compile("\\d{1,18}");
 
-    /**
-     * Epoch values below this are seconds; each further factor of 1000 is the next unit down. In
-     * seconds, 10^11 is the year 5138, and in milliseconds it is March 1973, so no timestamp a log
-     * carries today falls on the wrong side of a boundary.
-     */
     private static final BigDecimal SECONDS_BELOW = new BigDecimal("1e11");
 
     private static final BigDecimal MILLIS_BELOW = new BigDecimal("1e14");
 
     private static final BigDecimal MICROS_BELOW = new BigDecimal("1e17");
 
-    /**
-     * Largest number of digits on either side of the point a number may have to be tried as an
-     * epoch. {@code 1e999999999} is a short literal but a billion-digit integer once rescaled.
-     */
     private static final int MAX_EPOCH_DIGITS = 30;
 
     private static final Map<String, Severity> SEVERITY_WORDS =
@@ -198,34 +143,22 @@ public class JsonLogParser {
                 ZoneOffset.UTC);
     }
 
-    /**
-     * @param mapping where each standard field is looked for
-     * @param clock stamps a line that carries no usable timestamp
-     * @param zone the zone a text timestamp without an offset is read in
-     */
     JsonLogParser(JsonFieldMapping mapping, Clock clock, ZoneId zone) {
         this.mapping = Objects.requireNonNull(mapping, "mapping");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.zone = Objects.requireNonNull(zone, "zone");
     }
 
-    /**
-     * Parses one JSON log line.
-     *
-     * @param line a single line, without its line terminator
-     * @return the event, or empty when the line is not exactly one JSON object
-     */
     public Optional<NormalizedEvent> parse(String line) {
         Objects.requireNonNull(line, "line");
         JsonNode root;
         try {
             root = MAPPER.readTree(line);
         } catch (JsonProcessingException e) {
-            // Malformed, a repeated key, trailing content or too deep; StreamConstraintsException
-            // is a JsonProcessingException too.
+
             return Optional.empty();
         }
-        // An empty or blank line reads as a missing node, not as an error.
+
         if (!(root instanceof ObjectNode object)) {
             return Optional.empty();
         }
@@ -267,10 +200,6 @@ public class JsonLogParser {
                         .build());
     }
 
-    /**
-     * One pass over one line's object: finds the value for each field, remembers where it was, and
-     * hands back what no field claimed.
-     */
     private final class Extraction {
 
         private final ObjectNode root;
@@ -296,16 +225,12 @@ public class JsonLogParser {
             return Optional.empty();
         }
 
-        /**
-         * Removes every consumed value, and each object that removal empties, then converts the
-         * rest. Only called once every field has been looked up, so no lookup sees a pruned tree.
-         */
         Map<String, Object> remaining() {
             for (List<Step> location : consumed) {
                 for (int i = location.size() - 1; i >= 0; i--) {
                     Step step = location.get(i);
                     step.parent().remove(step.key());
-                    // An object that was empty in the line stays; only one emptied here goes.
+
                     if (!step.parent().isEmpty()) {
                         break;
                     }
@@ -318,17 +243,8 @@ public class JsonLogParser {
         }
     }
 
-    /** One key lookup on the way to a value: {@code parent.get(key)}. */
     private record Step(ObjectNode parent, String key) {}
 
-    /**
-     * Finds {@code segments[from..]} under {@code node}, returning the lookups from {@code node}
-     * down, or {@code null}.
-     *
-     * <p>Longest key first: for {@code log.level} the flat key {@code "log.level"} is tried before
-     * the object {@code "log"}, so a line carrying both reads the more specific one. A path has a
-     * handful of segments, so trying every split costs nothing.
-     */
     private static List<Step> locate(ObjectNode node, String[] segments, int from) {
         for (int end = segments.length; end > from; end--) {
             String key = String.join(".", List.of(segments).subList(from, end));
@@ -352,9 +268,6 @@ public class JsonLogParser {
         return null;
     }
 
-    // --- Coercion: each returns empty when the value cannot fill the field -----------------------
-
-    /** Text, or an integer written as a number (a numeric user id). Never an object or array. */
     private static Optional<String> text(JsonNode node) {
         if (node.isTextual()) {
             return Optional.of(node.textValue());
@@ -374,7 +287,6 @@ public class JsonLogParser {
         return value != null && value >= 0 ? Optional.of(value) : Optional.empty();
     }
 
-    /** A JSON integer that fits a long, or a string of digits; loggers write numbers either way. */
     private static Long wholeNumber(JsonNode node) {
         if (node.isIntegralNumber() && node.canConvertToLong()) {
             return node.longValue();
@@ -405,7 +317,7 @@ public class JsonLogParser {
             }
             return Optional.empty();
         } catch (DateTimeException | ArithmeticException e) {
-            // A date that does not exist or an instant outside what java.time holds.
+
             return Optional.empty();
         }
     }
@@ -449,10 +361,6 @@ public class JsonLogParser {
         return Optional.of(Instant.ofEpochSecond(whole.longValueExact(), nanos));
     }
 
-    /**
-     * Level words, case-insensitive, and two numeric scales that do not overlap: syslog's 0-7 and
-     * pino's and bunyan's 10-60.
-     */
     private static Optional<Severity> severity(JsonNode node) {
         Long number = wholeNumber(node);
         if (number != null) {
@@ -483,7 +391,6 @@ public class JsonLogParser {
         return Optional.ofNullable(severity);
     }
 
-    /** Converts what is left of the line to plain, read-only Java values. */
     private static Object toJava(JsonNode node) {
         if (node.isObject()) {
             Map<String, Object> map = new LinkedHashMap<>();
@@ -491,7 +398,7 @@ public class JsonLogParser {
             return Collections.unmodifiableMap(map);
         }
         if (node.isArray()) {
-            // List.copyOf would reject the nulls a JSON array may hold.
+
             List<Object> list = new ArrayList<>(node.size());
             for (Iterator<JsonNode> elements = node.elements(); elements.hasNext(); ) {
                 list.add(toJava(elements.next()));

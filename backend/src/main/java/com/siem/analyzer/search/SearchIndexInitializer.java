@@ -16,20 +16,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import org.jboss.logging.Logger;
 
-/**
- * Creates the index and its alias when they are missing, and brings an existing index's mapping up
- * to date.
- *
- * <p>Runs at start-up and is idempotent, so it is safe on every boot and on every replica. On an
- * existing index it only ever adds properties: OpenSearch accepts new fields on a mapping but
- * refuses a changed type for a field it already maps. A changed type still means a new {@code
- * app.search.index-name} and an alias moved onto it, which is a deliberate operation rather than
- * something a restart performs silently.
- *
- * <p>A failure here is logged, not thrown. The engine is a derived read path — an application that
- * refuses to start because search is unavailable would stop accepting the uploads that PostgreSQL
- * can still take.
- */
 @ApplicationScoped
 public class SearchIndexInitializer {
 
@@ -42,7 +28,6 @@ public class SearchIndexInitializer {
     private final Rest5Client restClient;
     private final AppConfig appConfig;
 
-    // Read by the readiness check, written by whichever thread last ran ensureIndex().
     private volatile boolean mappingCurrent;
 
     @Inject
@@ -63,11 +48,6 @@ public class SearchIndexInitializer {
         }
     }
 
-    /**
-     * Creates the index and alias if they are missing. When the index is present, points the alias
-     * at it and pushes the mapping's properties onto it, so an index created before a field was
-     * added to the mapping gains that field instead of refusing every document that carries it.
-     */
     public void ensureIndex() {
         if (indexExists()) {
             ensureAlias();
@@ -82,18 +62,10 @@ public class SearchIndexInitializer {
                 appConfig.search().indexName(), appConfig.search().alias());
     }
 
-    /** Whether the last run left the index carrying every property of the mapping resource. */
     public boolean mappingCurrent() {
         return mappingCurrent;
     }
 
-    /**
-     * Whether the configured index is present.
-     *
-     * <p>Status is read off the response rather than caught as a {@link ResponseException}: the
-     * low-level client only raises that exception for a 5xx (a node failure worth retrying), and
-     * treats every other status, 404 included, as a normal answer.
-     */
     public boolean indexExists() {
         try {
             Response response =
@@ -113,9 +85,7 @@ public class SearchIndexInitializer {
         try {
             Response response = restClient.performRequest(request);
             int status = response.getStatusCode();
-            // A 400 here is another replica winning the race; the index it created carries the
-            // same mapping. Anything else 4xx is a real problem (a malformed mapping, most
-            // likely) and is not swallowed the same way.
+
             if (status == 400) {
                 LOG.debugf("Index '%s' already existed", appConfig.search().indexName());
             } else if (status >= 400) {
@@ -129,16 +99,6 @@ public class SearchIndexInitializer {
         }
     }
 
-    /**
-     * Pushes the mapping's properties onto an index that already exists. OpenSearch accepts new
-     * fields on an existing mapping but refuses a changed type for an existing field, so this is
-     * additive by construction.
-     *
-     * <p>A failure here is logged, not thrown, and shows as {@code mapping: outdated} on the
-     * readiness check, which stays UP. Readiness never gates on the search engine. Enriched events
-     * would be rejected as {@code strict_dynamic_mapping_exception}, stay in the anti-join backlog
-     * and be picked up by {@link SearchBackfillJob} once the mapping is repaired.
-     */
     private void updateMapping(String index) {
         try {
             Request request = new Request("PUT", "/" + index + "/_mapping");
@@ -153,29 +113,17 @@ public class SearchIndexInitializer {
                 LOG.infof("Mapping of %s is up to date", index);
             }
         } catch (IOException e) {
-            // ResponseException (a 5xx) is an IOException, so a node failure lands here too.
+
             mappingCurrent = false;
             LOG.errorf(e, "Could not update the %s mapping", index);
         }
     }
 
-    /**
-     * The body {@code PUT <index>/_mapping} expects: only the {@code properties} object of the
-     * mapping resource. Settings cannot change on an open index, and {@code dynamic} is already set
-     * by whichever run created it.
-     */
     private String propertiesBody() throws IOException {
         JsonNode properties = JSON.readTree(readMapping()).path("mappings").path("properties");
         return JSON.createObjectNode().set("properties", properties).toString();
     }
 
-    /**
-     * Points the alias at the index.
-     *
-     * <p>Written through {@code _aliases} rather than {@code PUT /index/_alias/name} because the
-     * actions body is what a rebuild uses to move the alias between two indices atomically, and
-     * running the same shape in both places means the rebuild path is exercised on every boot.
-     */
     private void ensureAlias() {
         String body =
                 """

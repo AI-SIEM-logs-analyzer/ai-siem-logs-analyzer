@@ -14,18 +14,6 @@ import nl.basjes.parse.useragent.UserAgent;
 import nl.basjes.parse.useragent.UserAgentAnalyzer;
 import org.jboss.logging.Logger;
 
-/**
- * Classifies User-Agent headers with Yauaa.
- *
- * <p>The analyzer is built once, at start-up ({@link Startup}), because building it compiles
- * Yauaa's whole rule set and takes seconds: paid lazily, that cost would land on whichever upload
- * happened to be first. It is restricted to the fields this class reads, which is what keeps both
- * that build and every parse cheap: Yauaa skips every rule that only feeds a field nobody asked
- * for.
- *
- * <p>{@link UserAgentAnalyzer#parse(String)} is thread-safe, so one analyzer serves every consumer
- * thread.
- */
 @Startup
 @ApplicationScoped
 public class YauaaUserAgentEnricher implements UserAgentEnricher {
@@ -41,19 +29,8 @@ public class YauaaUserAgentEnricher implements UserAgentEnricher {
                     UserAgent.DEVICE_CLASS,
                     UserAgent.AGENT_CLASS);
 
-    /**
-     * The class Yauaa gives a header carrying an attack (SQL injection, a scanner's signature such
-     * as sqlmap or Nmap) or one no real client would send. Yauaa then writes it into every field,
-     * agent and operating system names included.
-     */
     private static final String HACKER = "Hacker";
 
-    /**
-     * Device and agent classes that mean an automated client. Yauaa files command-line tools and
-     * HTTP libraries (curl, wget, python-requests) and headless browsers as {@code Robot} too,
-     * which is what a SIEM wants from a bot flag. {@code Robot Imitator} claims to be a well-known
-     * crawler without being one; {@code Hacker} is never a person at a browser.
-     */
     private static final Set<String> BOT_CLASSES =
             Set.of("Robot", "Robot Mobile", "Robot Imitator", "Cloud Application", HACKER);
 
@@ -83,8 +60,6 @@ public class YauaaUserAgentEnricher implements UserAgentEnricher {
                 UserAgentAnalyzer.newBuilder()
                         .withFields(FIELDS)
                         .hideMatcherLoadStats()
-                        // The rule files carry thousands of test cases of their own; nothing here
-                        // runs them, so there is no reason to keep them in the heap.
                         .dropTests()
                         .immediateInitialization();
         analyzer =
@@ -112,7 +87,7 @@ public class YauaaUserAgentEnricher implements UserAgentEnricher {
             return Optional.empty();
         }
         String header = userAgent.trim();
-        // "-" is how access logs spell "the client sent no User-Agent", not a header to classify.
+
         if (header.isEmpty() || "-".equals(header)) {
             return Optional.empty();
         }
@@ -120,8 +95,7 @@ public class YauaaUserAgentEnricher implements UserAgentEnricher {
         try {
             parsed = current.parse(header);
         } catch (RuntimeException e) {
-            // Classification is additive: a header that trips the rule engine costs the event its
-            // ua fields, never its place in the ingestion batch.
+
             LOG.debugf(e, "User-Agent classification failed");
             return Optional.empty();
         }
@@ -132,8 +106,7 @@ public class YauaaUserAgentEnricher implements UserAgentEnricher {
         String deviceClass = value(parsed, UserAgent.DEVICE_CLASS);
         String agentClass = value(parsed, UserAgent.AGENT_CLASS);
         if (HACKER.equals(deviceClass) || HACKER.equals(agentClass)) {
-            // "Hacker" as a browser or an operating system name would sit in those facets beside
-            // Chrome and Windows; the class fields already say it, so only they carry it.
+
             return Optional.of(
                     new UserAgentEnrichment(null, null, null, null, HACKER, HACKER, true));
         }
@@ -142,8 +115,7 @@ public class YauaaUserAgentEnricher implements UserAgentEnricher {
         String os = value(parsed, UserAgent.OPERATING_SYSTEM_NAME);
         String osVersion = value(parsed, UserAgent.OPERATING_SYSTEM_VERSION);
         if (browser == null && os == null && deviceClass == null && agentClass == null) {
-            // Nothing recognised at all: writing uaBot=false for it would claim a finding the
-            // header does not support.
+
             return Optional.empty();
         }
         boolean bot = isBotClass(deviceClass) || isBotClass(agentClass);
@@ -153,14 +125,10 @@ public class YauaaUserAgentEnricher implements UserAgentEnricher {
     }
 
     private static boolean isBotClass(String value) {
-        // Set.of(...).contains(null) throws rather than answering false.
+
         return value != null && BOT_CLASSES.contains(value);
     }
 
-    /**
-     * The field's value, or {@code null} when Yauaa fell back to its default ({@code Unknown},
-     * {@code ??}): a default is Yauaa saying it does not know, not a value to index.
-     */
     private static String value(UserAgent parsed, String field) {
         AgentField agentField = parsed.get(field);
         if (agentField == null || agentField.isDefaultValue()) {

@@ -21,12 +21,6 @@ import java.util.Objects;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/**
- * Something worth an analyst's attention, raised from a {@link LogEvent}.
- *
- * <p>The status only moves through {@link #changeStatus}, which keeps {@code resolved_at} and
- * {@code status_changed_at} in step with it; {@link AlertStatus} decides which moves are allowed.
- */
 @Entity
 @Table(name = "alert")
 public class Alert {
@@ -35,12 +29,6 @@ public class Alert {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /**
-     * The rule that fired, when there was one.
-     *
-     * <p>Optional on purpose: an alert raised by a model has no rule behind it, and the column has
-     * been nullable since the first migration so that case needs no schema change.
-     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rule_id")
     private AlertRule rule;
@@ -66,24 +54,19 @@ public class Alert {
     @Column(name = "raised_at", nullable = false)
     private Instant raisedAt;
 
-    /** When the alert was closed, as resolved or as a false positive; cleared on reopening. */
     @Column(name = "resolved_at")
     private Instant resolvedAt;
 
-    /** When the status last changed; the raise time until the first transition. */
     @Column(name = "status_changed_at", nullable = false)
     private Instant statusChangedAt;
 
-    /** The group-by fields and their values; {@code null} for an ungrouped or per-event rule. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "group_key")
     private Map<String, Object> groupKey;
 
-    /** The aggregate that crossed the rule's threshold; 1 for a per-event rule. */
     @Column(name = "aggregate_value")
     private BigDecimal aggregateValue;
 
-    /** How many events the rule's window held when it fired. */
     @Column(name = "event_count")
     private Integer eventCount;
 
@@ -93,7 +76,6 @@ public class Alert {
     @Column(name = "window_end")
     private Instant windowEnd;
 
-    /** The severity a model gave the alert when it last summarised it; the rule's stays as is. */
     @Enumerated(EnumType.STRING)
     @Column(name = "ai_severity")
     private Severity aiSeverity;
@@ -108,15 +90,10 @@ public class Alert {
     @Column(name = "ai_recommended_action")
     private String aiRecommendedAction;
 
-    /**
-     * The values from the alert the model rested its summary on, each one checked to be in it;
-     * {@code null} on a summary written before evidence was asked for.
-     */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "ai_evidence")
     private List<String> aiEvidence;
 
-    /** Which model wrote the summary, as {@code provider/model}. */
     @Column(name = "ai_model")
     private String aiModel;
 
@@ -133,13 +110,6 @@ public class Alert {
         }
     }
 
-    /**
-     * Moves the alert to another status at {@code at}.
-     *
-     * <p>Closing it stamps {@code resolved_at}; reopening it clears that again.
-     *
-     * @throws IllegalStateException {@link AlertStatus#canMoveTo} refuses the move
-     */
     public void changeStatus(AlertStatus target, Instant at) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(at, "at");
@@ -152,12 +122,6 @@ public class Alert {
         resolvedAt = target.isClosed() ? at : null;
     }
 
-    /**
-     * Records a model's summary of the alert, replacing the previous one.
-     *
-     * <p>All the columns move together; {@code ck_alert_ai_summary} refuses a row where they
-     * disagree, and {@code ck_alert_ai_evidence} evidence without a summary.
-     */
     public void recordAiSummary(
             Severity severity,
             AttackType attackType,

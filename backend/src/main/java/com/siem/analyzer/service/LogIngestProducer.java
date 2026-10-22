@@ -12,15 +12,6 @@ import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.jboss.logging.Logger;
 
-/**
- * Publishes log ingestion events to the {@code logs.ingest} Kafka channel.
- *
- * <p>A message is emitted only once the transaction that produced it has committed. The consumer of
- * this channel reads the {@code log_upload} row the event names, so an event sent from inside a
- * transaction that then rolls back would point at a row that never existed. The payload is still
- * serialised eagerly, inside the caller's transaction: a value this producer cannot serialise is a
- * fault of the work in progress, and it belongs with the rollback rather than after it.
- */
 @ApplicationScoped
 public class LogIngestProducer {
 
@@ -40,13 +31,6 @@ public class LogIngestProducer {
         this.transactionRegistry = transactionRegistry;
     }
 
-    /**
-     * Serializes the event and sends it to the Kafka channel once the current transaction commits.
-     *
-     * <p>Called with no transaction in progress, it sends immediately.
-     *
-     * @throws IllegalStateException the event cannot be serialized
-     */
     public void publish(LogIngestEvent event) {
         String json;
         try {
@@ -61,8 +45,7 @@ public class LogIngestProducer {
             return;
         }
         if (status != Status.STATUS_ACTIVE) {
-            // Already rolling back or already completing: there is no commit left to wait for, and
-            // registering a synchronization at this point would itself fail.
+
             LOG.warnf(
                     "Not publishing to logs.ingest: transaction status is %d, not active."
                             + " uploadId=%d, fileName=%s",
@@ -73,9 +56,7 @@ public class LogIngestProducer {
         transactionRegistry.registerInterposedSynchronization(
                 new Synchronization() {
                     @Override
-                    public void beforeCompletion() {
-                        // Nothing to do: the send belongs after the commit, not before it.
-                    }
+                    public void beforeCompletion() {}
 
                     @Override
                     public void afterCompletion(int completionStatus) {
@@ -91,13 +72,6 @@ public class LogIngestProducer {
                 });
     }
 
-    /**
-     * Emits the payload and reports the outcome.
-     *
-     * <p>After the commit there is no caller left to receive a failure — the upload has already
-     * been answered — so a broker that refuses the message is logged at error level instead. The
-     * row stays {@code PENDING}, which is what a later reconciliation looks for.
-     */
     private void send(String json, LogIngestEvent event) {
         try {
             emitter.send(json)

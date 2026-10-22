@@ -7,14 +7,6 @@ import io.restassured.http.ContentType;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/**
- * Which sign-in endpoints an anonymous caller may reach.
- *
- * <p>The two open endpoints are asserted with a body that fails validation, so a {@code 400} proves
- * the request reached the handler. Asserting on credentials instead would not: a wrong password is
- * answered with {@code 401}, the same status a security refusal carries, and the test would pass
- * whether the endpoint were open or shut.
- */
 @QuarkusTest
 class AuthResourceSecurityTest {
 

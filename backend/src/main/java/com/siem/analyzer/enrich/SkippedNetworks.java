@@ -5,10 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.jboss.logging.Logger;
 
-/**
- * Decides which addresses are worth a database lookup. Private, loopback and link-local space is
- * skipped: the databases have nothing for it, so a lookup would only cost time.
- */
 final class SkippedNetworks {
 
     private static final Logger LOG = Logger.getLogger(SkippedNetworks.class);
@@ -20,9 +16,7 @@ final class SkippedNetworks {
         for (String entry : configured) {
             Cidr cidr = Cidr.parse(entry);
             if (cidr == null) {
-                // A bad entry disables one range, not the whole enricher: enrichment is additive
-                // and must
-                // never be the reason the application refuses to start.
+
                 LOG.warnf("Ignoring unparsable app.geoip.skipped-networks entry: %s", entry);
             } else {
                 parsed.add(cidr);
@@ -41,7 +35,6 @@ final class SkippedNetworks {
         return false;
     }
 
-    /** One configured range, held as its raw prefix bytes and prefix length. */
     private record Cidr(byte[] prefix, int bits) {
 
         static Cidr parse(String entry) {

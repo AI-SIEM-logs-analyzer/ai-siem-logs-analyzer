@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { roleLabels } from '@/lib/auth/permissions';
 
-/** Account administration. The route is ADMIN only — see `app/routes.tsx`. */
 export function UsersPage() {
   return (
     <>

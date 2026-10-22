@@ -16,13 +16,9 @@ import { fieldText, formatEventTime } from '@/lib/event-fields';
 import { hasFilterValue, type DrillField, type EventFilters } from '@/lib/event-filters';
 import { cn } from '@/lib/utils';
 
-// The events table, headless through TanStack Table: the backend filters, sorts and pages, so
-// the table is in manual mode and only owns which columns show and which way time runs.
-
 const features = tableFeatures({ rowSortingFeature, columnVisibilityFeature });
 const helper = createColumnHelper<typeof features, EventHit>();
 
-/** Hidden until asked for: rarely what a first look needs, and the table stays narrow. */
 const INITIAL_VISIBILITY: ColumnVisibilityState = { sourceId: false, request: false };
 
 const NO_HITS: EventHit[] = [];
@@ -30,20 +26,16 @@ const NO_HITS: EventHit[] = [];
 interface EventsTableProps {
   hits: EventHit[] | undefined;
   filters: EventFilters;
-  /** Narrows the search to `value` of `field` as well. */
+
   onDrill: (field: DrillField, value: string | number) => void;
   onOrderChange: (order: EventFilters['order']) => void;
-  /** Opens the details of a row. */
+
   onSelect: (hit: EventHit) => void;
   selectedId: number | undefined;
-  /** Dimmed while a new page or filter loads in place of these rows. */
+
   stale?: boolean;
 }
 
-/**
- * A value that narrows the search when clicked. The click stays on the value: the row behind
- * it opens the details.
- */
 function DrillValue({
   field,
   value,

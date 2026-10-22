@@ -11,10 +11,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/**
- * What the upload endpoints refuse. The size limit is lowered to a few bytes for the run, so the
- * 413 path is exercised without moving 50 MiB through the suite.
- */
 @QuarkusTest
 @TestProfile(LogUploadValidationTest.SmallLimitProfile.class)
 @TestSecurity(user = "validator", roles = "ADMIN")
@@ -98,8 +94,6 @@ class LogUploadValidationTest {
                 .then()
                 .statusCode(415);
 
-        // A refused upload must leave no metadata behind: validation runs before the file is
-        // stored, the row is written or the ingest event is published.
         given().when()
                 .get("/api/logs/uploads?size=100")
                 .then()

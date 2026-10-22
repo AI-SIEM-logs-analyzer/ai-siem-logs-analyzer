@@ -23,11 +23,6 @@ import {
 const count = new Intl.NumberFormat();
 const clock = new Intl.DateTimeFormat(undefined, { timeStyle: 'medium' });
 
-/**
- * Where the table is in one search. `now` ends a relative range and stays fixed while paging,
- * so the pages chain; `cursors[i]` starts page i + 1. Both belong to the filters named by
- * `key`: a different search starts over on its first page.
- */
 interface Paging {
   key: string;
   now: number;
@@ -35,14 +30,12 @@ interface Paging {
 }
 
 export function EventsPage() {
-  // The filters live in the URL, so a reload, the back button or a shared link shows the same
-  // search; paging and the open event are this visit's.
   const [params, setParams] = useSearchParams();
   const filters = useMemo(() => parseEventFilters(params), [params]);
   const key = eventFiltersToParams(filters).toString();
 
   const [paging, setPaging] = useState<Paging>(() => ({ key, now: Date.now(), cursors: [] }));
-  // Filters reached without going through `applyFilters` (back, forward) start on page one.
+
   const cursors = paging.key === key ? paging.cursors : [];
   const cursor = cursors.at(-1) ?? null;
 

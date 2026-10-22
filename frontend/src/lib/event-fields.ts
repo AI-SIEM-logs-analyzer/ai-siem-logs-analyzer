@@ -1,9 +1,5 @@
-// How an event's parsed fields read on screen: the table's columns pick single fields, the
-// details panel lays every field out in groups. Kept free of React so it is tested alone.
-
 import type { DrillField } from '@/lib/event-filters';
 
-/** The parsed fields of one hit, as /api/events/search returns them (camelCase). */
 export type EventFields = Readonly<Record<string, unknown>>;
 
 const dateTime = new Intl.DateTimeFormat(undefined, {
@@ -15,14 +11,12 @@ const dateTime = new Intl.DateTimeFormat(undefined, {
   second: '2-digit',
 });
 
-/** An event time in the reader's locale and zone, to the second; the ISO text if unparseable. */
 export function formatEventTime(iso: string | undefined): string {
   if (!iso) return '—';
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? iso : dateTime.format(date);
 }
 
-/** A field as text, or undefined when the event does not carry it (or carries an object). */
 export function fieldText(fields: EventFields | undefined, key: string): string | undefined {
   const value = fields?.[key];
   if (typeof value === 'string') return value || undefined;
@@ -34,9 +28,9 @@ export interface FieldRow {
   key: string;
   label: string;
   value: string;
-  /** The filter a click on the value adds, for the fields the search can filter on. */
+
   drill?: DrillField;
-  /** Addresses, paths and versions read better in a fixed-width face. */
+
   mono?: boolean;
 }
 
@@ -54,7 +48,6 @@ interface FieldSpec {
 
 const bytes = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 
-/** The fields the backend names, in the order and groups the details panel shows them. */
 const GROUPS: readonly { title: string; fields: Readonly<Record<string, FieldSpec>> }[] = [
   {
     title: 'Origin',

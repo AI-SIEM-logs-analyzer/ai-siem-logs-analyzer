@@ -11,7 +11,6 @@ import io.quarkus.test.security.TestSecurity;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 
-/** Covers the filtered, paged listing at {@code GET /api/logs/uploads}. */
 @QuarkusTest
 @TestSecurity(user = "admin", roles = "ADMIN")
 class LogUploadListingTest {

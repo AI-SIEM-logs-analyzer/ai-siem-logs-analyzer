@@ -152,7 +152,6 @@ class OpenSearchEventSearchIndexTest {
     @Test
     void refusesABatchWithNoEventsQuietly() {
         search.index(List.of());
-        // No request is made at all; reaching here is the assertion.
     }
 
     private IndexableEvent event(long id, String message, Map<String, Object> payload) {

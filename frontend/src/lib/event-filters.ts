@@ -1,7 +1,3 @@
-// The events page's filters: read from and written to the URL, so a reload, the back button or
-// a shared link shows the same slice, and turned into the query /api/events/search takes.
-// Kept free of React so it is tested alone.
-
 import type { components, operations } from '@/api/schema';
 
 export type Severity = components['schemas']['Severity'];
@@ -10,7 +6,6 @@ export type EventSearchQuery = NonNullable<operations['searchEvents']['parameter
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
 
-/** The time ranges the filter bar offers, relative to when the search runs. */
 export const EVENT_RANGES = {
   '15m': { label: 'Last 15 minutes', durationMs: 15 * MINUTE_MS },
   '1h': { label: 'Last hour', durationMs: HOUR_MS },
@@ -27,7 +22,6 @@ export const DEFAULT_EVENT_RANGE: EventRange = '24h';
 
 export const SEVERITIES: readonly Severity[] = ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'];
 
-/** Mirrors the backend's EventQuery bounds; the backend still has the final say. */
 export const MAX_FILTER_VALUES = 50;
 export const MAX_SUBSTRING_LENGTH = 256;
 
@@ -35,23 +29,22 @@ export type SortOrder = 'asc' | 'desc';
 
 export interface EventFilters {
   range: EventRange;
-  /** ISO instants, read only when `range` is `custom`; either may be left open. */
+
   from?: string;
   to?: string;
-  /** Full-text search over the message. */
+
   q: string;
-  /** Literal, case-insensitive substring of the raw line. */
+
   substring: string;
   severity: Severity[];
-  /** Addresses or CIDR ranges. */
+
   srcIp: string[];
-  /** Codes (404) or classes (5xx). */
+
   status: string[];
   sourceId: number[];
   order: SortOrder;
 }
 
-/** The filters a field can be narrowed by from a value on screen (drill-down). */
 export type DrillField = 'severity' | 'srcIp' | 'status' | 'sourceId';
 
 export const NO_FILTERS: EventFilters = {
@@ -73,7 +66,6 @@ function isSeverity(value: string): value is Severity {
   return (SEVERITIES as readonly string[]).includes(value);
 }
 
-/** An HTTP status code (100–599) or class (1xx–5xx), as the backend's `status` filter takes. */
 export function isStatusFilter(value: string): boolean {
   return /^[1-5](\d\d|xx)$/i.test(value);
 }
@@ -86,10 +78,6 @@ function unique<T>(values: Iterable<T>): T[] {
   return [...new Set(values)];
 }
 
-/**
- * Splits a list typed into one box: commas or whitespace separate the values, blanks and
- * repeats are dropped.
- */
 export function splitList(text: string): string[] {
   return unique(
     text
@@ -99,11 +87,6 @@ export function splitList(text: string): string[] {
   );
 }
 
-/**
- * The filters `params` describe. A value the backend would refuse (an unknown severity, a
- * status that is no code, an unparseable instant) is dropped rather than sent, so a mangled
- * link still opens on a page of events.
- */
 export function parseEventFilters(params: URLSearchParams): EventFilters {
   const range = params.get('range');
   const from = params.get('from');
@@ -128,7 +111,6 @@ export function parseEventFilters(params: URLSearchParams): EventFilters {
   };
 }
 
-/** The URL parameters for `filters`; defaults are left out so a plain link stays plain. */
 export function eventFiltersToParams(filters: EventFilters): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.range !== DEFAULT_EVENT_RANGE) params.set('range', filters.range);
@@ -146,7 +128,6 @@ export function eventFiltersToParams(filters: EventFilters): URLSearchParams {
   return params;
 }
 
-/** The time window `filters` cover at `now`, as ISO instants; an open end is left out. */
 export function eventWindow(filters: EventFilters, now: number): { from?: string; to?: string } {
   if (filters.range === 'custom') {
     return {
@@ -159,10 +140,6 @@ export function eventWindow(filters: EventFilters, now: number): { from?: string
   return { from: new Date(now - durationMs).toISOString(), to: new Date(now).toISOString() };
 }
 
-/**
- * The search for `filters`, with a relative range ending at `now`. The caller fixes `now` while
- * it pages, so every page of one search covers the same window.
- */
 export function eventSearchQuery(filters: EventFilters, now: number): EventSearchQuery {
   return {
     ...eventWindow(filters, now),
@@ -176,10 +153,6 @@ export function eventSearchQuery(filters: EventFilters, now: number): EventSearc
   };
 }
 
-/**
- * `filters` narrowed to events whose `field` is `value` as well — the drill-down from a value on
- * screen. A value already filtered on leaves the filters as they are.
- */
 export function withFilterValue(
   filters: EventFilters,
   field: DrillField,
@@ -209,7 +182,6 @@ export function withFilterValue(
   }
 }
 
-/** Whether `filters` already narrow `field` to `value`. */
 export function hasFilterValue(
   filters: EventFilters,
   field: DrillField,
@@ -227,7 +199,6 @@ export function hasFilterValue(
   }
 }
 
-/** How many filters beyond the time range and the order are in effect. */
 export function activeFilterCount(filters: EventFilters): number {
   return (
     (filters.q ? 1 : 0) +

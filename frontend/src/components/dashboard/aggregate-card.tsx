@@ -11,21 +11,16 @@ interface AggregateCardProps {
   title: string;
   description: string;
   range: TimelineRange;
-  /** Names the card in an error ("the top source IPs"). */
+
   what: string;
-  /** Whether the overview holds nothing for this card. */
+
   isEmpty: (overview: EventOverview) => boolean;
-  /** Shown instead of the chart when `isEmpty`. */
+
   empty: string;
   children: (overview: EventOverview) => ReactNode;
   className?: string;
 }
 
-/**
- * The frame every aggregate widget shares: loading, error and empty states around a chart.
- * The data is the dashboard's overview query, shared with the timeline, so a widget adds no
- * request of its own and changes range, refreshes and dims together with the rest.
- */
 export function AggregateCard({
   title,
   description,

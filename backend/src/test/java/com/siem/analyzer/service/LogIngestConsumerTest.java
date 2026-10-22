@@ -22,14 +22,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/**
- * Proves the {@code logs.ingest-in} incoming channel end to end, minus the broker: the consumer,
- * the deserialisation and the status transitions are the production ones, and only the connector is
- * swapped for the in-memory source the %test profile configures.
- *
- * <p>The in-memory source delivers in order, so a test that needs to observe "nothing happened"
- * sends a second, valid message afterwards and waits for that one instead of sleeping.
- */
 @QuarkusTest
 class LogIngestConsumerTest {
 
@@ -172,9 +164,6 @@ class LogIngestConsumerTest {
         return readUpload(uploadId, LogUpload::getErrorMessage);
     }
 
-    /**
-     * Reads one field of the row in its own transaction, so it sees what the consumer committed.
-     */
     private <T> T readUpload(Long uploadId, java.util.function.Function<LogUpload, T> field) {
         return QuarkusTransaction.requiringNew()
                 .call(
@@ -188,7 +177,6 @@ class LogIngestConsumerTest {
                                                                 "no upload with id " + uploadId)));
     }
 
-    /** Polls until the row reaches the status, because the consumer runs on its own thread. */
     private void awaitStatus(Long uploadId, LogUploadStatus expected) {
         long deadline = System.nanoTime() + TIMEOUT.toNanos();
         LogUploadStatus seen = null;

@@ -7,14 +7,6 @@ import jakarta.ws.rs.ext.Provider;
 import java.util.Map;
 import org.jboss.logging.Logger;
 
-/**
- * Answers 502 when the AI provider gave no usable summary.
- *
- * <p>The provider is the upstream that failed, not this server. The message is generic on purpose:
- * a provider's error text can carry request ids, account details or fragments of the prompt, which
- * hold log data. The cause is logged instead. An answer dropped by the grounding check gets a
- * sentence of its own, so the analyst knows the provider worked and the model made things up.
- */
 @Provider
 public class AlertSummaryFailedExceptionMapper
         implements ExceptionMapper<AlertSummaryFailedException> {

@@ -7,13 +7,6 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 import java.util.Map;
 
-/**
- * Turns a refused upload status transition into 409.
- *
- * <p>Conflict rather than 400: the request is well formed and would have been valid a moment
- * earlier. The current status is in the body so a caller can tell a redelivered message apart from
- * a genuine mistake without a second request.
- */
 @Provider
 public class IllegalUploadTransitionExceptionMapper
         implements ExceptionMapper<IllegalUploadTransitionException> {

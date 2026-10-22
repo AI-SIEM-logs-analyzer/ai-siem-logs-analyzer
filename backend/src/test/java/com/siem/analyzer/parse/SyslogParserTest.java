@@ -24,11 +24,9 @@ class SyslogParserTest {
     private final SyslogParser parser =
             new SyslogParser(Clock.fixed(NOW, ZoneOffset.UTC), ZoneOffset.UTC);
 
-    // --- RFC 5424 ---------------------------------------------------------------------------
-
     @Test
     void rfc5424LineWithStructuredDataFillsEveryField() {
-        // RFC 5424 section 6.5, example 3.
+
         String line =
                 "<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47"
                         + " [exampleSDID@32473 iut=\"3\" eventSource=\"Application\""
@@ -46,7 +44,7 @@ class SyslogParserTest {
         assertEquals("notice", event.attributes().get("syslogSeverity"));
         assertEquals("evntslog", event.attributes().get("appName"));
         assertEquals("ID47", event.attributes().get("msgId"));
-        // PROCID was the nil value, so it has no key at all.
+
         assertFalse(event.attributes().containsKey("procId"));
         assertEquals(
                 Map.of(
@@ -57,7 +55,7 @@ class SyslogParserTest {
 
     @Test
     void rfc5424LineWithoutStructuredDataAndWithByteOrderMark() {
-        // RFC 5424 section 6.5, example 1: the MSG is UTF-8 and announces it with a BOM.
+
         NormalizedEvent event =
                 parse(
                         "<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 -"
@@ -120,7 +118,7 @@ class SyslogParserTest {
 
     @Test
     void veryLongStructuredDataValueDoesNotExhaustTheStack() {
-        // The sender controls this field; a recursive regex would overflow on it.
+
         String value = "A".repeat(200_000) + "\\\"" + "B".repeat(200_000);
 
         NormalizedEvent event =
@@ -131,11 +129,9 @@ class SyslogParserTest {
                 event.attributes().get("structuredData"));
     }
 
-    // --- RFC 3164 / BSD ---------------------------------------------------------------------
-
     @Test
     void bsdLineFromLinuxLogFile() {
-        // /var/log/auth.log as rsyslog writes it: no priority, no year.
+
         NormalizedEvent event =
                 parse(
                         "Sep 14 10:15:30 web-01 sshd[4242]: Failed password for root from"
@@ -147,7 +143,7 @@ class SyslogParserTest {
         assertEquals("sshd", event.attributes().get("appName"));
         assertEquals("4242", event.attributes().get("procId"));
         assertEquals("Failed password for root from 203.0.113.9 port 22 ssh2", event.message());
-        // Without a priority the source said nothing about severity or facility.
+
         assertEquals(Severity.INFO, event.severity());
         assertFalse(event.attributes().containsKey("facility"));
     }
@@ -205,7 +201,7 @@ class SyslogParserTest {
 
     @Test
     void bsdTimestampInTheFutureBelongsToLastYear() {
-        // A December log read on 2 January.
+
         SyslogParser january =
                 new SyslogParser(
                         Clock.fixed(Instant.parse("2027-01-02T08:00:00Z"), ZoneOffset.UTC),
@@ -230,8 +226,7 @@ class SyslogParserTest {
 
     @Test
     void rsyslogHighPrecisionFileFormat() {
-        // RSYSLOG_FileFormat, the default on current Debian and Ubuntu: a BSD line with an
-        // RFC 3339 timestamp.
+
         NormalizedEvent event =
                 parse(
                         "2026-09-14T13:15:30.123456+03:00 web-01 systemd[1]: Started Session 4 of"
@@ -243,8 +238,6 @@ class SyslogParserTest {
         assertEquals("1", event.attributes().get("procId"));
         assertEquals("Started Session 4 of user alice.", event.message());
     }
-
-    // --- Network gear -----------------------------------------------------------------------
 
     @Test
     void ciscoIosLineWithSequenceNumberAndUnsyncedClock() {
@@ -291,8 +284,7 @@ class SyslogParserTest {
 
     @Test
     void otherDeviceTimezoneIsKeptButNotGuessed() {
-        // "EST" and "IST" each name more than one zone, so the abbreviation is recorded and the
-        // configured zone is used.
+
         NormalizedEvent event =
                 parse("<187>Sep 14 10:15:30 EET: %SYS-5-CONFIG_I: Configured from console");
 
@@ -300,8 +292,6 @@ class SyslogParserTest {
         assertEquals("EET", event.attributes().get("timezone"));
         assertEquals("%SYS-5-CONFIG_I", event.attributes().get("appName"));
     }
-
-    // --- sshd login attempts ----------------------------------------------------------------
 
     @Test
     void sshdFailedPasswordNamesTheClient() {
@@ -324,7 +314,6 @@ class SyslogParserTest {
         assertEquals("2001:db8::7", failed.srcIp());
         assertEquals("admin", failed.user());
 
-        // Older sshd writes no port.
         NormalizedEvent invalid =
                 parse("Sep 14 10:15:30 web-01 sshd[7]: Invalid user oracle from 203.0.113.9");
         assertEquals("203.0.113.9", invalid.srcIp());
@@ -347,7 +336,7 @@ class SyslogParserTest {
 
     @Test
     void sshdUserNameCannotSpoofTheAddress() {
-        // The client chose the user name "root from 198.51.100.1 port 22 ssh2".
+
         NormalizedEvent event =
                 parse(
                         "Sep 14 10:15:30 web-01 sshd[7]: Failed password for invalid user root"
@@ -391,8 +380,6 @@ class SyslogParserTest {
         assertEquals("203.0.113.9", event.srcIp());
         assertNull(event.srcPort());
     }
-
-    // --- Rejected lines ---------------------------------------------------------------------
 
     @Test
     void lineInAnotherFormatIsNotParsed() {

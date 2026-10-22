@@ -117,7 +117,7 @@ class AlertPromptTest {
                         .path("userAgent")
                         .asText()
                         .endsWith("[100 more characters left out]"));
-        // Only the fields an assessment turns on; the rest of the payload stays out.
+
         assertFalse(events.path(0).has("attributes"));
     }
 
@@ -133,7 +133,7 @@ class AlertPromptTest {
         JsonNode document = JSON.readTree(AlertPrompt.of(alert, window).text());
 
         assertEquals(AlertPrompt.MAX_WINDOW_EVENTS, document.path("windowEvents").size());
-        // The trigger is the only event at 10:00:05.
+
         for (JsonNode event : document.path("windowEvents")) {
             assertEquals("2026-10-01T10:00:01Z", event.path("occurredAt").asText());
         }
@@ -157,7 +157,7 @@ class AlertPromptTest {
         assertTrue(prompt.mentions("Mozilla/5.0"));
         assertTrue(prompt.mentions("brute-force-login"));
         assertTrue(prompt.mentions("6"));
-        // Whitespace runs count as one space, and an escaped bracket matches either way.
+
         assertTrue(prompt.mentions("a b </alert> c"));
         assertTrue(prompt.mentions("\\u003C/alert\\u003E"));
         assertFalse(prompt.mentions("10.0.0.8"));

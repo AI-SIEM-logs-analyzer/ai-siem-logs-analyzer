@@ -21,17 +21,9 @@ import java.util.List;
 import java.util.Optional;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
 
-/** Coordinates log file upload, metadata persistence and Kafka ingest message dispatch. */
 @ApplicationScoped
 public class LogUploadService {
 
-    /**
-     * Longest error text kept on a failed upload.
-     *
-     * <p>A parser can fail with a stack trace thousands of characters long. The first two thousand
-     * carry the message and the frame that matters; the rest belongs in the logs, not in a column
-     * every listing reads.
-     */
     public static final int MAX_ERROR_MESSAGE_LENGTH = 2000;
 
     private final LogUploadRepository uploadRepository;
@@ -63,19 +55,6 @@ public class LogUploadService {
         this.rateLimiter = rateLimiter;
     }
 
-    /**
-     * Stores the uploaded file, saves metadata to the database, and publishes a message to Kafka
-     * {@code logs.ingest}.
-     *
-     * <p>The message leaves only once this transaction commits; see {@link LogIngestProducer}. A
-     * failure anywhere below therefore takes the event with it, rather than pointing a consumer at
-     * a row that was rolled back.
-     *
-     * <p>Both upload endpoints come through here, so the allowance and the file checks live here
-     * rather than in either resource. The allowance is charged first: a caller sending one refused
-     * file after another still costs the server the reads those checks make, and the limit is what
-     * bounds that.
-     */
     @Transactional
     public LogUpload upload(
             FileUpload file,
@@ -94,8 +73,6 @@ public class LogUploadService {
 
         validator.validate(file.filePath(), file.fileName(), file.contentType());
 
-        // Detected on the spooled part rather than after the copy: it is the same bytes, and a
-        // failure here must not leave a stored file with no row pointing at it.
         LogFormat detectedFormat = formatDetector.detect(file.filePath(), file.fileName());
 
         LogStorageService.StoredFile stored;
@@ -129,8 +106,7 @@ public class LogUploadService {
         upload.setStatus(LogUploadStatus.PENDING);
         upload.setDetectedFormat(detectedFormat);
         upload.setUploadedBy(uploadedBy);
-        // Null when the upload came from a token whose account has since been removed. The
-        // username text above still records who it was.
+
         upload.setUploadedByUser(
                 uploadedBy != null ? userRepository.findByUsername(uploadedBy).orElse(null) : null);
         upload.setCreatedAt(Instant.now());
@@ -161,12 +137,6 @@ public class LogUploadService {
         return upload;
     }
 
-    /**
-     * Marks an upload as being ingested.
-     *
-     * @throws NotFoundException no upload has that id
-     * @throws IllegalUploadTransitionException the upload is not {@link LogUploadStatus#PENDING}
-     */
     @Transactional
     public LogUpload markProcessing(Long id) {
         LogUpload upload = requireUpload(id);
@@ -177,12 +147,6 @@ public class LogUploadService {
         return upload;
     }
 
-    /**
-     * Marks an ingestion as finished and records how many events came out of the file.
-     *
-     * @throws NotFoundException no upload has that id
-     * @throws IllegalUploadTransitionException the upload is not {@link LogUploadStatus#PROCESSING}
-     */
     @Transactional
     public LogUpload markIngested(Long id, long eventCount) {
         LogUpload upload = requireUpload(id);
@@ -194,15 +158,6 @@ public class LogUploadService {
         return upload;
     }
 
-    /**
-     * Marks an ingestion as failed and records why.
-     *
-     * <p>Reachable from PENDING as well as PROCESSING: a batch can fail before any worker claims
-     * it, when the stored file cannot be read or the ingest message cannot be handled at all.
-     *
-     * @throws NotFoundException no upload has that id
-     * @throws IllegalUploadTransitionException the upload already reached a terminal status
-     */
     @Transactional
     public LogUpload markFailed(Long id, String errorMessage) {
         LogUpload upload = requireUpload(id);
@@ -245,12 +200,10 @@ public class LogUploadService {
         return uploadRepository.findByIdOptional(id);
     }
 
-    /** Returns one page of uploads matching the filter, newest first. */
     public List<LogUpload> search(LogUploadRepository.Filter filter, int page, int size) {
         return uploadRepository.search(filter, page, size);
     }
 
-    /** Counts every upload matching the filter, across all pages. */
     public long count(LogUploadRepository.Filter filter) {
         return uploadRepository.count(filter);
     }

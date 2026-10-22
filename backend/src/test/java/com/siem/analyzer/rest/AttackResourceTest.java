@@ -18,7 +18,6 @@ import java.io.ByteArrayInputStream;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** The ATT&CK catalogue and dataset endpoints, on the fixture the suite boots with. */
 @QuarkusTest
 @TestSecurity(user = "admin", roles = "ADMIN")
 class AttackResourceTest {
@@ -54,9 +53,7 @@ class AttackResourceTest {
                 .get("/api/attack/techniques?inUse=true")
                 .then()
                 .statusCode(200)
-                // mapped by the built-in rules
                 .body("id", hasItems("T1110.001", "T1190", "T1083", "T1595.002", "T1595.003"))
-                // named by the attack-type fallback; T1059 is not in the fixture, so it is bare
                 .body("id", hasItems("T1110", "T1059"))
                 .body("find { it.id == 'T1059' }.name", nullValue())
                 .body("id", not(hasItem("T1078")));

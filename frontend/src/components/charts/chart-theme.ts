@@ -1,11 +1,3 @@
-// ECharts paints with concrete colours, not CSS variables, so the theme's tokens are mirrored
-// here: a single series is blue, everything else the neutral greys of the shadcn/ui theme in
-// index.css. The status colours are fixed across modes and reserved for status (HTTP classes);
-// they never stand in for a series, and always come with a label.
-//
-// `heat` is the sequential ramp for magnitude (the activity heatmap), one blue hue, faintest
-// first: in light mode it darkens away from the white surface, in dark mode it lightens away from
-// the dark one, so the fullest cells stand out in both. `heatEmpty` fills a cell with no events.
 export const CHART_COLORS = {
   light: {
     bar: '#2a78d6',

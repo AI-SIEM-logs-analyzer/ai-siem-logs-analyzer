@@ -13,14 +13,6 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Authorization over a real token.
- *
- * <p>The rest of the suite states the rules with {@code @TestSecurity}, which installs an identity
- * directly and never touches a token. That leaves one link untested: whether the {@code groups}
- * claim {@code TokenService} writes is what the {@code @RolesAllowed} check reads. These tests sign
- * in for real and present the access token, so a break anywhere along that chain shows up here.
- */
 @QuarkusTest
 class RbacJwtTest {
 
@@ -30,7 +22,6 @@ class RbacJwtTest {
 
     @Inject UserService users;
 
-    /** Creates an account with the given role and signs in as it, returning the access token. */
     private String tokenFor(Role role) {
         String username = "rbac." + UUID.randomUUID().toString().substring(0, 8);
         users.create(username, null, PASSWORD, Set.of(role));
@@ -70,7 +61,7 @@ class RbacJwtTest {
         String token = tokenFor(Role.ADMIN);
 
         as(token).when().get("/api/users").then().statusCode(200);
-        // Through the role check and into the handler, which finds nothing to delete.
+
         as(token).when().delete("/api/users/" + MISSING_ID).then().statusCode(404);
     }
 

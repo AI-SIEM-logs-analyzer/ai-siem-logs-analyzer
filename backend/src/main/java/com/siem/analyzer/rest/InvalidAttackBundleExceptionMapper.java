@@ -7,7 +7,6 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 import java.util.Map;
 
-/** Turns a refused ATT&CK bundle into 400, with the reason the reader gave. */
 @Provider
 public class InvalidAttackBundleExceptionMapper
         implements ExceptionMapper<InvalidAttackBundleException> {

@@ -3,11 +3,6 @@ import { Navigate, useLocation } from 'react-router';
 import { getSessionEnd } from '@/lib/auth/session';
 import { useSession } from '@/lib/auth/use-session';
 
-/**
- * Renders `children` only while there is a session. Without one — never signed in, signed out,
- * or a session the backend refused to renew — it redirects to the sign-in page, which returns
- * here once the user is back in.
- */
 export function RequireAuth({ children }: { children: ReactNode }) {
   const session = useSession();
   const location = useLocation();

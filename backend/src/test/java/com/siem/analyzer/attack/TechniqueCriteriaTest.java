@@ -8,10 +8,8 @@ import java.util.EnumSet;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** Turning the technique filter's values into what the alert query matches. */
 class TechniqueCriteriaTest {
 
-    // forTechniques reads no table, so no repository is needed.
     private final TechniqueCriteria criteria = new TechniqueCriteria(null);
 
     @Test

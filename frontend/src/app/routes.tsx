@@ -13,9 +13,6 @@ import { RouteErrorPage } from '@/pages/route-error-page';
 import { UploadsPage } from '@/pages/uploads-page';
 import { UsersPage } from '@/pages/users-page';
 
-// Kept apart from the router instance so tests can mount the same tree in a memory router.
-// Every page but /login needs a session (RequireAuth); a page for some roles only also needs the
-// matching permission (RequirePermission), and its nav item names the same one.
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage />, errorElement: <RouteErrorPage /> },
   {
@@ -28,8 +25,6 @@ export const routes: RouteObject[] = [
     errorElement: <RouteErrorPage />,
     children: [
       {
-        // A page that fails to render keeps the layout around its error, so the sidebar still
-        // leads elsewhere; an error in the layout itself falls through to the boundary above.
         errorElement: <RouteErrorPage variant="page" />,
         children: [
           { index: true, element: <DashboardPage /> },

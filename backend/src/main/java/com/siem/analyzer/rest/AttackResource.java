@@ -20,13 +20,6 @@ import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
-/**
- * The MITRE ATT&CK Enterprise tactics and techniques alerts are mapped to, and the dataset they
- * come from.
- *
- * <p>Reading is open to every signed-in role, like the alerts the catalogue names. Replacing the
- * dataset is for administrators: it changes what every alert in the system is said to be.
- */
 @Path("/api/attack")
 @Produces(MediaType.APPLICATION_JSON)
 @Tag(name = "MITRE ATT&CK", description = "The ATT&CK techniques and tactics alerts are mapped to")

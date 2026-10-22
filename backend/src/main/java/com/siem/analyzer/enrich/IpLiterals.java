@@ -6,15 +6,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-/**
- * Parses literal IPv4 and IPv6 addresses by hand, into raw bytes, and never calls {@link
- * InetAddress#getByName}. That method falls back to the system's DNS resolver for anything it
- * cannot parse as a literal - including address-shaped strings that are not, such as {@code
- * "zzz:1"} or {@code "google.com:80"} - so a value pulled out of a log line must never reach it.
- * {@link InetAddress#getByAddress(byte[])} builds an address straight from bytes, with no lookup of
- * any kind, which is what {@link #parse} hands its result to. {@code InetAddress.ofLiteral} would
- * do the parsing itself in one call but arrived after Java 21.
- */
 final class IpLiterals {
 
     private static final Pattern HEX_GROUP = Pattern.compile("[0-9A-Fa-f]{1,4}");
@@ -34,20 +25,13 @@ final class IpLiterals {
             return Optional.empty();
         }
         try {
-            // bytes is always exactly 4 or 16 long here, so this never actually throws.
-            // getByAddress performs no forward or reverse lookup either way.
+
             return Optional.of(InetAddress.getByAddress(bytes.get()));
         } catch (UnknownHostException e) {
             return Optional.empty();
         }
     }
 
-    /**
-     * Four dot-separated decimal octets, 0-255, no leading zero. A leading zero is rejected
-     * outright rather than read as decimal: some parsers read it as octal, so one spelling must not
-     * silently mean two different addresses - the same concern {@link
-     * com.siem.analyzer.search.IpFilter}'s own IPv4 pattern documents.
-     */
     private static Optional<byte[]> parseIpv4(String candidate) {
         String[] parts = candidate.split("\\.", -1);
         if (parts.length != 4) {
@@ -76,13 +60,6 @@ final class IpLiterals {
         return Optional.of(result);
     }
 
-    /**
-     * Hex groups of 1-4 digits separated by {@code :}, at most one {@code ::} run standing in for
-     * one or more all-zero groups, and an optional trailing embedded IPv4 tail such as {@code
-     * ::ffff:192.0.2.1}. A zone index (the {@code %eth0} suffix on a link-local address) is
-     * rejected rather than stripped: it names an interface on the machine doing the parsing, not
-     * something a log line or a configured range can mean anything by.
-     */
     private static Optional<byte[]> parseIpv6(String candidate) {
         if (candidate.indexOf('%') >= 0) {
             return Optional.empty();
@@ -131,8 +108,7 @@ final class IpLiterals {
 
         int embeddedSlots = embeddedBytes == null ? 0 : 2;
         int explicitSlots = head.size() + tail.size() + embeddedSlots;
-        // Uncompressed addresses must spell out all 8 groups. A compressed one must leave at least
-        // one group for "::" to stand in for - otherwise it is not compressing anything.
+
         if (compressed ? explicitSlots >= 8 : explicitSlots != 8) {
             return Optional.empty();
         }
@@ -154,11 +130,6 @@ final class IpLiterals {
         return Optional.of(result);
     }
 
-    /**
-     * Splits one side of a {@code ::} split (or the whole address, when there is no {@code ::}) on
-     * {@code :}. A stray empty group - a colon pair that is not the address's one allowed {@code
-     * ::} - means the address is malformed, reported here as a {@code null} return.
-     */
     private static List<String> splitGroups(String part) {
         if (part.isEmpty()) {
             return List.of();

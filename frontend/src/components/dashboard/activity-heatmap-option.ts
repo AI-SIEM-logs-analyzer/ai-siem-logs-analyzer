@@ -3,15 +3,12 @@ import type { EChartOption } from '@/components/charts/echart';
 import { columnLabel, levelColors, type ActivityHeatmap, type DensityLevel } from '@/lib/heatmap';
 import { formatBucket } from '@/lib/timeline';
 
-/** Height of one address's row of cells, in pixels. */
 const ROW_PX = 28;
 
-/** The chart height that gives each of `rows` addresses the same room, axis labels included. */
 export function heatmapChartHeight(rows: number): number {
   return rows * ROW_PX + 32;
 }
 
-/** The fill of each band of `levels`, faintest first, and of an empty cell. */
 export function heatmapColors(levels: number, dark?: boolean) {
   const colors = chartColors(dark);
   return { levels: levelColors(levels, colors.heat), empty: colors.heatEmpty };
@@ -19,17 +16,11 @@ export function heatmapColors(levels: number, dark?: boolean) {
 
 interface ActivityHeatmapOptions {
   levels: readonly DensityLevel[];
-  /** Widest an address gets before it is cut with an ellipsis; the tooltip and table carry it whole. */
+
   labelWidth: number;
   dark?: boolean;
 }
 
-/**
- * A row per address, busiest on top, and a column per timeline bucket. A cell is coloured by the
- * band its count falls in (see densityLevels); an empty cell is drawn faintly rather than left out, so the grid stays
- * whole and hovering it says so. Every cell is separated from its neighbours by a hairline of the
- * surface colour.
- */
 export function activityHeatmapOption(
   heatmap: ActivityHeatmap,
   { levels, labelWidth, dark }: ActivityHeatmapOptions,
@@ -81,7 +72,7 @@ export function activityHeatmapOption(
       borderColor: colors.grid,
       textStyle: { color: colors.ink, fontSize: 12 },
       extraCssText: 'max-width: 28rem; white-space: normal; overflow-wrap: anywhere;',
-      // The address is backend text, so it is escaped into the HTML; the rest is numbers.
+
       formatter: (params) => {
         const item = Array.isArray(params) ? params[0] : params;
         const [x, y] = (item?.value ?? []) as number[];

@@ -154,7 +154,7 @@ describe('uploads page', () => {
     expect(within(row('bad.json')).getByText('boom')).toBeInTheDocument();
     expect(within(row('new.log')).getByText('Queued')).toBeInTheDocument();
     expect(within(row('new.log')).getByText(/by anna/)).toBeInTheDocument();
-    // A viewer follows uploads but is not offered the form.
+
     expect(screen.queryByLabelText('Log file')).not.toBeInTheDocument();
   });
 });

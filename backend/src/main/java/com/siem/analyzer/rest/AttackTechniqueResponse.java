@@ -6,13 +6,6 @@ import com.siem.analyzer.domain.AttackTechnique;
 import java.util.Comparator;
 import java.util.List;
 
-/**
- * A MITRE ATT&CK technique or sub-technique.
- *
- * @param name {@code null} when the loaded dataset does not know the ID
- * @param parentId the base technique of a sub-technique; {@code null} on a base technique
- * @param tactics in matrix order
- */
 public record AttackTechniqueResponse(
         String id,
         String name,

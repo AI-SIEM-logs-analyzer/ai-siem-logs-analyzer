@@ -5,7 +5,6 @@ import com.siem.analyzer.domain.LogUpload;
 import com.siem.analyzer.domain.LogUploadStatus;
 import java.time.Instant;
 
-/** JSON payload returned when a log upload is processed or queried. */
 public record LogUploadResponse(
         Long id,
         Long sourceId,

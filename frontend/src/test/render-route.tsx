@@ -4,7 +4,6 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { Providers } from '@/app/providers';
 import { routes } from '@/app/routes';
 
-/** Mounts the real route tree at `path`, with a fresh query client that never retries. */
 export function renderRoute(path: string) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },

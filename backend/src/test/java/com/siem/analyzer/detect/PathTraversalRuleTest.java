@@ -12,13 +12,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** The built-in path traversal rule, fed request lines through the production access-log parser. */
 class PathTraversalRuleTest {
 
     private final AccessLogParser accessLogs = new AccessLogParser();
     private final RuleEngine engine = new RuleEngine(List.of(PathTraversalRule.rule()));
 
-    /** An access-log line for {@code GET target}, as the server would log it. */
     private NormalizedEvent get(String target) {
         String line =
                 "203.0.113.9 - - [14/Sep/2026:10:15:30 +0000] \"GET %s HTTP/1.1\" 200 512"
@@ -51,13 +49,11 @@ class PathTraversalRuleTest {
     @ParameterizedTest
     @ValueSource(
             strings = {
-                // Parent segments, as typed.
                 "/../../../etc/passwd",
                 "/static/../../app/config.yml",
                 "/download?file=../../secret.txt",
                 "/download?file=..\\..\\boot.ini",
                 "/img/..\\\\..\\\\web.config",
-                // Filter dodges: doubled dots, Tomcat's ;, off-by-slash aliases, a bare ..
                 "/download?file=....//....//app.yml",
                 "/download?file=..././..././app.yml",
                 "/app/..;/manager/html",
@@ -66,7 +62,6 @@ class PathTraversalRuleTest {
                 "/files/..",
                 "/files/..?list",
                 "/browse?dir=..&sort=name",
-                // Percent-encoded, mixed, double- and triple-encoded.
                 "/%2e%2e/%2e%2e/app.yml",
                 "/download?file=%2E%2E%2F%2E%2E%2Fapp.yml",
                 "/download?file=..%2fapp.yml",
@@ -75,22 +70,18 @@ class PathTraversalRuleTest {
                 "/download?file=%252e%252e%252fapp.yml",
                 "/download?file=%25252e%25252e%25252fapp.yml",
                 "/download?file=..%255c..%255capp.yml",
-                // Overlong UTF-8, plain and double-encoded.
                 "/scripts/..%c0%af../winnt/cmd.exe",
                 "/%c0%ae%c0%ae/%c0%ae%c0%ae/app.yml",
                 "/scripts/..%C1%9C../app.yml",
                 "/x/%e0%80%ae%e0%80%ae%e0%80%afapp.yml",
                 "/x/%f0%80%80%ae%f0%80%80%ae/app.yml",
                 "/scripts/..%25c0%25af../app.yml",
-                // IIS %u escapes and fullwidth look-alikes.
                 "/download?file=%u002e%u002e%u2215app.yml",
                 "/download?file=%U002E%U002E/app.yml",
                 "/download?file=%ef%bc%8e%ef%bc%8e%ef%bc%8fapp.yml",
                 "/download?file=..%e2%88%95app.yml",
-                // A NUL byte cutting off an appended extension.
                 "/view?page=index.php%00",
                 "/view?page=report%2500.pdf",
-                // System files, with or without the climb.
                 "/etc/passwd",
                 "/view?file=/etc/shadow",
                 "/view?file=%2Fetc%2Fhosts",
@@ -137,8 +128,7 @@ class PathTraversalRuleTest {
 
     @Test
     void hostileRequestsStayFast() {
-        // Each pads a near-match with what the possessive runs consume, so a pattern that
-        // backtracked would take quadratic time or worse.
+
         List<String> targets =
                 List.of(
                         "/a?q=" + ".".repeat(200_000) + "x",

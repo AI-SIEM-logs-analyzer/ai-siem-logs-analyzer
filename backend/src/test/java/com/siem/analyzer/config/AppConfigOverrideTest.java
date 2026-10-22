@@ -9,12 +9,6 @@ import jakarta.inject.Inject;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/**
- * Verifies that an external configuration source overrides the values baked into application.yaml.
- * The overrides below stand in for the environment variables ({@code APP_ENVIRONMENT}, {@code
- * APP_AI_API_KEY}) used in a deployed environment: both land in config sources that outrank the
- * YAML file, so what this test proves about precedence holds for them too.
- */
 @QuarkusTest
 @TestProfile(AppConfigOverrideTest.OverrideProfile.class)
 class AppConfigOverrideTest {

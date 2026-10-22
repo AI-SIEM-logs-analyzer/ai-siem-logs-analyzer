@@ -20,10 +20,6 @@ import { Progress } from '@/components/ui/progress';
 import { errorMessage } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 
-/**
- * Picks a log file, sends it with a progress bar, then follows the upload's metadata until the
- * backend has parsed it or given up.
- */
 export function UploadForm() {
   const queryClient = useQueryClient();
   const inputId = useId();
@@ -49,7 +45,6 @@ export function UploadForm() {
     },
   });
 
-  // Leaving the page mid-upload stops sending the file.
   useEffect(() => () => controller.current?.abort(), []);
 
   function choose(chosen: File | undefined) {

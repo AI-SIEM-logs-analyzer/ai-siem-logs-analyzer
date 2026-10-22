@@ -11,14 +11,9 @@ import {
 import { cn } from '@/lib/utils';
 
 interface RouteErrorPageProps {
-  /**
-   * `screen` fills the window, for an error above the app layout; `page` fills the content
-   * area, so the sidebar stays and the user can go elsewhere.
-   */
   variant?: 'screen' | 'page';
 }
 
-/** Boundary for a render or loader error: says what went wrong and offers a way out. */
 export function RouteErrorPage({ variant = 'screen' }: RouteErrorPageProps) {
   const error = useRouteError();
   const { title, message } = routeErrorDescription(error);

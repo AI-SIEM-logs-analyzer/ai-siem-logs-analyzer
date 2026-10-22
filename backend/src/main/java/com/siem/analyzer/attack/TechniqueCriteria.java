@@ -8,11 +8,6 @@ import jakarta.inject.Inject;
 import java.util.Set;
 import java.util.TreeSet;
 
-/**
- * Turns the alert list's {@code technique} and {@code tactic} values into what the alert query
- * matches. The model-assigned attack types are worked out here, in Java, from {@link
- * AttackTypeTechniques}, so the query only compares a column with a list.
- */
 @ApplicationScoped
 public class TechniqueCriteria {
 
@@ -23,10 +18,6 @@ public class TechniqueCriteria {
         this.techniques = techniques;
     }
 
-    /**
-     * Alerts mapped to one of {@code ids}. A base technique ({@code T1110}) also matches its
-     * sub-techniques; a sub-technique matches only itself.
-     */
     public TechniqueCriterion forTechniques(Set<String> ids) {
         Set<String> bases = new TreeSet<>();
         for (String id : ids) {
@@ -39,11 +30,6 @@ public class TechniqueCriteria {
         return new TechniqueCriterion(ids, bases, attackTypes);
     }
 
-    /**
-     * Alerts mapped to a technique under one of {@code tacticIds}, as the loaded dataset files
-     * techniques under tactics. A sub-technique is filed under its parent's tactics, so this needs
-     * no prefix match.
-     */
     public TechniqueCriterion forTactics(Set<String> tacticIds) {
         Set<String> ids = techniques.idsInTactics(tacticIds);
         return new TechniqueCriterion(ids, Set.of(), AttackTypeTechniques.matching(ids::contains));

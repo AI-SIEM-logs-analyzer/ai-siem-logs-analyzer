@@ -6,19 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Counts across everything the query matched, not only the page it returned.
- *
- * <p>Each map preserves the order the engine ranked it in, so the caller can show "top N" without
- * sorting again. Every field here is an explicitly mapped one: a value kept in {@code attributes}
- * cannot be aggregated efficiently, which is why the mapping promotes the fields the dashboard
- * needs.
- *
- * <p>{@code byStatus} counts events per HTTP status code; events without one are not counted.
- * {@code topErrors} counts the most frequent messages among ERROR and CRITICAL events, by their
- * exact text. {@code srcIpOverTime} holds, for each address in {@code bySrcIp}, its events per
- * hour, leaving out the hours it has none: how the busiest addresses' activity is spread in time.
- */
 public record EventFacets(
         Map<String, Long> bySeverity,
         Map<String, Long> bySourceId,
@@ -40,7 +27,6 @@ public record EventFacets(
         srcIpOverTime = copyHistograms(srcIpOverTime);
     }
 
-    /** An empty set of facets, for a query that asked for none. */
     public static EventFacets none() {
         return new EventFacets(
                 Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), List.of(), Map.of());
@@ -60,6 +46,5 @@ public record EventFacets(
         return Collections.unmodifiableMap(copy);
     }
 
-    /** How many events fell in one interval of the histogram. */
     public record TimeBucket(Instant start, long count) {}
 }

@@ -13,7 +13,6 @@ import jakarta.inject.Inject;
 import jakarta.persistence.PersistenceException;
 import org.junit.jupiter.api.Test;
 
-/** Persistence behaviour of {@link LogSource}, exercised against the real schema. */
 @QuarkusTest
 class LogSourceRepositoryTest {
 
@@ -40,8 +39,7 @@ class LogSourceRepositoryTest {
         assertEquals("edge-firewall", found.getName());
         assertEquals(LogSourceType.FIREWALL, found.getType());
         assertEquals("edge-fw-01", found.getHostname());
-        // Defaults are assigned in Java rather than left to the column default: Hibernate
-        // sends every mapped column on insert, so a null field would override the default.
+
         assertTrue(found.isEnabled());
         assertNotNull(found.getCreatedAt());
     }

@@ -17,12 +17,9 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** Persistence behaviour of {@link User}, exercised against the real schema. */
 @QuarkusTest
 class UserRepositoryTest {
 
-    // Not a credential: the column only ever holds an encoded hash, and nothing in these
-    // tests verifies a password. It has to satisfy ck_app_user_password_hash all the same.
     private static final String HASH = "$argon2id$v=19$m=512,t=1,p=1$c2FsdHNhbHRzYWx0$ZGlnZXN0";
 
     @Inject UserRepository repository;
@@ -119,8 +116,6 @@ class UserRepositoryTest {
         List<String> admins =
                 repository.listByRole(Role.ADMIN).stream().map(User::getUsername).toList();
 
-        // 'admin' is seeded by V2__users.sql, so the listing is asserted by membership rather
-        // than by size.
         assertTrue(admins.contains("only.admin"));
         assertTrue(admins.contains("admin.and.analyst"));
         assertFalse(admins.contains("plain.viewer"));
@@ -162,7 +157,7 @@ class UserRepositoryTest {
 
         assertTrue(admin.hasRole(Role.ADMIN));
         assertTrue(admin.isEnabled());
-        // The seeded row carries the locked marker, not a hash of any password.
+
         assertEquals("!", admin.getPasswordHash());
     }
 }

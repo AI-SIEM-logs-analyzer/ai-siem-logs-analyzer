@@ -13,7 +13,7 @@ export interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
-  /** Shown only to accounts allowed this; the route itself is guarded the same way. */
+
   permission?: Permission;
 }
 

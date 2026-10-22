@@ -8,36 +8,6 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-/**
- * Parses the rule language stored in {@code alert_rule.expression}.
- *
- * <pre>
- * expression := condition ( '|' window )?
- * window     := aggregate ( 'by' field ( ',' field )* )? 'within' DURATION ( '&gt;' | '&gt;=' ) NUMBER
- * aggregate  := 'count' ( '(' ')' )? | 'distinct' '(' field ')' | 'sum' '(' field ')'
- * condition  := and ( 'or' and )*
- * and        := unary ( 'and' unary )*
- * unary      := 'not' unary | '(' condition ')' | 'true' | predicate
- * predicate  := field ( CMP literal | 'in' '(' literal ( ',' literal )* ')' | 'exists'
- *                     | ( 'contains' | 'startswith' | 'endswith' | 'matches' ) STRING )
- * CMP        := '==' | '!=' | '&gt;' | '&gt;=' | '&lt;' | '&lt;='
- * literal    := STRING | NUMBER | 'true' | 'false'
- * DURATION   := integer followed by s, m, h or d — 30s, 5m, 1h, 1d
- * </pre>
- *
- * <p>Keywords are case-insensitive; {@code not} binds tighter than {@code and}, which binds tighter
- * than {@code or}. Strings take double or single quotes, with backslash escaping the quote, a
- * backslash, {@code \n} and {@code \t}. Field names are those of {@link EventField}. Some rules:
- *
- * <pre>
- * userAgent matches "(?i)sqlmap|nikto|nmap"
- * status in (401, 403) and path startswith "/login" | count by srcIp within 5m &gt;= 10
- * status == 404 | distinct(path) by srcIp within 1m &gt; 30
- * method == "GET" | sum(bytes) by srcIp within 10m &gt; 500000000
- * </pre>
- *
- * <p>The window clause's semantics are described on {@link WindowSpec} and {@link RuleEngine}.
- */
 public final class RuleExpressionParser {
 
     private final String source;
@@ -49,11 +19,6 @@ public final class RuleExpressionParser {
         this.tokens = tokenize(source);
     }
 
-    /**
-     * Parses a rule expression.
-     *
-     * @throws RuleSyntaxException the text is not a valid expression
-     */
     public static RuleExpression parse(String source) {
         if (source == null || source.isBlank()) {
             throw new RuleSyntaxException("the expression is empty", 0);
@@ -70,8 +35,6 @@ public final class RuleExpressionParser {
         }
         return new RuleExpression(condition, window);
     }
-
-    // --- conditions ------------------------------------------------------------------------
 
     private Condition or() {
         List<Condition> operands = new ArrayList<>(List.of(and()));
@@ -175,15 +138,12 @@ public final class RuleExpressionParser {
                 return token.value();
             }
             case IDENTIFIER -> {
-                // Bare true/false compare as text, which is how a JSON boolean reads.
                 if (isKeyword(token, "true") || isKeyword(token, "false")) {
                     next++;
                     return token.text().toLowerCase(Locale.ROOT);
                 }
             }
-            default -> {
-                // Falls through to the error below.
-            }
+            default -> {}
         }
         throw error("expected a quoted string or a number", token);
     }
@@ -196,8 +156,6 @@ public final class RuleExpressionParser {
             throw error(e.getMessage(), token);
         }
     }
-
-    // --- window clause ---------------------------------------------------------------------
 
     private WindowSpec window() {
         Aggregation aggregation = aggregation();
@@ -253,8 +211,6 @@ public final class RuleExpressionParser {
         throw error("expected count, distinct(<field>) or sum(<field>) after '|'", peek());
     }
 
-    // --- token stream ----------------------------------------------------------------------
-
     private Token peek() {
         return tokens.get(next);
     }
@@ -302,8 +258,6 @@ public final class RuleExpressionParser {
                 message + ", found " + found, Math.min(token.position(), source.length()));
     }
 
-    // --- tokenizer -------------------------------------------------------------------------
-
     private enum TokenType {
         IDENTIFIER,
         STRING,
@@ -343,8 +297,7 @@ public final class RuleExpressionParser {
                             case 'n' -> text.append('\n');
                             case 't' -> text.append('\t');
                             case '\\', '"', '\'' -> text.append(escaped);
-                            // A regex escape such as \d or \. is kept as written, so patterns
-                            // need no doubled backslashes.
+
                             default -> text.append('\\').append(escaped);
                         }
                     } else {
@@ -438,7 +391,6 @@ public final class RuleExpressionParser {
         return c >= '0' && c <= '9';
     }
 
-    /** Hyphens are allowed so attribute keys such as {@code x-forwarded-for} need no quoting. */
     private static boolean isIdentifierPart(char c) {
         return Character.isLetterOrDigit(c) || c == '_' || c == '.' || c == '-';
     }

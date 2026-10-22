@@ -8,23 +8,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Parses a Sigma {@code condition} over search identifiers that are already converted.
- *
- * <pre>
- * condition   := or ( '|' aggregation )?
- * or          := and ( 'or' and )*
- * and         := unary ( 'and' unary )*
- * unary       := 'not' unary | '(' or ')' | quantifier | IDENTIFIER
- * quantifier  := ( '1' | 'any' | 'all' ) 'of' ( 'them' | PATTERN )
- * aggregation := FUNCTION '(' field? ')' ( 'by' field )? OPERATOR NUMBER
- * </pre>
- *
- * <p>Keywords are case-insensitive. {@code them} is every search identifier not starting with an
- * underscore; a {@code PATTERN} is an identifier with {@code *} wildcards. The aggregation is Sigma
- * 1's, kept for the many rules still written that way; Sigma 2 moves it into correlation rules. Its
- * field names are returned as written, for the caller to map.
- */
 final class SigmaConditionParser {
 
     private static final Pattern TOKEN = Pattern.compile("[()]|[^\\s()]+");
@@ -41,18 +24,9 @@ final class SigmaConditionParser {
     private final List<String> tokens = new ArrayList<>();
     private int next;
 
-    /**
-     * A Sigma 1 aggregation, after the {@code |}.
-     *
-     * @param function {@code count}, {@code sum}, … lower-cased
-     * @param field the function's argument; {@code null} for {@code count()}
-     * @param groupBy the {@code by} field; {@code null} when absent
-     * @param operator as written: {@code >}, {@code >=}, …
-     */
     record Aggregation(
             String function, String field, String groupBy, String operator, BigDecimal threshold) {}
 
-    /** A parsed condition and its aggregation, {@code null} when there is none. */
     record Parsed(Expr condition, Aggregation aggregation) {}
 
     private SigmaConditionParser(String source, Map<String, Expr> searches) {
@@ -64,12 +38,6 @@ final class SigmaConditionParser {
         }
     }
 
-    /**
-     * Parses one condition.
-     *
-     * @param searches the rule's search identifiers, converted, in file order
-     * @throws SigmaException the condition is malformed or names an identifier that is not defined
-     */
     static Parsed parse(String condition, Map<String, Expr> searches) {
         int bar = condition.indexOf('|');
         String head = bar < 0 ? condition : condition.substring(0, bar);

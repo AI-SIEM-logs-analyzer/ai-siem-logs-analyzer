@@ -24,18 +24,10 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * What every parser promises for a line it cannot read: an empty result, never an exception, and
- * never a wait. An upload is read line by line, so one line that throws or hangs stops the whole
- * file, and the sender of a log line is not always friendly.
- *
- * <p>Whatever a parser does return keeps the line it was given as {@code raw}, byte for byte.
- */
 class MalformedLinesTest {
 
     private static final Instant NOW = Instant.parse("2026-09-25T12:00:00Z");
 
-    /** Generous for a CI runner; a regex that backtracks or recurses badly takes far longer. */
     private static final Duration PER_LINE = Duration.ofSeconds(5);
 
     private static final String ACCESS =
@@ -121,10 +113,6 @@ class MalformedLinesTest {
         }
     }
 
-    /**
-     * A file cut off by a full disk, a rotation or a size-limited upload ends in half a line. Every
-     * prefix of a real line of each format must be handled, whatever the cut makes of it.
-     */
     @ParameterizedTest
     @ValueSource(strings = {ACCESS, RFC5424, BSD, JSON})
     void everyTruncationOfALineIsHandled(String line) {
@@ -160,10 +148,6 @@ class MalformedLinesTest {
         }
     }
 
-    /**
-     * Seeded random damage to real lines: characters replaced by the ones parsers treat specially
-     * or never expect, deleted, or duplicated. The seed is fixed so a failure reproduces.
-     */
     @Test
     void randomlyCorruptedLinesAreHandled() throws IOException {
         List<String> seeds = new ArrayList<>(List.of(ACCESS, RFC5424, BSD, JSON));
@@ -191,10 +175,6 @@ class MalformedLinesTest {
         }
     }
 
-    /**
-     * Lines built to hurt a regex engine or a scanner: each would overflow the stack, backtrack for
-     * minutes or grow a structure quadratically in a naive parser.
-     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("hostileLines")
     void hostileLinesFinishQuickly(String description, String line) {
@@ -268,10 +248,6 @@ class MalformedLinesTest {
         assertEquals(10_000, ((List<?>) params.get("a")).size());
     }
 
-    /**
-     * A file with CRLF endings split on {@code \n} alone leaves a {@code \r} on every line. That
-     * must not change what the line means, only what its raw text is.
-     */
     @ParameterizedTest
     @ValueSource(strings = {ACCESS, RFC5424, BSD, JSON})
     void trailingCarriageReturnDoesNotChangeTheEvent(String line) {
@@ -287,7 +263,6 @@ class MalformedLinesTest {
         }
     }
 
-    /** Every parser either declines the line or returns an event that keeps it whole. */
     private static void assertHandled(String line) {
         for (Map.Entry<String, Function<String, Optional<NormalizedEvent>>> parser :
                 PARSERS.entrySet()) {
@@ -301,7 +276,6 @@ class MalformedLinesTest {
         }
     }
 
-    /** Turns anything a parser throws, errors included, into a failure that names the line. */
     private static Optional<NormalizedEvent> parseSafely(
             Function<String, Optional<NormalizedEvent>> parser, String line) {
         try {

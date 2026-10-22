@@ -7,7 +7,6 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 import java.util.Map;
 
-/** Turns an oversized upload into 413, naming the limit the caller has to stay under. */
 @Provider
 public class PayloadTooLargeExceptionMapper implements ExceptionMapper<PayloadTooLargeException> {
 

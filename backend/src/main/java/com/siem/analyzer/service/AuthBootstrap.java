@@ -12,17 +12,6 @@ import java.util.List;
 import java.util.Optional;
 import org.jboss.logging.Logger;
 
-/**
- * Gives the seeded administrator a password, once.
- *
- * <p>{@code V2__users.sql} deliberately seeds an account whose hash matches no password, so that a
- * credential is not identical on every deployment that runs the migration. Something has to close
- * that gap, and a start-up setting is the smallest thing that can: an endpoint would be a permanent
- * door for a problem that exists once.
- *
- * <p>Idempotent, so {@code APP_AUTH_BOOTSTRAP_PASSWORD} can stay in the environment across restarts
- * without overwriting a password someone has since chosen.
- */
 @ApplicationScoped
 public class AuthBootstrap {
 
@@ -58,12 +47,6 @@ public class AuthBootstrap {
         }
     }
 
-    /**
-     * Sets the password on an account that has none.
-     *
-     * <p>Visible for the start-up path and for tests; the guard, not the caller, is what makes it
-     * safe to call more than once.
-     */
     @Transactional
     void applyTo(User admin, String password) {
         if (!passwords.isLocked(admin.getPasswordHash())) {

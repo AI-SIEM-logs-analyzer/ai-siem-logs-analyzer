@@ -43,7 +43,6 @@ class LogUploadResourceTest {
         int id = response.path("id");
         assertTrue(id > 0);
 
-        // Read back via GET /logs/upload/{id}
         given().when()
                 .get("/logs/upload/" + id)
                 .then()
@@ -73,7 +72,6 @@ class LogUploadResourceTest {
         int id = response.path("id");
         assertTrue(id > 0);
 
-        // Read back via GET /api/logs/uploads/{id}
         given().when()
                 .get("/api/logs/uploads/" + id)
                 .then()
@@ -101,7 +99,7 @@ class LogUploadResourceTest {
 
     @Test
     void rejectsUploadWithMissingOrEmptyFile() {
-        // Multipart request with empty file
+
         given().multiPart("file", "empty.log", new byte[0], "text/plain")
                 .formParam("sourceName", "some-source")
                 .when()
@@ -109,7 +107,6 @@ class LogUploadResourceTest {
                 .then()
                 .statusCode(400);
 
-        // Non-multipart request
         given().formParam("sourceName", "some-source")
                 .when()
                 .post("/api/logs/upload")

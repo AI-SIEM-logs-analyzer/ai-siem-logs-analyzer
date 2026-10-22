@@ -15,7 +15,6 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** A rule's ATT&CK techniques, as the alert reads and the technique catalogue query them. */
 @QuarkusTest
 class AlertRuleTechniquesTest {
 
@@ -55,7 +54,7 @@ class AlertRuleTechniquesTest {
         Set<String> inUse = rules.techniqueIdsOfEnabledRules();
 
         assertTrue(inUse.contains("T1078"));
-        // The built-in rules are enabled, and V15 maps them.
+
         assertTrue(inUse.contains("T1190"));
         assertFalse(inUse.contains("T1499.004"));
     }

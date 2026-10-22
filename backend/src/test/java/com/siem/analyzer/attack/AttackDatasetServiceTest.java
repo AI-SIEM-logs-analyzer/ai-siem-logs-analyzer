@@ -18,10 +18,6 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-/**
- * Importing the dataset. Each import commits, so every test leaves the fixture loaded again for the
- * classes that run after it.
- */
 @QuarkusTest
 class AttackDatasetServiceTest {
 

@@ -7,13 +7,6 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * The event that raised an alert, read from PostgreSQL rather than the search index, so it is there
- * even before the index has caught up.
- *
- * @param fields the parsed fields under the camelCase names a search hit carries, absent ones left
- *     out; whatever the parser could not place is nested under {@code attributes}
- */
 public record AlertEventResponse(
         long eventId,
         long sourceId,

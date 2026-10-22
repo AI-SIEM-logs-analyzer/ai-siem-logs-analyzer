@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/** What {@link AlertSummaryService} accepts from a model before it stores anything. */
 class AlertSummaryServiceTest {
 
     private static final List<String> EVIDENCE = List.of("10.0.0.7");
@@ -76,7 +75,7 @@ class AlertSummaryServiceTest {
 
         assertEquals(AlertSummaryService.MAX_EVIDENCE, kept.size());
         assertEquals("a", kept.get(0));
-        // Cut without a marker, so what is kept is still a piece of the alert.
+
         assertEquals("x".repeat(AlertSummaryService.MAX_EVIDENCE_CHARS), kept.get(1));
         assertEquals("v0", kept.get(2));
     }
@@ -129,7 +128,7 @@ class AlertSummaryServiceTest {
                         AlertSummaryFailedException.class,
                         () -> AlertSummaryService.grounded(1L, invented, prompt()));
         assertTrue(failure.isUngrounded());
-        // The model's words stay in the log, not in what the caller is told.
+
         assertFalse(failure.getMessage().contains("10.0.0.9"), failure.getMessage());
     }
 

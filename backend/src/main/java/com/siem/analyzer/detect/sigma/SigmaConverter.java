@@ -20,51 +20,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-/**
- * Converts Sigma rules into rule-language expressions for the {@link
- * com.siem.analyzer.detect.RuleEngine}.
- *
- * <p><b>Detection.</b> A search identifier that is a mapping ANDs its fields; a list ORs its items;
- * a field's list of values ORs them, or ANDs them under {@code |all}. A plain string or a list of
- * them is a keyword search, matched anywhere in the {@code raw} line. String matching ignores case,
- * as in Sigma, and {@code *} and {@code ?} are wildcards ({@code \*}, {@code \?} and {@code \\} are
- * the literal characters). A {@code null} value means the field is absent.
- *
- * <p>Supported modifiers: {@code contains}, {@code startswith}, {@code endswith}, {@code all},
- * {@code re} (with {@code i}, {@code m}, {@code s}), {@code cased}, {@code exists}, {@code lt},
- * {@code lte}, {@code gt}, {@code gte}, {@code base64} and {@code base64offset}. Anything else
- * ({@code cidr}, {@code windash}, {@code fieldref}, the UTF-16 encodings, …) makes the rule
- * unsupported.
- *
- * <p><b>Conditions.</b> {@code and}, {@code or}, {@code not}, parentheses, {@code 1 of} / {@code
- * all of} a pattern or {@code them}; see {@link SigmaConditionParser}. A Sigma 1 aggregation
- * ({@code | count() by c-ip > 10} with a {@code timeframe}) and a Sigma 2 {@code event_count},
- * {@code value_count} or {@code value_sum} correlation become the engine's sliding window: {@code
- * count}, {@code distinct(field)} or {@code sum(field)}. Only thresholds that rise ({@code >},
- * {@code >=}) exist in the engine, so the others are refused.
- *
- * <p><b>Log source.</b> The {@link SigmaFieldMapping}'s guard for the rule's {@code logsource} is
- * ANDed in front of the converted condition.
- *
- * <p><b>Lifecycle.</b> {@code deprecated} and {@code unsupported} rules are skipped. Rules a
- * correlation refers to are not imported on their own unless it sets {@code generate: true}, as
- * Sigma specifies.
- *
- * <p>Each result is checked by parsing it with {@link RuleExpressionParser}, so what this returns
- * is what the engine will run. Instances are immutable and may be shared.
- */
 public final class SigmaConverter {
 
-    /** Characters that mean something in a Java regular expression outside a class. */
     private static final String REGEX_META = "\\.[]{}()*+?^$|";
 
     private static final Set<String> SKIPPED_STATUSES = Set.of("deprecated", "unsupported");
 
-    /**
-     * A Sigma tag naming an ATT&CK technique: {@code attack.t1110} or {@code attack.t1110.001}.
-     * Tactic ({@code attack.credential_access}), group ({@code attack.g0007}) and software ({@code
-     * attack.s0002}) tags share the prefix but are not techniques.
-     */
     private static final Pattern ATTACK_TECHNIQUE_TAG =
             Pattern.compile("(?i)attack\\.(t\\d{4}(?:\\.\\d{3})?)");
 
@@ -76,19 +37,10 @@ public final class SigmaConverter {
         this.mapping = Objects.requireNonNull(mapping, "mapping");
     }
 
-    /** A converter with {@link SigmaFieldMapping#defaults()}. */
     public static SigmaConverter withDefaults() {
         return new SigmaConverter(SigmaFieldMapping.defaults());
     }
 
-    /**
-     * Converts every rule in a YAML stream of one or more documents.
-     *
-     * <p>A document that cannot be converted is reported in {@link SigmaImport#skipped()} and does
-     * not stop the others.
-     *
-     * @throws SigmaException the text is not YAML, or a document in it is not a mapping
-     */
     public SigmaImport convert(String yaml) {
         List<SigmaRule> rules = new ArrayList<>();
         List<SigmaCorrelation> correlations = new ArrayList<>();
@@ -184,8 +136,6 @@ public final class SigmaConverter {
                 reason);
     }
 
-    // --- rules -------------------------------------------------------------------------------
-
     private ConvertedRule convert(SigmaRule rule) {
         Map<String, Expr> searches = searches(rule);
         List<Expr> alternatives = new ArrayList<>();
@@ -204,7 +154,6 @@ public final class SigmaConverter {
         return finish(rule.meta(), guarded(rule, Expr.or(alternatives)), window);
     }
 
-    /** The per-event condition of a rule a correlation counts, log-source guard included. */
     private Expr correlated(SigmaRule rule) {
         Map<String, Expr> searches = searches(rule);
         List<Expr> alternatives = new ArrayList<>();
@@ -304,7 +253,6 @@ public final class SigmaConverter {
                 .toString();
     }
 
-    /** A Sigma time span in the rule language's units, which are the same letters. */
     private static String duration(String timespan) {
         if (timespan == null || !timespan.matches("[1-9]\\d{0,8}[smhd]")) {
             throw new SigmaException(
@@ -318,8 +266,6 @@ public final class SigmaConverter {
     private String mappedField(String sigmaField) {
         return mapping.field(sigmaField);
     }
-
-    // --- correlations ------------------------------------------------------------------------
 
     private ConvertedRule convert(
             SigmaCorrelation correlation, Map<String, SigmaRule> byReference) {
@@ -362,8 +308,6 @@ public final class SigmaConverter {
         return correlation.field();
     }
 
-    // --- result ------------------------------------------------------------------------------
-
     private static ConvertedRule finish(SigmaRule.Meta meta, Expr condition, String window) {
         String expression = condition.render() + (window == null ? "" : " | " + window);
         try {
@@ -381,7 +325,6 @@ public final class SigmaConverter {
                 attackTechniques(meta.tags()));
     }
 
-    /** The ATT&CK technique IDs among a rule's tags, upper-cased. */
     static Set<String> attackTechniques(List<String> tags) {
         Set<String> ids = new TreeSet<>();
         for (String tag : tags) {
@@ -393,7 +336,6 @@ public final class SigmaConverter {
         return ids;
     }
 
-    /** {@code sigma-<title>-<first 8 of id>}: readable, and stable across re-imports. */
     static String name(SigmaRule.Meta meta) {
         String slug =
                 meta.title()
@@ -416,7 +358,6 @@ public final class SigmaConverter {
         return name.toString();
     }
 
-    /** Sigma's five levels onto the platform's severities; a rule without one is medium. */
     static Severity severity(String level) {
         if (level == null) {
             return Severity.WARNING;
@@ -451,8 +392,6 @@ public final class SigmaConverter {
         }
         return description.toString();
     }
-
-    // --- search identifiers ------------------------------------------------------------------
 
     private Expr search(String identifier, Object definition) {
         if (definition instanceof Map<?, ?> map) {
@@ -501,7 +440,6 @@ public final class SigmaConverter {
         return Expr.and(all);
     }
 
-    /** One {@code field|modifiers: values} entry; an empty field is a keyword search. */
     private Expr item(String identifier, String key, List<Object> values) {
         if (values.isEmpty()) {
             throw new SigmaException("'" + key + "' in '" + identifier + "' has no values");
@@ -527,7 +465,6 @@ public final class SigmaConverter {
         return modifiers.all() ? Expr.and(matches) : Expr.or(matches);
     }
 
-    /** {@code field in (...)} when every value is a plain literal; {@code null} otherwise. */
     private static String in(String field, List<Object> values) {
         List<String> literals = new ArrayList<>();
         for (Object value : values) {
@@ -615,7 +552,6 @@ public final class SigmaConverter {
         return matchString(field, SigmaString.parse(text), match, modifiers.cased());
     }
 
-    /** A Sigma string, wildcards and all, compared in the given way. */
     private static Expr matchString(String field, SigmaString value, Match match, boolean cased) {
         SigmaString pattern = value.anchoredFor(match);
         boolean leading = pattern.startsWithAny();
@@ -658,7 +594,6 @@ public final class SigmaConverter {
         return value instanceof String || value instanceof Number || value instanceof Boolean;
     }
 
-    /** A YAML number as an exact decimal, or {@code null} when it is not a finite number. */
     static BigDecimal decimal(Object value) {
         if (!(value instanceof Number)) {
             return null;
@@ -675,12 +610,6 @@ public final class SigmaConverter {
         return decimal == null ? null : decimal.toPlainString();
     }
 
-    /**
-     * {@code text} as a double-quoted rule-language string.
-     *
-     * <p>A backslash is doubled only where the tokenizer would otherwise read it as an escape, so a
-     * regular expression such as {@code \d+} stays readable in the stored rule.
-     */
     static String quote(String text) {
         StringBuilder quoted = new StringBuilder(text.length() + 2).append('"');
         for (int i = 0; i < text.length(); i++) {
@@ -699,7 +628,6 @@ public final class SigmaConverter {
         return quoted.append('"').toString();
     }
 
-    /** {@code text} with every regular-expression metacharacter escaped. */
     static String regexLiteral(String text) {
         StringBuilder escaped = new StringBuilder(text.length());
         for (int i = 0; i < text.length(); i++) {
@@ -712,9 +640,6 @@ public final class SigmaConverter {
         return escaped.toString();
     }
 
-    // --- modifiers ---------------------------------------------------------------------------
-
-    /** How a value is compared, before wildcards are taken into account. */
     enum Match {
         EQUALS,
         CONTAINS,
@@ -727,11 +652,6 @@ public final class SigmaConverter {
         PLAIN,
         OFFSET;
 
-        /**
-         * The encodings that can appear in a log for {@code value}: one for {@code base64}; three
-         * for {@code base64offset}, one per alignment the value can have inside a longer encoded
-         * string, with the characters that depend on its neighbours cut off.
-         */
         List<String> encode(String value) {
             Base64.Encoder encoder = Base64.getEncoder();
             byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
@@ -757,12 +677,6 @@ public final class SigmaConverter {
         }
     }
 
-    /**
-     * The modifiers on one field key, validated together.
-     *
-     * @param comparison {@code < <= > >=} for {@code lt}, {@code lte}, {@code gt}, {@code gte};
-     *     {@code null} otherwise
-     */
     record Modifiers(
             Match match,
             boolean all,
@@ -773,7 +687,6 @@ public final class SigmaConverter {
             String comparison,
             Base64Mode base64) {
 
-        /** No modifier that changes how a single value is compared. */
         boolean isPlain() {
             return match == Match.EQUALS
                     && !regex

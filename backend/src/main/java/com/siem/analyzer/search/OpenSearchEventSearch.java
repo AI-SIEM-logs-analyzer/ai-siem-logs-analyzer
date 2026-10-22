@@ -22,13 +22,6 @@ import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.jboss.logging.Logger;
 
-/**
- * The only class that speaks OpenSearch's wire protocol.
- *
- * <p>Requests are built as Jackson trees and serialised once. Nothing is concatenated into a
- * request body: a query carries caller input, and a body assembled from strings is a body whose
- * escaping is decided by whoever typed the search box.
- */
 @ApplicationScoped
 public class OpenSearchEventSearch implements EventSearch {
 
@@ -102,14 +95,6 @@ public class OpenSearchEventSearch implements EventSearch {
         }
     }
 
-    /**
-     * The bool query.
-     *
-     * <p>Filters go in {@code filter}, which skips scoring and is cacheable. Only the full-text
-     * clause goes in {@code must}, because it is the one part whose score orders anything — and
-     * even then the sort below is by time, so the score serves relevance debugging rather than
-     * ordering.
-     */
     private ObjectNode queryClause(EventQuery query) {
         ObjectNode bool = objectMapper.createObjectNode();
         ArrayNode filters = bool.putObject("bool").putArray("filter");
@@ -122,8 +107,7 @@ public class OpenSearchEventSearch implements EventSearch {
                 bounds.put("gte", query.from().toString());
             }
             if (query.to() != null) {
-                // Exclusive, so consecutive windows neither overlap nor leave a gap. Same
-                // contract as LogEventRepository.listForSourceBetween.
+
                 bounds.put("lt", query.to().toString());
             }
             filters.add(range);
@@ -141,15 +125,14 @@ public class OpenSearchEventSearch implements EventSearch {
             filters.add(terms);
         }
         if (!query.srcIps().isEmpty()) {
-            // `terms` on an `ip` field takes addresses and CIDR ranges alike.
+
             ObjectNode terms = objectMapper.createObjectNode();
             ArrayNode values = terms.putObject("terms").putArray("src_ip");
             query.srcIps().forEach(ip -> values.add(ip.value()));
             filters.add(terms);
         }
         if (!query.statuses().isEmpty()) {
-            // Any of the ranges. An event without a status matches none of them, so a status
-            // filter narrows the result to HTTP events.
+
             ObjectNode anyStatus = objectMapper.createObjectNode();
             ObjectNode inner = anyStatus.putObject("bool");
             ArrayNode should = inner.putArray("should");
@@ -164,8 +147,7 @@ public class OpenSearchEventSearch implements EventSearch {
             filters.add(anyStatus);
         }
         if (query.substring() != null) {
-            // A literal substring, not a pattern: the caller's asterisks and question marks
-            // are escaped so a search box cannot turn into a scan of the whole index.
+
             ObjectNode wildcard = objectMapper.createObjectNode();
             wildcard.putObject("wildcard")
                     .putObject("raw")
@@ -181,22 +163,10 @@ public class OpenSearchEventSearch implements EventSearch {
         return bool;
     }
 
-    /**
-     * Escapes the two characters {@code wildcard} treats as pattern syntax.
-     *
-     * <p>Callers search for text, not for patterns. Leaving {@code *} through would let one query
-     * ask the engine to verify every document in the index.
-     */
     private String escapeWildcard(String literal) {
         return literal.replace("\\", "\\\\").replace("*", "\\*").replace("?", "\\?");
     }
 
-    /**
-     * By event time, with the identifier breaking ties so the sort key is unique.
-     *
-     * <p>Both keys share one direction: {@code search_after} compares the cursor against them in
-     * order, so a mixed direction would page through a different sequence than the one sorted.
-     */
     private ArrayNode sortClause(SortOrder order) {
         ArrayNode sort = objectMapper.createArrayNode();
         sort.addObject().putObject("occurred_at").put("order", order.engineValue());
@@ -204,22 +174,18 @@ public class OpenSearchEventSearch implements EventSearch {
         return sort;
     }
 
-    /** Facets over the whole match. Every field here is an explicitly mapped one. */
     private ObjectNode aggregations() {
         ObjectNode aggs = objectMapper.createObjectNode();
         aggs.putObject("by_severity").putObject("terms").put("field", "severity").put("size", 10);
         aggs.putObject("by_source").putObject("terms").put("field", "source_id").put("size", 20);
         aggs.putObject("by_host").putObject("terms").put("field", "host").put("size", 20);
-        // Each address also counts its own events per hour, for the activity heatmap: the
-        // histogram rides on the same terms buckets, so it costs no second ranking.
+
         ObjectNode bySrcIp = aggs.putObject("by_src_ip");
         bySrcIp.putObject("terms").put("field", "src_ip").put("size", 20);
         bySrcIp.putObject("aggs").set("over_time", hourlyHistogram());
-        // HTTP defines about sixty codes, so 60 buckets hold every one a log can carry.
+
         aggs.putObject("by_status").putObject("terms").put("field", "status").put("size", 60);
-        // The most frequent error messages, by exact text (message.keyword; a message longer
-        // than its ignore_above is not counted). Severity is filtered here rather than in the
-        // query, so the other facets still count every severity.
+
         ObjectNode topErrors = aggs.putObject("top_errors");
         topErrors
                 .putObject("filter")
@@ -237,7 +203,6 @@ public class OpenSearchEventSearch implements EventSearch {
         return aggs;
     }
 
-    /** Events per hour, the empty hours left out. */
     private ObjectNode hourlyHistogram() {
         ObjectNode histogram = objectMapper.createObjectNode();
         histogram
@@ -254,7 +219,7 @@ public class OpenSearchEventSearch implements EventSearch {
             hits.add(toHit(raw.path("_source")));
         }
         long total = response.path("hits").path("total").path("value").asLong();
-        // A full page may have more behind it; a short one cannot.
+
         SearchCursor next = hits.size() < query.size() ? null : hits.get(hits.size() - 1).cursor();
         EventFacets facets =
                 query.withFacets() ? toFacets(response.path("aggregations")) : EventFacets.none();
@@ -291,13 +256,11 @@ public class OpenSearchEventSearch implements EventSearch {
                         "ua_bot")) {
             JsonNode value = source.get(field);
             if (value != null && !value.isNull()) {
-                // The camelCase name the payload contract uses, so a caller sees one
-                // vocabulary rather than the index's snake_case alongside it.
+
                 fields.put(toCamelCase(field), scalar(value));
             }
         }
-        // geo_location is an object ({lat, lon}), not a scalar, so asText() would return "" for
-        // it above; split it into the two numeric fields the payload contract already uses.
+
         JsonNode location = source.get("geo_location");
         if (location != null
                 && location.isObject()
@@ -376,13 +339,6 @@ public class OpenSearchEventSearch implements EventSearch {
         return counts;
     }
 
-    /**
-     * Sends one `_bulk` request and fails if any of its items did.
-     *
-     * <p>A bulk response answers 200 even when individual items were rejected, so the per-item
-     * errors are what decides the outcome. A partially applied batch is re-sent whole by the
-     * caller: the writes are idempotent, so repeating the ones that worked costs nothing.
-     */
     private void bulk(List<IndexableEvent> events) {
         StringBuilder body = new StringBuilder();
         try {
@@ -418,7 +374,6 @@ public class OpenSearchEventSearch implements EventSearch {
         }
     }
 
-    /** Builds the document for one event, in the field names the mapping declares. */
     private ObjectNode toDocument(IndexableEvent event) {
         ObjectNode document = objectMapper.createObjectNode();
         document.put("event_id", event.eventId());
@@ -461,8 +416,7 @@ public class OpenSearchEventSearch implements EventSearch {
         document.put("message", event.message());
         document.put("raw", event.raw());
         if (!event.attributes().isEmpty()) {
-            // flat_object holds the whole map as one field, so an unexpected key here grows
-            // nothing — which is why `dynamic: strict` above it is safe.
+
             document.set("attributes", objectMapper.valueToTree(event.attributes()));
         }
         return document;

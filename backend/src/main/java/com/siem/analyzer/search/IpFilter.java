@@ -5,27 +5,12 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.regex.Pattern;
 
-/**
- * One source-address filter: a single address or a CIDR range, IPv4 or IPv6.
- *
- * <p>Validated here rather than left to the engine, which would answer a malformed value with a 400
- * of its own that the search path reports as the engine being down. The check is purely textual:
- * {@link InetAddress#getByName} resolves anything that is not a literal, and a search parameter
- * must never become a DNS query.
- *
- * @param value the address or range as the engine's {@code ip} field accepts it, for example {@code
- *     203.0.113.7} or {@code 10.0.0.0/8}
- */
 public record IpFilter(String value) {
 
-    // Four dotted decimal octets only. The JDK also accepts "127.1" and octal or hex parts,
-    // which read as one address and match another.
     private static final Pattern IPV4 =
             Pattern.compile(
                     "((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)");
 
-    // Hex groups, colons and an optional embedded IPv4 tail. No zone id: it names an interface
-    // on this host and means nothing to an indexed address.
     private static final Pattern IPV6_CHARACTERS = Pattern.compile("[0-9A-Fa-f:.]+");
 
     private static final Pattern PREFIX = Pattern.compile("\\d{1,3}");
@@ -36,7 +21,6 @@ public record IpFilter(String value) {
         }
     }
 
-    /** Parses one {@code srcIp} parameter value, trimming surrounding whitespace. */
     public static IpFilter parse(String raw) {
         String candidate = raw == null ? "" : raw.trim();
         if (candidate.isEmpty()) {
@@ -73,8 +57,7 @@ public record IpFilter(String value) {
             return false;
         }
         try {
-            // Safe to hand to the resolver now: a string with a colon is only ever parsed as an
-            // IPv6 literal, never looked up.
+
             return InetAddress.getByName(address) instanceof Inet6Address;
         } catch (UnknownHostException e) {
             return false;

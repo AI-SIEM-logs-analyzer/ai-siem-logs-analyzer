@@ -11,7 +11,6 @@ import jakarta.inject.Inject;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** The one-off that makes a fresh deployment signable into. */
 @QuarkusTest
 class AuthBootstrapTest {
 

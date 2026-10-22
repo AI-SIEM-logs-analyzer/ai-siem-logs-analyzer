@@ -14,12 +14,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** Sigma YAML to rule-language text, rule by rule. */
 class SigmaConverterTest {
 
     private final SigmaConverter converter = SigmaConverter.withDefaults();
 
-    /** A webserver rule around {@code detection}, which is indented as a YAML block body. */
     private static String webserver(String detection) {
         return """
                 title: Test rule
@@ -37,7 +35,6 @@ class SigmaConverterTest {
         return result.rules().get(0);
     }
 
-    /** The expression for a webserver rule, without the {@code method exists and} guard. */
     private String condition(String detection) {
         String expression = only(webserver(detection)).expression();
         String guard = SigmaFieldMapping.HTTP_REQUEST + " and ";
@@ -51,8 +48,6 @@ class SigmaConverterTest {
         assertEquals(1, result.skipped().size());
         return result.skipped().get(0).reason();
     }
-
-    // --- values and modifiers ------------------------------------------------------------------
 
     @ParameterizedTest
     @CsvSource(
@@ -197,8 +192,6 @@ class SigmaConverterTest {
         }
     }
 
-    // --- conditions ----------------------------------------------------------------------------
-
     @Test
     void combinesSearchIdentifiers() {
         String detection =
@@ -267,8 +260,6 @@ class SigmaConverterTest {
                 only(yaml.formatted("selection | sum(sc-bytes) > 1000")).expression());
     }
 
-    // --- correlations --------------------------------------------------------------------------
-
     private static final String FAILED_LOGIN =
             """
             title: Failed login
@@ -332,8 +323,6 @@ class SigmaConverterTest {
                         + " | distinct(user) by srcIp within 5m >= 10",
                 only(yaml).expression());
     }
-
-    // --- metadata ------------------------------------------------------------------------------
 
     @Test
     void keepsTheRuleIdentityAndDescription() {
@@ -412,8 +401,6 @@ class SigmaConverterTest {
                 rule.expression());
         assertNull(rule.sigmaId());
     }
-
-    // --- what is refused -----------------------------------------------------------------------
 
     @ParameterizedTest
     @CsvSource(

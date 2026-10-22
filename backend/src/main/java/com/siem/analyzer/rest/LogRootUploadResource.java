@@ -20,7 +20,6 @@ import jakarta.ws.rs.core.UriInfo;
 import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
 
-/** Direct endpoint under {@code /logs} for multipart upload compatibility. */
 @Path("/logs")
 @Produces(MediaType.APPLICATION_JSON)
 public class LogRootUploadResource {
@@ -32,10 +31,6 @@ public class LogRootUploadResource {
         this.uploadService = uploadService;
     }
 
-    /**
-     * Uploads a log file via multipart form-data, stores it, records its metadata, and publishes an
-     * ingestion event to Kafka {@code logs.ingest}.
-     */
     @RolesAllowed({"ADMIN", "ANALYST"})
     @POST
     @Path("/upload")
@@ -61,7 +56,6 @@ public class LogRootUploadResource {
                 .build();
     }
 
-    /** Retrieves the metadata of an upload by ID. */
     @RolesAllowed({"ADMIN", "ANALYST", "VIEWER"})
     @GET
     @Path("/upload/{id}")

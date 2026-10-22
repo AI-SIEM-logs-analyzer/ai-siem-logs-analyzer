@@ -106,7 +106,7 @@ describe('alert drill-down', () => {
       new URLSearchParams([
         ['range', 'custom'],
         ['from', '2026-10-01T10:00:00.000Z'],
-        // The window's end is inclusive and the search's `to` is not.
+
         ['to', '2026-10-01T10:00:05.001Z'],
         ['srcIp', '10.0.0.7'],
         ['status', '401'],

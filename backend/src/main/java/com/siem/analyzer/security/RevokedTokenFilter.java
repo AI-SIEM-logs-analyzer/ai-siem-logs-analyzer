@@ -12,14 +12,6 @@ import jakarta.ws.rs.ext.Provider;
 import java.util.Map;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
-/**
- * Turns away a request that carries a withdrawn access token.
- *
- * <p>Runs after authentication — the priority is what guarantees that — so the token has already
- * been verified and {@link JsonWebToken} is populated. An anonymous request has no token identifier
- * and passes straight through; whether it is allowed at all is a question for
- * {@code @RolesAllowed}, not for this filter.
- */
 @Provider
 @Priority(Priorities.AUTHENTICATION + 100)
 public class RevokedTokenFilter implements ContainerRequestFilter {

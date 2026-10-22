@@ -10,19 +10,6 @@ import org.eclipse.microprofile.health.HealthCheck;
 import org.eclipse.microprofile.health.HealthCheckResponse;
 import org.eclipse.microprofile.health.Readiness;
 
-/**
- * Reports the search engine's state and how far the index trails PostgreSQL.
- *
- * <p>Always UP, deliberately. The index is derived: an engine that is down degrades search while
- * ingestion continues, and a check that went DOWN would fail readiness and have the orchestrator
- * pull an instance that is still doing its main job. The state is reported as data so a dashboard
- * or an alert can act on it; {@code quarkus.elasticsearch.health.enabled} is false for the same
- * reason, since the extension's own check does gate readiness.
- *
- * <p>{@code mapping} is {@code outdated} when start-up could not push the mapping's properties onto
- * an existing index; events carrying the new fields are then refused by the index and wait in the
- * backlog until the mapping is repaired.
- */
 @Readiness
 @ApplicationScoped
 public class SearchIndexHealthCheck implements HealthCheck {

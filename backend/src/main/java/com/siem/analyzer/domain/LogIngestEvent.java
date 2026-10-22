@@ -2,7 +2,6 @@ package com.siem.analyzer.domain;
 
 import java.time.Instant;
 
-/** Message published to the {@code logs.ingest} Kafka channel when a log upload arrives. */
 public record LogIngestEvent(
         Long uploadId,
         Long sourceId,

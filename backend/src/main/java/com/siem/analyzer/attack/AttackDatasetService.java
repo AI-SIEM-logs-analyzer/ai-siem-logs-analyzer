@@ -22,26 +22,14 @@ import java.util.Map;
 import java.util.Optional;
 import org.jboss.logging.Logger;
 
-/**
- * Loads a MITRE ATT&CK release into the dataset tables: the one bundled in the jar, or one an
- * administrator uploads.
- *
- * <p>The bundle is read before any transaction opens, so a 50 MB parse never holds database locks,
- * and a bundle the reader refuses changes nothing. Storing it is then one transaction that empties
- * and refills the four {@code attack_*} tables under an advisory lock: the dataset changes whole or
- * not at all, and replicas importing together take turns. {@code alert_rule_technique} is never
- * touched; rules keep their technique IDs across releases.
- */
 @ApplicationScoped
 public class AttackDatasetService {
 
     private static final Logger LOG = Logger.getLogger(AttackDatasetService.class);
 
-    /** What a start-up import did. */
     public enum Outcome {
-        /** The bundled release was stored. */
         IMPORTED,
-        /** The stored release is the bundled one or newer; nothing was read. */
+
         CURRENT
     }
 
@@ -62,15 +50,10 @@ public class AttackDatasetService {
         this.appConfig = appConfig;
     }
 
-    /** The loaded release; empty until an import has succeeded. */
     public Optional<AttackDataset> current() {
         return QuarkusTransaction.requiringNew().call(datasets::current);
     }
 
-    /**
-     * Imports the bundled release when nothing is stored yet or the stored release is older. A
-     * newer stored release, which only an upload can have put there, is left alone.
-     */
     public Outcome importBundledIfNewer() {
         AppConfig.Attack config = appConfig.attack();
         Optional<String> stored = current().map(AttackDataset::getVersion);
@@ -91,13 +74,6 @@ public class AttackDatasetService {
         }
     }
 
-    /**
-     * Replaces the dataset with an uploaded bundle, gzipped or plain, whatever its release: an
-     * administrator going back to an older one is making that call.
-     *
-     * @throws PayloadTooLargeException the body is over {@code app.attack.max-upload-bytes}
-     * @throws InvalidAttackBundleException the body is not an ATT&CK bundle; nothing changes
-     */
     public AttackDataset importUpload(InputStream body) {
         AppConfig.Attack config = appConfig.attack();
         byte[] bytes = readAtMost(body, config.maxUploadBytes());
@@ -111,10 +87,6 @@ public class AttackDatasetService {
         return imported;
     }
 
-    /**
-     * Reads {@code in} whole, refusing it once it passes {@code limit} bytes. Reads one byte past
-     * the limit, not the rest of the body, to tell "exactly the limit" from "over it".
-     */
     static byte[] readAtMost(InputStream in, long limit) {
         try {
             byte[] bytes = in.readNBytes((int) Math.min(limit + 1, Integer.MAX_VALUE - 8));

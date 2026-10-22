@@ -8,20 +8,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.StringJoiner;
 
-/**
- * One Sigma detection rule, as read from YAML and before any conversion.
- *
- * <p>Only what conversion and the stored description need is kept. The detection's search
- * identifiers stay as the YAML tree Jackson produced, since what a value means depends on the
- * modifiers on its key and is decided by {@link SigmaConverter}.
- *
- * @param meta title, identity and the other descriptive keys
- * @param logsource what the rule was written against
- * @param searches the detection's search identifiers in file order, {@code condition} excluded
- * @param conditions the detection's condition, one entry per list item; several are ORed
- * @param timeframe the window of a Sigma 1 aggregation such as {@code | count() by c-ip > 10}, as
- *     written ({@code 5m}); {@code null} when absent
- */
 public record SigmaRule(
         Meta meta,
         Logsource logsource,
@@ -36,17 +22,6 @@ public record SigmaRule(
         conditions = List.copyOf(conditions);
     }
 
-    /**
-     * The keys every Sigma document carries, rule or correlation.
-     *
-     * @param title required
-     * @param id a UUID by convention; {@code null} when absent
-     * @param name the handle a correlation refers to the rule by; {@code null} when absent
-     * @param status {@code stable}, {@code test}, {@code experimental}, {@code deprecated} or
-     *     {@code unsupported}; {@code null} when absent
-     * @param falsepositives known benign causes of the match
-     * @param tags free-form labels; {@code attack.t1110.001} names an ATT&CK technique
-     */
     public record Meta(
             String title,
             String id,
@@ -85,7 +60,6 @@ public record SigmaRule(
         }
     }
 
-    /** The {@code logsource} block; each key {@code null} when the rule leaves it out. */
     public record Logsource(String category, String product, String service) {
 
         @Override
@@ -104,11 +78,6 @@ public record SigmaRule(
         }
     }
 
-    /**
-     * Reads a rule document.
-     *
-     * @throws SigmaException a required key is missing or has the wrong shape
-     */
     static SigmaRule from(Map<String, Object> document) {
         Meta meta = Meta.from(document);
         Logsource logsource = new Logsource(null, null, null);
@@ -147,7 +116,6 @@ public record SigmaRule(
         return new SigmaRule(meta, logsource, searches, conditions, text(document, "timeframe"));
     }
 
-    /** A scalar value as text, or {@code null} when absent; a mapping or a list is an error. */
     static String text(Map<String, Object> map, String key) {
         Object value = map.get(key);
         if (value == null) {
@@ -160,7 +128,6 @@ public record SigmaRule(
         return text.isEmpty() ? null : text;
     }
 
-    /** A list of scalars as text, a lone scalar as a list of one; empty when absent. */
     static List<String> texts(Map<String, Object> map, String key) {
         Object value = map.get(key);
         if (value == null) {

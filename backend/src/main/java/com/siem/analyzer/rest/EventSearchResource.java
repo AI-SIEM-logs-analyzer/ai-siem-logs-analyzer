@@ -30,15 +30,6 @@ import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
-/**
- * Search over ingested events.
- *
- * <p>Readable by every signed-in role, for the same reason the user listing is: triage needs to see
- * the evidence. Nothing here writes.
- *
- * <p>Results come from the derived index, which trails PostgreSQL by at most one backfill interval.
- * A caller that needs the authoritative row reads it by {@code eventId}.
- */
 @Path("/api/events/search")
 @Produces(MediaType.APPLICATION_JSON)
 @Tag(name = "Events", description = "Search over ingested log events")
@@ -182,8 +173,7 @@ public class EventSearchResource {
             builder.size(size);
         }
         if ((cursorOccurredAt == null) != (cursorEventId == null)) {
-            // Half a cursor is a caller bug; resuming from the first page instead would
-            // silently repeat results.
+
             throw new BadRequestException(
                     "cursorOccurredAt and cursorEventId must be sent together");
         }
@@ -194,8 +184,7 @@ public class EventSearchResource {
 
         EventQuery query;
         try {
-            // Every bound EventQuery enforces is a limit on what one caller can make the
-            // cluster do, so a rejected query is a 400 rather than a 500.
+
             query = builder.build();
         } catch (IllegalArgumentException e) {
             throw new BadRequestException(e.getMessage(), e);
@@ -231,7 +220,6 @@ public class EventSearchResource {
         return parsed;
     }
 
-    /** Parses a repeated parameter; the parser's IllegalArgumentException becomes a 400. */
     private <T> Set<T> parseAll(List<String> values, Function<String, T> parser) {
         if (values == null || values.isEmpty()) {
             return Set.of();

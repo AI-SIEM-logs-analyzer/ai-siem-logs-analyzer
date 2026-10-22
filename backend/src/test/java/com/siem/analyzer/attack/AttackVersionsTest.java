@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-/** ATT&CK releases compare as dotted numbers, not as text. */
 class AttackVersionsTest {
 
     @Test

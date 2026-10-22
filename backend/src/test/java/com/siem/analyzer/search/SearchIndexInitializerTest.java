@@ -78,10 +78,6 @@ class SearchIndexInitializerTest {
         JsonNode afterFirstRun = mappingProperties();
         initializer.ensureIndex();
 
-        // No exception is half the assertion: a second create would answer 400
-        // resource_already_exists_exception, and a second alias write would fail the same way if
-        // it were not written as an idempotent action. The other half is that pushing the mapping
-        // onto an index that already carries it leaves the mapping exactly as it was.
         assertTrue(initializer.indexExists());
         assertEquals(afterFirstRun, mappingProperties());
         assertTrue(initializer.mappingCurrent());
@@ -89,8 +85,7 @@ class SearchIndexInitializerTest {
 
     @Test
     void anExistingIndexGainsTheGeoMapping() throws IOException {
-        // An index created before the geo fields existed: the real mapping minus every geo_*
-        // property, so the test tracks the resource rather than a hand-written copy of it.
+
         ObjectNode oldMapping = mappingResource();
         ObjectNode oldProperties = (ObjectNode) oldMapping.path("mappings").path("properties");
         oldProperties.remove(GEO_FIELDS);
@@ -108,9 +103,7 @@ class SearchIndexInitializerTest {
             assertEquals("geo_point", properties.path("geo_location").path("type").asText());
             assertEquals("long", properties.path("geo_asn").path("type").asText());
             assertEquals("keyword", properties.path("geo_as_org").path("type").asText());
-            // Every property of the resource, by type: OpenSearch echoes some defaults back
-            // (doc_values on the wildcard field), so the node as a whole is not byte-for-byte the
-            // resource.
+
             mappingResource()
                     .path("mappings")
                     .path("properties")
@@ -132,7 +125,7 @@ class SearchIndexInitializerTest {
 
     @Test
     void anExistingIndexGainsTheUserAgentMapping() throws IOException {
-        // An index created before the User-Agent fields existed, but already carrying geo.
+
         ObjectNode oldMapping = mappingResource();
         ((ObjectNode) oldMapping.path("mappings").path("properties")).remove(USER_AGENT_FIELDS);
 
@@ -155,8 +148,7 @@ class SearchIndexInitializerTest {
 
     @Test
     void aRefusedMappingUpdateIsReportedAsOutdatedWithoutGatingReadiness() throws IOException {
-        // OpenSearch refuses to change the type of a field an index already maps, so an index
-        // holding geo_asn as a keyword makes the update fail for real, with no fake server.
+
         ObjectNode conflicting = mappingResource();
         ((ObjectNode) conflicting.path("mappings").path("properties"))
                 .putObject("geo_asn")
@@ -179,11 +171,6 @@ class SearchIndexInitializerTest {
         assertTrue(initializer.mappingCurrent());
     }
 
-    /**
-     * Leaves the shared Dev Services index as every other test expects it: freshly created from the
-     * full mapping and aliased. Called from a {@code finally}, so a test that fails between
-     * recreating the index with an altered mapping and its last assertion still restores it.
-     */
     private void restoreFullIndex() throws IOException {
         restClient.performRequest(new Request("DELETE", "/" + appConfig.search().indexName()));
         initializer.ensureIndex();

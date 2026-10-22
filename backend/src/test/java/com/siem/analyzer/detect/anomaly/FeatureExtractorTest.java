@@ -56,7 +56,6 @@ class FeatureExtractorTest {
         extractor.extract(request("10.0.0.1", 0));
         extractor.extract(request("10.0.0.1", 30));
 
-        // The window is (t - 1m, t]: at 60s the request at 0s has just left it.
         assertEquals(2, extractor.extract(request("10.0.0.1", 60)).requestRate());
         assertEquals(1, extractor.extract(request("10.0.0.1", 200)).requestRate());
     }
@@ -100,7 +99,7 @@ class FeatureExtractorTest {
         for (int i = 0; i < 100; i++) {
             extractor.extract(request("10.0.1." + i, 0));
         }
-        // One busy address an hour later; the sweep runs every SWEEP_INTERVAL events.
+
         for (int i = 0; i < FeatureExtractor.SWEEP_INTERVAL; i++) {
             extractor.extract(request("10.0.0.1", 3_600));
         }

@@ -11,18 +11,9 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Who may reach the account endpoints.
- *
- * <p>Every case here aims at an account id that does not exist. A caller that is allowed through
- * therefore gets {@code 404} and one that is not gets {@code 403}, which separates the two answers
- * without any fixture to set up or clean up. The one exception is account creation, which has no id
- * to miss and so creates and removes a throwaway account.
- */
 @QuarkusTest
 class UserResourceSecurityTest {
 
-    /** Outside the range the suite's sequences reach, so every lookup for it misses. */
     private static final long MISSING_ID = 9_999_999L;
 
     private static final String PASSWORD = "an-adequately-long-password";
@@ -43,8 +34,6 @@ class UserResourceSecurityTest {
                                 "sec." + UUID.randomUUID().toString().substring(0, 8),
                                 "password",
                                 PASSWORD,
-                                // An administrator is what a privilege escalation would reach
-                                // for, so that is what the refused calls ask for.
                                 "roles",
                                 List.of("ADMIN")))
                 .when()

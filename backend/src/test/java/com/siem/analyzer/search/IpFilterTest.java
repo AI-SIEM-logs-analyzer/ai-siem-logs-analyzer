@@ -44,7 +44,7 @@ class IpFilterTest {
 
     @Test
     void refusesAHostName() {
-        // A name would be resolved, which turns a search parameter into a DNS query.
+
         assertThrows(IllegalArgumentException.class, () -> IpFilter.parse("example.com"));
     }
 

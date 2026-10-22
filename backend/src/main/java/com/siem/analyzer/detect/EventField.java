@@ -6,28 +6,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 
-/**
- * A field of a {@link NormalizedEvent} that a rule can read by name.
- *
- * <p>The standard fields are matched case-insensitively, so {@code srcip} and {@code srcIp} are the
- * same field. Anything else is reached through {@code attributes.<key>}, where the key is matched
- * exactly, as the source wrote it, and dots descend into nested JSON objects. Enums ({@code
- * severity}, {@code format}) read as their constant names.
- *
- * <p>Three fields are derived from {@code path}. {@code decodedPath} is {@code path}
- * percent-decoded by {@link UrlDecoding}, so a rule can match {@code ' OR 1=1} however the client
- * encoded it while {@code path} keeps what the server logged. {@code uriStem} and {@code uriQuery}
- * are the parts of {@code path} before and after the first {@code ?}, as logged; {@code uriQuery}
- * is absent when there is no query string, {@code uriStem} when the target is nothing but one.
- *
- * <p>{@code raw} is the line exactly as received, for a search that must not depend on how a parser
- * split it up.
- *
- * <p>Two fields are equal when their names are, which is what lets a field serve in a group key.
- */
 public final class EventField {
 
-    /** The prefix that reaches into {@link NormalizedEvent#attributes()}. */
     public static final String ATTRIBUTES_PREFIX = "attributes.";
 
     private static final Map<String, EventField> STANDARD = standardFields();
@@ -40,12 +20,6 @@ public final class EventField {
         this.accessor = accessor;
     }
 
-    /**
-     * Resolves a field by name.
-     *
-     * @throws IllegalArgumentException no standard field has that name, and it does not start with
-     *     {@value #ATTRIBUTES_PREFIX}
-     */
     public static EventField named(String name) {
         EventField standard = STANDARD.get(name.toLowerCase(Locale.ROOT));
         if (standard != null) {
@@ -65,23 +39,14 @@ public final class EventField {
                         + "<key>");
     }
 
-    /** The name as the rule spells it, for a standard field its canonical camelCase spelling. */
     public String name() {
         return name;
     }
 
-    /** The field's value on {@code event}, or {@code null} when the event does not carry it. */
     public Object read(NormalizedEvent event) {
         return accessor.apply(event);
     }
 
-    /**
-     * Finds {@code key} in {@code map}, descending into nested maps at dots.
-     *
-     * <p>A key that itself contains dots is tried whole first, so a flat {@code "http.method"} key
-     * and a nested {@code {"http": {"method": …}}} are both found by {@code
-     * attributes.http.method}.
-     */
     private static Object lookup(Map<?, ?> map, String key) {
         if (map.containsKey(key)) {
             return map.get(key);

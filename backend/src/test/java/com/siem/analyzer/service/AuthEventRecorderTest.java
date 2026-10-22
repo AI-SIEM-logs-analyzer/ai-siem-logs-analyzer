@@ -13,7 +13,6 @@ import jakarta.transaction.Transactional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** The audit trail behind every sign-in attempt. */
 @QuarkusTest
 class AuthEventRecorderTest {
 

@@ -235,7 +235,6 @@ describe('alerts page', () => {
     await waitFor(() => expect(router.state.location.search).toBe('?technique=T1110.001'));
     await waitFor(() => expect(listQuery(fetchMock, 1).getAll('technique')).toEqual(['T1110.001']));
 
-    // Only tactics an in-use technique serves are offered.
     const tactic = screen.getByRole('group', { name: 'Tactic' });
     expect(within(tactic).queryByRole('button', { name: 'Initial Access' })).toBeNull();
     await user.click(within(tactic).getByRole('button', { name: 'Credential Access' }));
@@ -330,7 +329,7 @@ describe('alert details', () => {
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual(aiSummary.evidence);
-    // A viewer reads the summary but is not offered a new one.
+
     expect(within(card).queryByRole('button')).not.toBeInTheDocument();
   });
 

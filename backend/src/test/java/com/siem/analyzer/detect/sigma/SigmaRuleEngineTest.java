@@ -11,10 +11,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/**
- * Converted Sigma rules run by the {@link RuleEngine} over lines read by the production parsers, so
- * the field mapping is checked against what the parsers actually fill in.
- */
 class SigmaRuleEngineTest {
 
     private final AccessLogParser accessLogs = new AccessLogParser();
@@ -27,7 +23,6 @@ class SigmaRuleEngineTest {
                 converted.rules().stream().map(ConvertedRule::toDetectionRule).toList());
     }
 
-    /** A combined-format request at 10:15:{@code second}. */
     private NormalizedEvent request(
             String ip, String target, int status, String agent, int second) {
         String line =
@@ -68,9 +63,7 @@ class SigmaRuleEngineTest {
                         List.of(
                                 request(ip, "/view?file=../../../etc/passwd", 200, "x", 1),
                                 request(ip, "/view?f=%252e%252e%252fetc%252fhosts", 500, "x", 2),
-                                // SigmaHQ's cs-uri-query means the whole target, path included.
                                 request(ip, "/../../../etc/passwd", 403, "x", 3),
-                                // Filtered out: the server did not have it.
                                 request(ip, "/view?file=../../../etc/passwd", 404, "x", 4),
                                 request(ip, "/index.html", 200, "x", 5)));
 

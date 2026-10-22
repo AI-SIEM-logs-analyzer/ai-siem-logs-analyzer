@@ -11,7 +11,6 @@ const PAGE_SIZE = 20;
 
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
-/** Every upload, newest first; rows still being parsed refresh on their own. */
 export function UploadsTable() {
   const [page, setPage] = useState(0);
   const { data, error, isPending, isFetching, isPlaceholderData, refetch } = useUploads(
@@ -27,7 +26,6 @@ export function UploadsTable() {
         </CardTitle>
       </CardHeader>
       <CardContent className="overflow-x-auto px-0">
-        {/* A failed refresh keeps the last list on screen and says it may be out of date. */}
         {data && error && (
           <ErrorState
             error={error}

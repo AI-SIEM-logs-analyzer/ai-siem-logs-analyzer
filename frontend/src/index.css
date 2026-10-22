@@ -1,9 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
-/* shadcn/ui theme — neutral base colour. Components read these tokens through the
-   Tailwind colour utilities mapped in @theme inline below (bg-background, text-muted-foreground…). */
-
 @custom-variant dark (&:is(.dark *));
 
 :root {

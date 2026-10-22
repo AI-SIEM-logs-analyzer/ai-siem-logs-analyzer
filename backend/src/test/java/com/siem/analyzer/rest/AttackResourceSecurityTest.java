@@ -7,10 +7,6 @@ import io.quarkus.test.security.TestSecurity;
 import io.restassured.response.ValidatableResponse;
 import org.junit.jupiter.api.Test;
 
-/**
- * Who may read the ATT&CK catalogue, and who may replace the dataset. The import sends a body the
- * reader refuses, so a caller let through gets {@code 400} and the dataset is never touched.
- */
 @QuarkusTest
 class AttackResourceSecurityTest {
 

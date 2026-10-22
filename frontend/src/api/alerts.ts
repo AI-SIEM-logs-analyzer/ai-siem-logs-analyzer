@@ -5,8 +5,6 @@ import { unwrap } from '@/lib/api-client';
 import type { AlertFilters } from '@/lib/alert-filters';
 import type { Severity } from '@/lib/attack-matrix';
 
-// /api/alerts: the alerts detection raised, listed for triage and opened one at a time.
-
 export type Alert = components['schemas']['AlertResponse'];
 export type AlertDetail = Alert;
 export type AlertEvent = components['schemas']['AlertEventResponse'];
@@ -25,10 +23,8 @@ export type AlertSummary = Omit<Alert, 'id' | 'severity' | 'techniques'> &
   };
 export type AttackType = components['schemas']['AttackType'];
 
-/** Alerts per page on the alerts page. */
 export const ALERT_PAGE_SIZE = 25;
 
-/** How often the alert list asks again, so a new alert shows up without a reload. */
 export const ALERTS_REFRESH_MS = 30_000;
 export const ALERTS_POLL_INTERVAL_MS = ALERTS_REFRESH_MS;
 
@@ -61,7 +57,6 @@ export function fetchAlertPage(
   );
 }
 
-/** A page of the alert list, kept on screen while another page or filter loads. */
 export function useAlertPage(filters: AlertFilters) {
   return useQuery({
     queryKey: alertKeys.list(filters),
@@ -83,15 +78,10 @@ export function useAlert(id: number) {
   });
 }
 
-/** Has the backend's LLM summarise alert `id`; resolves to the alert with its new summary. */
 export function summarizeAlert(id: number): Promise<Alert> {
   return unwrap(api.POST('/api/alerts/{id}/summary', { params: { path: { id } } }));
 }
 
-/**
- * Asks for a fresh summary of alert `id`. The answer replaces the cached alert, so the page shows
- * it without a second request, and the list refetches to pick it up too.
- */
 export function useSummarizeAlert(id: number) {
   const queryClient = useQueryClient();
   return useMutation({

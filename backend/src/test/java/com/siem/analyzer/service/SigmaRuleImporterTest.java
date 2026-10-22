@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** Sigma rules stored as {@code alert_rule} rows. */
 @QuarkusTest
 class SigmaRuleImporterTest {
 

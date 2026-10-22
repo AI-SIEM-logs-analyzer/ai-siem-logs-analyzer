@@ -51,7 +51,6 @@ function page(
   });
 }
 
-/** The query of the `n`th search the stub received. */
 function searchQuery(fetchMock: ReturnType<typeof stubBackend>, n: number): URLSearchParams {
   return new URL(callsTo(fetchMock, 'GET /api/events/search')[n].url).searchParams;
 }
@@ -144,7 +143,7 @@ describe('events page', () => {
     expect(await screen.findByText('1 event · page 1 of 1')).toBeInTheDocument();
     expect(searchQuery(fetchMock, 1).getAll('srcIp')).toEqual(['203.0.113.7']);
     expect(router.state.location.search).toBe('?srcIp=203.0.113.7');
-    // The click narrowed the search; it did not open the event.
+
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
     const active = screen.getByRole('list', { name: 'Active filters' });

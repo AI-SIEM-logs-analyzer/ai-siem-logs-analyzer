@@ -30,8 +30,6 @@ class JsonLogParserTest {
             new JsonLogParser(
                     JsonFieldMapping.defaults(), Clock.fixed(NOW, ZoneOffset.UTC), ZoneOffset.UTC);
 
-    // --- Default mapping ---------------------------------------------------------------------
-
     @Test
     void ecsLineFillsEveryStandardFieldAndKeepsTheRestNested() {
         String line =
@@ -64,8 +62,7 @@ class JsonLogParserTest {
         assertEquals(Severity.WARNING, event.severity());
         assertEquals("forbidden", event.message());
         assertEquals(line, event.raw());
-        // Mapped values are taken out, and an object left empty by that goes with them; what no
-        // field claimed keeps its place in the tree.
+
         assertEquals(
                 Map.of("log", Map.of("logger", "access"), "event", Map.of("action", "deny")),
                 event.attributes());
@@ -96,7 +93,7 @@ class JsonLogParserTest {
 
         assertEquals(Instant.parse("2026-09-14T10:15:30Z"), event.timestamp());
         assertEquals("192.0.2.10", event.srcIp());
-        // nginx writes an empty string for a missing value; the event normalises it to null.
+
         assertNull(event.user());
         assertNull(event.referrer());
         assertEquals("POST", event.method());
@@ -205,15 +202,13 @@ class JsonLogParserTest {
         assertEquals(Map.of("level", "chatty"), event.attributes());
     }
 
-    // --- Candidates and coercion -------------------------------------------------------------
-
     @Test
     void firstCandidateWithAUsableValueWins() {
         NormalizedEvent event =
                 parse("{\"http\":{\"response\":{\"status_code\":\"n/a\"}},\"status\":503}");
 
         assertEquals(503, event.status());
-        // The unusable candidate was not consumed.
+
         assertEquals(
                 Map.of("http", Map.of("response", Map.of("status_code", "n/a"))),
                 event.attributes());
@@ -292,8 +287,6 @@ class JsonLogParserTest {
                 UnsupportedOperationException.class, () -> ((List<?>) ctx.get("tags")).clear());
     }
 
-    // --- Custom mapping ----------------------------------------------------------------------
-
     @Test
     void customMappingReplacesTheDefaultsForAField() {
         JsonFieldMapping cloudTrail =
@@ -321,7 +314,7 @@ class JsonLogParserTest {
         assertEquals("203.0.113.50", event.srcIp());
         assertEquals("arn:aws:iam::1:user/bob", event.user());
         assertEquals("ConsoleLogin", event.message());
-        // "timestamp" is no longer a candidate, so it is just another attribute.
+
         assertEquals(
                 Map.of(
                         "userIdentity",
@@ -358,8 +351,6 @@ class JsonLogParserTest {
         }
     }
 
-    // --- Rejections --------------------------------------------------------------------------
-
     @Test
     void linesThatAreNotOneJsonObjectAreRejected() {
         for (String line :
@@ -380,8 +371,7 @@ class JsonLogParserTest {
 
     @Test
     void duplicateKeysAreRejected() {
-        // Two values for one key is how a line shows one user to one reader and another user to
-        // the next, so the line is refused rather than resolved either way.
+
         assertFalse(parser.parse("{\"user\":\"admin\",\"user\":\"guest\"}").isPresent());
     }
 
@@ -394,9 +384,7 @@ class JsonLogParserTest {
 
     @Test
     void hugeNumericExponentIsNotExpandedIntoATimestamp() {
-        // BigDecimal keeps 1e20000000 compact, but rescaling it to whole seconds builds a
-        // twenty-million-digit number: seconds of CPU per value from a ten-byte literal. Larger
-        // exponents are cheap again only because BigInteger gives up on them outright.
+
         NormalizedEvent event =
                 assertTimeoutPreemptively(
                         Duration.ofSeconds(1),

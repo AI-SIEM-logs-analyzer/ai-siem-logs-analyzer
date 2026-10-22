@@ -1,19 +1,10 @@
-// The dashboard's aggregate widgets: the search facets turned into what they draw. Kept free of
-// React and ECharts so it is tested alone.
-
-/** One value of a facet and how many events carried it. */
 export interface RankedEntry {
   key: string;
   count: number;
 }
 
-/** How many entries a ranked widget shows. The backend returns 20 IPs and 10 messages. */
 export const TOP_ENTRIES = 10;
 
-/**
- * The `limit` largest counts, largest first. The backend already ranks its facets, but a JSON
- * object is not an ordered contract, so the order is restored here; a tie keeps the order it came in.
- */
 export function topEntries(
   counts: Readonly<Record<string, number>> | undefined,
   limit = TOP_ENTRIES,
@@ -44,23 +35,18 @@ export interface StatusCodeCount {
 export interface StatusClassCount {
   statusClass: StatusClass;
   count: number;
-  /** Of the events with a status, between 0 and 1. */
+
   share: number;
 }
 
 export interface StatusBreakdown {
-  /** Every code seen, in numeric order. */
   codes: StatusCodeCount[];
-  /** The classes that have events, 1xx to 5xx. */
+
   classes: StatusClassCount[];
-  /** Events that carried a status code from 100 to 599. */
+
   total: number;
 }
 
-/**
- * Splits the per-code counts into codes and classes. A status outside 100–599 (a parser's 0, a
- * proxy's 999) belongs to no class and is left out, so the classes add up to the total.
- */
 export function statusBreakdown(
   byStatus: Readonly<Record<string, number>> | undefined,
 ): StatusBreakdown {

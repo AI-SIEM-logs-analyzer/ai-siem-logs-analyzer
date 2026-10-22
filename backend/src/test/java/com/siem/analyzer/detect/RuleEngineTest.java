@@ -62,7 +62,6 @@ class RuleEngineTest {
     void eventsSpreadWiderThanTheWindowNeverFire() {
         RuleEngine engine = engine(BRUTE_FORCE);
 
-        // One failure every 80 seconds: at most four fit in any five-minute window.
         List<Detection> fired = new ArrayList<>();
         for (int i = 0; i < 20; i++) {
             fired.addAll(engine.evaluate(failedLogin("10.0.0.1", i * 80L)));
@@ -121,7 +120,6 @@ class RuleEngineTest {
             fired += engine.evaluate(failedLogin("10.0.0.1", i)).size();
         }
 
-        // Fires on the 5th and the 10th, not on every event from the 5th on.
         assertEquals(2, fired);
     }
 
@@ -164,7 +162,7 @@ class RuleEngineTest {
         RuleEngine engine = engine("status == 404 | distinct(path) by srcIp within 1m > 3");
 
         List<Detection> fired = new ArrayList<>();
-        // The same path over and over is one value, however often it is requested.
+
         for (int i = 0; i < 10; i++) {
             fired.addAll(engine.evaluate(notFound("10.0.0.9", "/a", i)));
         }
@@ -186,7 +184,7 @@ class RuleEngineTest {
 
         engine.evaluate(notFound("10.0.0.9", "/a", 0));
         engine.evaluate(notFound("10.0.0.9", "/b", 10));
-        // /a has expired by the time /c arrives, so only two distinct paths remain.
+
         assertEquals(List.of(), engine.evaluate(notFound("10.0.0.9", "/c", 61)));
         assertEquals(1, engine.evaluate(notFound("10.0.0.9", "/a", 62)).size());
     }
@@ -196,9 +194,9 @@ class RuleEngineTest {
         RuleEngine engine = engine("true | sum(bytes) by srcIp within 1m > 1000");
 
         assertEquals(List.of(), engine.evaluate(download("10.0.0.3", 600, 0)));
-        // 600 + 400 is exactly 1000: not above it.
+
         assertEquals(List.of(), engine.evaluate(download("10.0.0.3", 400, 30)));
-        // The first 600 has expired, so this is 400 + 600 again.
+
         assertEquals(List.of(), engine.evaluate(download("10.0.0.3", 600, 61)));
         List<Detection> fired = engine.evaluate(download("10.0.0.3", 1, 62));
 
@@ -276,7 +274,6 @@ class RuleEngineTest {
         }
         assertEquals(100, engine.trackedGroups());
 
-        // Enough later traffic from one address to trigger a sweep, an hour on.
         for (int i = 0; i < RuleEngine.SWEEP_INTERVAL; i++) {
             engine.evaluate(failedLogin("10.0.2.1", 3_600));
         }

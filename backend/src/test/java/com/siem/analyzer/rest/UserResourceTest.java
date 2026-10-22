@@ -18,12 +18,6 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/**
- * The users API over real HTTP.
- *
- * <p>These tests are not wrapped in a transaction — they go through the HTTP layer, which runs in
- * its own — so each one uses a username of its own and deletes what it created.
- */
 @QuarkusTest
 @TestSecurity(user = "admin", roles = "ADMIN")
 class UserResourceTest {
@@ -96,7 +90,7 @@ class UserResourceTest {
                     .then()
                     .body("$", not(hasKey("passwordHash")))
                     .body("$", not(hasKey("password")));
-            // Belt and braces: the plaintext must not appear anywhere in the response either.
+
             assertFalse(payload.contains(PASSWORD), payload);
         } finally {
             delete(id);
@@ -147,7 +141,6 @@ class UserResourceTest {
                     .body("email", equalTo("updated@example.test"))
                     .body("roles", contains("ADMIN", "ANALYST"))
                     .body("enabled", equalTo(false))
-                    // The username is not part of the update body and must survive it.
                     .body("username", equalTo("rest.update"));
         } finally {
             delete(id);
@@ -189,7 +182,7 @@ class UserResourceTest {
 
     @Test
     void rejectsAnInvalidBody() {
-        // Too short a password.
+
         given().contentType(ContentType.JSON)
                 .body(
                         Map.of(
@@ -204,7 +197,6 @@ class UserResourceTest {
                 .then()
                 .statusCode(400);
 
-        // No role at all.
         given().contentType(ContentType.JSON)
                 .body(Map.of("username", "rest.invalid", "password", PASSWORD, "roles", List.of()))
                 .when()
@@ -212,7 +204,6 @@ class UserResourceTest {
                 .then()
                 .statusCode(400);
 
-        // A username with characters that have no business in a login name.
         given().contentType(ContentType.JSON)
                 .body(body("rest invalid/../admin", List.of("VIEWER")))
                 .when()
@@ -220,7 +211,6 @@ class UserResourceTest {
                 .then()
                 .statusCode(400);
 
-        // A role that is not one of the three.
         given().contentType(ContentType.JSON)
                 .body(body("rest.invalid", List.of("SUPERUSER")))
                 .when()

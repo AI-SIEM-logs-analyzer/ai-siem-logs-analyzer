@@ -8,13 +8,11 @@ import com.siem.analyzer.domain.AttackType;
 import java.util.EnumSet;
 import org.junit.jupiter.api.Test;
 
-/** The fallback from the model's attack type to ATT&CK techniques. */
 class AttackTypeTechniquesTest {
 
     @Test
     void everyAttackTypeHasAnExplicitEntry() {
-        // A constant added to AttackType without a decision here would throw at the first alert
-        // the model classifies with it.
+
         for (AttackType type : AttackType.values()) {
             assertNotNull(AttackTypeTechniques.of(type), type.name());
         }

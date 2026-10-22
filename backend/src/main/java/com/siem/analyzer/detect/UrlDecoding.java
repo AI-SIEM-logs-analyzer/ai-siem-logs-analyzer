@@ -3,24 +3,12 @@ package com.siem.analyzer.detect;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 
-/**
- * Lenient percent-decoding of a request target, for rules that look for what a client sent rather
- * than how it encoded it.
- *
- * <p>Unlike {@link java.net.URLDecoder}, nothing here throws: a {@code %} not followed by two hex
- * digits is kept as written, and bytes that are not valid UTF-8 become U+FFFD. A {@code +} reads as
- * a space, as a form-encoded query has it. Decoding repeats while it changes something, up to
- * {@value #MAX_PASSES} passes, so a double-encoded {@code %2527} still comes out as {@code '}; only
- * the first pass turns {@code +} into a space, since a later {@code +} was itself encoded.
- */
 final class UrlDecoding {
 
-    /** Enough for double and triple encoding; anything deeper no server would decode either. */
     static final int MAX_PASSES = 3;
 
     private UrlDecoding() {}
 
-    /** {@code text} decoded, or {@code null} when it is {@code null}. */
     static String decode(String text) {
         if (text == null) {
             return null;
@@ -59,7 +47,6 @@ final class UrlDecoding {
         return bytes.toString(StandardCharsets.UTF_8);
     }
 
-    /** ASCII hex only: {@link Character#digit} would also take other scripts' digits. */
     private static boolean isHex(String text, int index) {
         char c = text.charAt(index);
         return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');

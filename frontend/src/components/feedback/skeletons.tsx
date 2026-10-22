@@ -1,19 +1,13 @@
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
-// Placeholders shaped like what is loading, so the page does not jump when it arrives. Each
-// is a `status` region named by `label`, so a screen reader hears what is on its way.
-
-/** Widths cycled across a row's cells, so the placeholder reads as text rather than a grid. */
 const CELL_WIDTHS = ['w-3/4', 'w-1/2', 'w-2/3', 'w-1/3', 'w-5/6'];
 
 interface LoadingProps {
-  /** What is loading ("Loading users"), read out instead of the placeholder. */
   label: string;
   className?: string;
 }
 
-/** A table on its way: a header and `rows` rows of `columns` cells. */
 export function TableSkeleton({
   label,
   rows = 5,

@@ -2,7 +2,6 @@ import { startSession, type Session } from '@/lib/auth/session';
 
 type Handler = (request: Request) => Response | Promise<Response>;
 
-/** A JSON response, as the backend would send it. */
 export function json(status: number, body: unknown, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
     status,
@@ -10,10 +9,6 @@ export function json(status: number, body: unknown, headers: Record<string, stri
   });
 }
 
-/**
- * Replaces `fetch` with a fake backend keyed by `"METHOD /path"`. An unlisted route answers
- * 404, so a test sees a call it did not expect as a failure rather than a hang.
- */
 export function stubBackend(routes: Record<string, Handler>) {
   const fetchMock = vi.fn((request: Request) => {
     const handler = routes[`${request.method} ${new URL(request.url).pathname}`];

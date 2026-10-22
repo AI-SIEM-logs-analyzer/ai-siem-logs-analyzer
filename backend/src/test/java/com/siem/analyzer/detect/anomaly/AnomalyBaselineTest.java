@@ -17,13 +17,6 @@ import java.util.Random;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-/**
- * Training on synthetic web traffic and scoring what departs from it.
- *
- * <p>The forest is randomised, so the assertions leave wide margins around what a run gives: the
- * attacks below sit far outside anything the baseline holds, and the bounds on false positives are
- * several times the configured contamination.
- */
 class AnomalyBaselineTest {
 
     private static final Instant T0 = Instant.parse("2026-09-14T08:00:00Z");
@@ -37,10 +30,6 @@ class AnomalyBaselineTest {
         baseline = AnomalyBaseline.train(baselineEvents, AnomalyOptions.defaults());
     }
 
-    /**
-     * Ordinary traffic: two requests a second, spread over 200 clients, mostly 200s with a few
-     * redirects, 304s and 404s, and response sizes log-normally distributed around 5 KB.
-     */
     private static List<NormalizedEvent> traffic(Random random, Instant start, Duration span) {
         List<NormalizedEvent> events = new ArrayList<>();
         for (long ms = 0; ms < span.toMillis(); ms += 500) {
@@ -103,8 +92,7 @@ class AnomalyBaselineTest {
 
     @Test
     void theThresholdLeavesAtMostTheContaminationOfTheBaselineAboveIt() {
-        // A fresh scorer reads the same rates training did, so these are the very scores the
-        // threshold was placed among.
+
         double share = anomalousShare(baselineEvents);
 
         assertTrue(share <= 0.01, "share above threshold " + share);
@@ -150,8 +138,6 @@ class AnomalyBaselineTest {
 
         AnomalyScore score = scorer.score(exfiltration).orElseThrow();
 
-        // The forest alone scores it like the largest baseline response, which may land on either
-        // side of the threshold; lying outside the baseline's range is what flags it every time.
         assertTrue(score.anomalous(), score.summary());
         assertEquals(List.of("responseBytes"), score.outsideRange());
         assertTrue(score.summary().contains("responseBytes=4000000000"), score.summary());

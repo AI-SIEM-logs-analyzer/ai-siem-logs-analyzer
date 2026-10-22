@@ -23,39 +23,17 @@ import java.util.Objects;
 import java.util.Set;
 import org.jboss.logging.Logger;
 
-/**
- * Has the configured LLM summarise an alert and records the answer on it.
- *
- * <p>No transaction is held while the model thinks: the alert and its window are read in one, the
- * provider is asked outside any, and the answer is written in another, so a slow provider ties up
- * an HTTP worker but never a database connection or a row lock. A new summary replaces the previous
- * one.
- *
- * <p>An answer is stored only once it is complete and grounded: every value it cites as evidence,
- * and every address it names, has to be in the alert the model was shown ({@link Grounding}).
- */
 @ApplicationScoped
 public class AlertSummaryService {
 
-    /** Longest summary kept; a model that rambles past it is cut rather than refused. */
     static final int MAX_SUMMARY_CHARS = 2_000;
 
-    /** Longest recommended action kept. */
     static final int MAX_ACTION_CHARS = 1_000;
 
-    /** Most evidence values kept; the schema asks for at most this many. */
     static final int MAX_EVIDENCE = 8;
 
-    /**
-     * Longest evidence value kept. A longer one is cut without a marker, so what is kept is still a
-     * verbatim piece of the alert.
-     */
     static final int MAX_EVIDENCE_CHARS = 300;
 
-    /**
-     * Most events of the window read to find the group's; a busy source's window can hold far more
-     * than the prompt ever shows.
-     */
     static final int MAX_WINDOW_SCAN = 500;
 
     private static final Logger LOG = Logger.getLogger(AlertSummaryService.class);
@@ -77,14 +55,6 @@ public class AlertSummaryService {
         this.model = model;
     }
 
-    /**
-     * Summarises one alert and stores the summary on it.
-     *
-     * @return the alert with its new summary, its rule and triggering event loaded
-     * @throws NotFoundException no alert has that id
-     * @throws AlertSummaryFailedException the provider could not be reached, refused, or answered
-     *     with something that is not a usable summary, or cites what the alert does not contain
-     */
     public Alert summarize(Long id) {
         AlertPrompt prompt =
                 QuarkusTransaction.requiringNew()
@@ -123,12 +93,6 @@ public class AlertSummaryService {
                 .call(() -> alerts.findWithDetails(id).orElseThrow(() -> notFound(id)));
     }
 
-    /**
-     * The other events of the alert's window that belong to its group, oldest first: the latest
-     * {@link AlertPrompt#MAX_WINDOW_EVENTS} of the triggering event's source between the window's
-     * start and end whose fields match the group key. An alert with no window, or one that counted
-     * a single event, has none.
-     */
     List<LogEvent> window(Alert alert) {
         LogEvent trigger = alert.getLogEvent();
         if (trigger == null
@@ -158,10 +122,6 @@ public class AlertSummaryService {
         return matching;
     }
 
-    /**
-     * Whether every group-by field of the alert has the same value on {@code event}. The fields are
-     * named as rules name them: a payload key, {@code severity}, or {@code attributes.<key>}.
-     */
     static boolean inGroup(LogEvent event, Map<String, Object> group) {
         for (Map.Entry<String, Object> field : group.entrySet()) {
             Object value = field(event, field.getKey());
@@ -190,12 +150,6 @@ public class AlertSummaryService {
         return null;
     }
 
-    /**
-     * The answer trimmed and capped, or a failure when any part of it is missing.
-     *
-     * <p>Structured output only guarantees the shape when the provider enforces the schema; a
-     * provider that is merely told about it can still leave a field out.
-     */
     static AlertSummary usable(Long id, AlertSummary answer) {
         if (answer == null
                 || answer.severity() == null
@@ -216,12 +170,6 @@ public class AlertSummaryService {
                 cap(answer.recommendedAction().strip(), MAX_ACTION_CHARS));
     }
 
-    /**
-     * The answer, or a failure when it cites a value the alert does not contain.
-     *
-     * <p>The values are logged, not returned: they are the model's words, and the analyst only
-     * needs to know the answer was not trustworthy.
-     */
     static AlertSummary grounded(Long id, AlertSummary answer, AlertPrompt prompt) {
         List<String> ungrounded = Grounding.ungrounded(answer, prompt);
         if (!ungrounded.isEmpty()) {
@@ -233,7 +181,6 @@ public class AlertSummaryService {
         return answer;
     }
 
-    /** Stripped, blank and repeated values dropped, at most {@link #MAX_EVIDENCE}, each capped. */
     private static List<String> evidence(List<String> values) {
         if (values == null) {
             return List.of();

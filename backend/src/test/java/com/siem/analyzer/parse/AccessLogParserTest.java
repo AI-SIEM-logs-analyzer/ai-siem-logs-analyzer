@@ -83,7 +83,7 @@ class AccessLogParserTest {
         assertEquals("POST", event.method());
         assertEquals("HTTP/2.0", event.protocol());
         assertEquals(0L, event.bytes());
-        // Escapes are kept as the server wrote them, like every other field.
+
         assertEquals("sqlmap/1.7 \\\"probe\\\"", event.userAgent());
     }
 
@@ -100,7 +100,7 @@ class AccessLogParserTest {
 
     @Test
     void requestThatIsNotMethodPathProtocolGoesOnlyToMessage() {
-        // A TLS handshake sent to a plain-HTTP port: Apache logs the bytes it could not parse.
+
         NormalizedEvent event =
                 parse(
                         "198.51.100.4 - - [14/Sep/2026:10:15:30 +0000] \"\\x16\\x03\\x01\\x02\" 400"
@@ -125,8 +125,7 @@ class AccessLogParserTest {
 
     @Test
     void veryLongUserAgentDoesNotExhaustTheStack() {
-        // The client controls this field. A regex that recurses once per character would throw
-        // StackOverflowError here and take the consumer thread with it.
+
         String agent = "A".repeat(200_000) + "\\\"" + "B".repeat(200_000);
 
         NormalizedEvent event =

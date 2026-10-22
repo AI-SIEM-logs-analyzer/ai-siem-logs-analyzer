@@ -16,7 +16,6 @@ export function LoginPage() {
   const target = safeRedirect(params.get('redirect'));
   const login = useMutation({ mutationFn: signIn });
 
-  // Signing in starts a session, and a session is what sends the user on.
   if (session) return <Navigate to={target} replace />;
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {

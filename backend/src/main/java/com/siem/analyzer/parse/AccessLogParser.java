@@ -16,77 +16,21 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/**
- * Parses Apache and Nginx access-log lines in Common or Combined Log Format.
- *
- * <p>Both formats are one grok expression: Combined is Common followed by the quoted referrer and
- * user agent, so those two fields are an optional tail. Nginx's default {@code combined} format
- * writes the same fields in the same order, which is why one parser covers both servers.
- *
- * <p>Fields are kept as the server wrote them. The escapes Apache and Nginx put into quoted fields
- * ({@code \"}, {@code \x16}) are not decoded, because an escaped byte in a request line is often
- * the very thing a detection rule is looking for.
- *
- * <p>A line that does not fit — another format, extra trailing fields, a date that does not exist,
- * a status outside 100-599 — yields an empty result rather than an exception. Deciding whether an
- * unparsed line is worth failing a batch over is the caller's call, not the parser's.
- *
- * <p>Instances are immutable and safe to share between threads: the compiled expression is
- * read-only, and every call gets its own matcher.
- */
 @ApplicationScoped
 public class AccessLogParser {
 
-    /**
-     * The inside of a double-quoted field. Both servers escape an embedded quote as {@code \"} or
-     * {@code \x22}, so a backslash always consumes the character after it and a bare quote always
-     * ends the field.
-     *
-     * <p>Written as an unrolled loop of possessive runs, not the shorter {@code (?:[^"\\]|\\.)*}.
-     * java.util.regex recurses once per repetition of a group, so the short form overflows the
-     * stack on a user agent a few thousand characters long — and the client chooses that length.
-     * Here the group repeats once per escape, and a run of plain characters costs no stack at all.
-     */
     private static final String QUOTED_BODY = "[^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+";
 
-    /**
-     * The request line when it has the usual shape, and anything else when it does not.
-     *
-     * <p>The second branch is what catches TLS handshakes sent to a plain-HTTP port, port scanners
-     * and timed-out connections ({@code "-"}). Those lines still carry a client address and a
-     * status, so they parse; they just have no method, path or protocol.
-     */
     private static final String REQUEST =
             "(?:%{WORD:method} %{NOTSPACE:path}(?: %{NOTSPACE:protocol})?|%{QUOTEDBODY})";
 
-    /**
-     * The client: an IP address or a host name, when {@code HostnameLookups} is on.
-     *
-     * <p>Replaces the stock {@code IPORHOST}, whose {@code HOSTNAME} repeats a group once per dot
-     * label. java.util.regex recurses once per repetition, so a first field of a few thousand
-     * {@code a.} overflows the stack — and the first field is the one every line, of any format, is
-     * tried against when the upload's format is sniffed. A name is at most 255 characters, so a
-     * bounded run of the characters a name can hold costs no stack and accepts every real one.
-     */
     private static final String CLIENT = "(?:%{IP}|[0-9A-Za-z][0-9A-Za-z.-]{0,254}+)";
 
-    /**
-     * Common Log Format, then the optional Combined tail.
-     *
-     * <p>{@code ident} and {@code auth} use {@code NOTSPACE} rather than the stock {@code USER}
-     * pattern, which rejects the {@code @} of an e-mail login. Anchored at both ends, so a line
-     * with extra fields (an Nginx {@code $http_x_forwarded_for}, say) is not silently truncated.
-     */
     private static final String EXPRESSION =
             "^%{ACCESSCLIENT:clientip} %{NOTSPACE:ident} %{NOTSPACE:auth} \\[%{HTTPDATE:timestamp}\\]"
                     + " \"%{ACCESSREQUEST:request}\" %{INT:status} (?:%{INT:bytes}|-)"
                     + "(?: \"%{QUOTEDBODY:referrer}\" \"%{QUOTEDBODY:agent}\")?$";
 
-    /**
-     * {@code %t} in Apache and {@code $time_local} in Nginx: {@code 10/Oct/2000:13:55:36 -0700}.
-     * Month names are English whatever the server's locale. Strict resolving rejects 31 February
-     * instead of rolling it into March.
-     */
     private static final DateTimeFormatter HTTP_DATE =
             DateTimeFormatter.ofPattern("dd/MMM/uuuu:HH:mm:ss Z", Locale.ENGLISH)
                     .withResolverStyle(ResolverStyle.STRICT);
@@ -99,16 +43,10 @@ public class AccessLogParser {
         compiler.register("QUOTEDBODY", QUOTED_BODY);
         compiler.register("ACCESSREQUEST", REQUEST);
         compiler.register("ACCESSCLIENT", CLIENT);
-        // Named-only keeps the captures to the fields above, not every sub-pattern of HTTPDATE.
+
         this.grok = compiler.compile(EXPRESSION, true);
     }
 
-    /**
-     * Parses one access-log line.
-     *
-     * @param line a single line, without its line terminator
-     * @return the event, or empty when the line is not a valid Common or Combined Log Format line
-     */
     public Optional<NormalizedEvent> parse(String line) {
         Objects.requireNonNull(line, "line");
 
@@ -134,11 +72,7 @@ public class AccessLogParser {
                             .bytes(number(text(fields, "bytes")))
                             .referrer(text(fields, "referrer"))
                             .userAgent(text(fields, "agent"))
-                            // The request line as a whole is the most useful one-line summary,
-                            // and the only place an unparseable request survives.
                             .message(text(fields, "request"))
-                            // RFC 1413 identd is almost never enabled, so this is nearly always
-                            // "-". When it is not, it has no standard slot.
                             .attributes(
                                     ident == null || "-".equals(ident)
                                             ? Map.of()
@@ -146,8 +80,7 @@ public class AccessLogParser {
                             .build();
             return Optional.of(event);
         } catch (DateTimeException | IllegalArgumentException e) {
-            // The shape matched but a value is impossible: 31/Feb, status 999, a byte count wider
-            // than a long (NumberFormatException is an IllegalArgumentException).
+
             return Optional.empty();
         }
     }

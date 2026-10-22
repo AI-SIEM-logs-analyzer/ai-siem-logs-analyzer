@@ -7,14 +7,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * An {@link EventSearch} that records instead of indexing, and fails on demand.
- *
- * <p>Lets a test prove the bookkeeping around the index — what is written, in what order, and what
- * happens when the engine refuses — without asserting against a live cluster. {@link
- * #failNextWrites(boolean)} fails reads too, so the 503 path can be exercised from the REST layer
- * without stopping a container.
- */
 @Mock
 @ApplicationScoped
 public class RecordingEventSearch implements EventSearch {
@@ -61,7 +53,6 @@ public class RecordingEventSearch implements EventSearch {
         return List.copyOf(indexed);
     }
 
-    /** The query the last search received, so a REST test can check what reached the seam. */
     public EventQuery lastQuery() {
         return lastQuery;
     }

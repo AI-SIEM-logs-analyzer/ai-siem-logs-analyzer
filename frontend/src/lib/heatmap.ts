@@ -1,35 +1,24 @@
-// The dashboard's activity heatmap: the busiest source addresses' hourly counts folded into the
-// timeline's buckets, and the scale the cells are coloured on. Kept free of React and ECharts so
-// it is tested alone.
-
 import { TOP_ENTRIES, topEntries } from '@/lib/facets';
 import { timelineBuckets, type TimelineBucket, type TimelineWindow } from '@/lib/timeline';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
-/** One source address: a row of the heatmap. */
 export interface HeatmapRow {
   ip: string;
-  /** Its events in the window, as the source IP facet counted them. */
+
   total: number;
-  /** A cell per timeline bucket, the empty ones included. */
+
   cells: TimelineBucket[];
 }
 
 export interface ActivityHeatmap {
-  /** The busiest addresses, busiest first. */
   rows: HeatmapRow[];
-  /** Where each column starts, in epoch milliseconds; a column is one timeline bucket. */
+
   columns: number[];
   bucketMs: number;
 }
 
-/**
- * The `limit` addresses with the most events, each with its hourly counts folded into the
- * window's buckets. The rows follow the source IP facet, so the heatmap and the top source IPs
- * name the same addresses in the same order.
- */
 export function activityHeatmap(
   bySrcIp: Readonly<Record<string, number>> | undefined,
   srcIpOverTime:
@@ -49,7 +38,6 @@ export function activityHeatmap(
   return { rows, columns, bucketMs: window.bucketMs };
 }
 
-/** The fullest cell and its address; undefined when every cell is empty. */
 export function peakCell(
   heatmap: ActivityHeatmap,
 ): { ip: string; start: number; count: number } | undefined {
@@ -62,33 +50,23 @@ export function peakCell(
   return peak;
 }
 
-/** How many of a row's cells have events. */
 export function activeCells(row: HeatmapRow): number {
   return row.cells.filter((cell) => cell.count > 0).length;
 }
 
-/** A band of the colour scale: the cells holding `from` to `to` events, both included. */
 export interface DensityLevel {
   from: number;
   to: number;
 }
 
-/** How many colours the scale has at most. */
 export const DENSITY_STEPS = 5;
 
-/** The largest of 1, 2 and 5 times a power of ten that is no larger than `value` (≥ 1). */
 function niceFloor(value: number): number {
   const power = 10 ** Math.floor(Math.log10(value));
   const [nice] = [5, 2, 1].filter((step) => step * power <= value);
   return nice * power;
 }
 
-/**
- * The colour bands for cells holding up to `max` events. A handful of addresses usually dwarfs
- * the rest, so the bands grow geometrically (1, 2–9, 10–49, …) rather than evenly: on an even
- * scale one scanner would leave every other cell the palest colour. Bounds are rounded to 1, 2
- * and 5 times a power of ten so the legend reads easily; a small `max` gets a band per count.
- */
 export function densityLevels(max: number, steps = DENSITY_STEPS): DensityLevel[] {
   if (!(max >= 1)) return [];
   const starts: number[] = [];
@@ -100,10 +78,6 @@ export function densityLevels(max: number, steps = DENSITY_STEPS): DensityLevel[
   return starts.map((from, i) => ({ from, to: i + 1 < starts.length ? starts[i + 1] - 1 : max }));
 }
 
-/**
- * Which of `colors` (palest first) each of `levels` bands takes: spread over the whole ramp,
- * always ending on the darkest, so the fullest cells look the same however many bands there are.
- */
 export function levelColors<T>(levels: number, colors: readonly T[]): T[] {
   return Array.from(
     { length: levels },
@@ -111,7 +85,6 @@ export function levelColors<T>(levels: number, colors: readonly T[]): T[] {
   );
 }
 
-/** "1", "2–9". */
 export function formatLevel({ from, to }: DensityLevel, format: (n: number) => string): string {
   return from === to ? format(from) : `${format(from)}–${format(to)}`;
 }

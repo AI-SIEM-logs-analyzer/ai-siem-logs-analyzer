@@ -3,9 +3,6 @@ import { api } from '@/api/client';
 import type { components } from '@/api/schema';
 import { unwrap } from '@/lib/api-client';
 
-// SmallRye Health (`/q/health`). It answers 503 with the same body when any check is DOWN,
-// so a DOWN backend is data to render, not a failed request.
-
 export type HealthReport = components['schemas']['HealthResponse'];
 export type HealthStatus = NonNullable<HealthReport['status']>;
 
