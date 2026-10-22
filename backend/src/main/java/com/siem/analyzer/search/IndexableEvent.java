@@ -7,27 +7,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * One {@link LogEvent} in the shape the index stores.
- *
- * <p>The standard fields are read out of the event's {@code payload}, whose keys are the component
- * names of {@link com.siem.analyzer.domain.NormalizedEvent} — that is the contract every file
- * parser writes to. Anything the parser could not place stays nested under {@code attributes} and
- * reaches the index as a {@code flat_object}: searchable, but deliberately not aggregatable, which
- * is why every field the dashboard facets on appears explicitly here.
- *
- * <p>A payload value of the wrong type is dropped rather than raised. The payload is parser output,
- * the index is derived, and refusing to index an otherwise good event because one field is
- * malformed would hide the event instead of the field.
- *
- * <p>The {@code geo*} fields are the GeoIP enrichment written for the event's source address.
- * {@code geoLocation} is only accepted, and split into {@code geoLatitude}/{@code geoLongitude},
- * when it is a map holding numeric {@code lat} and {@code lon}; anything else leaves both null.
- *
- * <p>The {@code ua*} fields are the User-Agent classification written for the event's {@code
- * userAgent}. {@code uaBot} is only accepted as a real boolean: a string {@code "true"} is dropped
- * like any other value of the wrong type.
- */
 public record IndexableEvent(
         long eventId,
         long sourceId,
@@ -72,7 +51,6 @@ public record IndexableEvent(
                         : Collections.unmodifiableMap(new LinkedHashMap<>(attributes));
     }
 
-    /** Projects a persisted event, reading its standard fields out of the payload. */
     public static IndexableEvent from(LogEvent event) {
         return new Builder()
                 .eventId(event.getId())
@@ -87,7 +65,6 @@ public record IndexableEvent(
                 .build();
     }
 
-    /** Assembles an event from its columns plus its payload map. */
     public static final class Builder {
 
         private long eventId;

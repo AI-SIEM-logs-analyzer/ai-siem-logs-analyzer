@@ -44,15 +44,6 @@ import java.util.Objects;
 import java.util.Optional;
 import org.jboss.logging.Logger;
 
-/**
- * Parses uploaded log files line by line, persists normalized events into PostgreSQL, indexes them
- * into the search store via {@link EventIndexer}, and marks the upload as ingested.
- *
- * <p>Detection runs inline: every parsed event goes through a {@link RuleEngine} built from the
- * enabled stored rules, and each {@link Detection} becomes an alert in the same transaction as the
- * batch holding its trigger event. Each upload gets an engine of its own, because windows run on
- * event time and two files whose clocks are far apart would make the older one look late.
- */
 @ApplicationScoped
 public class DefaultLogFileParser implements LogFileParser {
 
@@ -105,14 +96,6 @@ public class DefaultLogFileParser implements LogFileParser {
         this.alertService = alertService;
     }
 
-    /**
-     * Parses the file the event names.
-     *
-     * <p>The Kafka consumer calls this on a worker thread with neither a transaction nor a request
-     * context, and the reads here (the upload, its source, the external-id lookups) run outside the
-     * short write transactions on purpose. The request context gives those reads a session for the
-     * length of the parse.
-     */
     @Override
     @ActivateRequestContext
     public void parse(LogIngestEvent event) {
@@ -200,8 +183,7 @@ public class DefaultLogFileParser implements LogFileParser {
                                 eventRepository.persist(logEvent);
                             }
                             eventRepository.flush();
-                            // The trigger of a detection is always an event of this batch: the
-                            // engine fires on the event being added, never on an earlier one.
+
                             for (RaisedDetection raised : detections) {
                                 alertService.raise(raised.detection(), raised.trigger());
                             }
@@ -209,11 +191,6 @@ public class DefaultLogFileParser implements LogFileParser {
                         });
     }
 
-    /**
-     * The enabled stored rules, compiled. A rule whose expression no longer parses is left out and
-     * logged rather than failing the upload: the other rules, and the events, are still worth
-     * having.
-     */
     private List<DetectionRule> enabledRules() {
         List<DetectionRule> compiled = new ArrayList<>();
         for (AlertRule rule : ruleRepository.listEnabled()) {
@@ -226,7 +203,6 @@ public class DefaultLogFileParser implements LogFileParser {
         return compiled;
     }
 
-    /** A detection and the stored event its trigger was read from. */
     private record RaisedDetection(Detection detection, LogEvent trigger) {}
 
     private LogSource resolveSource(LogUpload upload, LogIngestEvent event) {
@@ -368,11 +344,6 @@ public class DefaultLogFileParser implements LogFileParser {
         return event;
     }
 
-    /**
-     * Adds geo data for the event's source address. Absent values write no key at all: an empty
-     * string or a "unknown" placeholder would be indexed and faceted as though it were a real
-     * value.
-     */
     private void applyGeo(Map<String, Object> payload, String srcIp) {
         if (srcIp == null) {
             return;
@@ -394,11 +365,6 @@ public class DefaultLogFileParser implements LogFileParser {
                         });
     }
 
-    /**
-     * Adds the browser, operating system and bot classification of the event's User-Agent. Like
-     * {@link #applyGeo}, a value the header does not carry writes no key; {@code uaBot} is written
-     * whenever the header was classified at all, since {@code false} is a finding too.
-     */
     private void applyUserAgent(Map<String, Object> payload, String userAgent) {
         if (userAgent == null) {
             return;

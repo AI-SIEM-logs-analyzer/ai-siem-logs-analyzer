@@ -6,8 +6,6 @@ import { renderRoute } from '@/test/render-route';
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.parse('2026-09-30T14:25:00Z');
 
-// ECharts is lazy-loaded. Importing it once up front keeps the first test that waits for a
-// chart from racing a cold transform of the library against findBy's one-second timeout.
 beforeAll(async () => {
   await import('@/components/charts/echart');
 });
@@ -17,10 +15,6 @@ const healthy = () => json(200, { status: 'UP', checks: [] });
 
 type Counts = Record<string, number>;
 
-/**
- * A search response counting `hourly` events per hour, as the backend facets them, with
- * `facets` in place of the empty term facets.
- */
 function counts(
   hourly: { start: string; count: number }[],
   facets: {
@@ -51,14 +45,12 @@ function counts(
     });
 }
 
-/** The dashboard card titled `title`. */
 function card(title: string): HTMLElement {
   return screen
     .getByText(title, { selector: '[data-slot="card-title"]' })
     .closest<HTMLElement>('[data-slot="card"]')!;
 }
 
-/** The rows of the table view in `container`, as cell texts. */
 async function tableRows(container: HTMLElement): Promise<string[][]> {
   await userEvent.setup().click(within(container).getByText('Show as table'));
   return within(container)
@@ -185,7 +177,6 @@ describe('dashboard event timeline', () => {
 
     renderRoute('/');
 
-    // Announced once, by the timeline; the widgets say the same without repeating the alert.
     expect(await screen.findByRole('alert')).toHaveTextContent('The search index is unreachable');
     expect(screen.getAllByText(/The search index is unreachable/)).toHaveLength(5);
   });

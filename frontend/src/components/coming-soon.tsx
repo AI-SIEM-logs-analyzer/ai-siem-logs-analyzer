@@ -7,7 +7,6 @@ interface ComingSoonProps {
   description: string;
 }
 
-/** Stands in for a page whose feature has a route but no screen yet. */
 export function ComingSoon({ icon: Icon, title, description }: ComingSoonProps) {
   return (
     <Card className="border-dashed">

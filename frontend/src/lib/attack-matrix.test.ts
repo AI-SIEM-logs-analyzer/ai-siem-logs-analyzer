@@ -148,7 +148,7 @@ describe('buildAttackMatrix', () => {
 
     const active = buildAttackMatrix(tactics, TECHNIQUES, ALERTS, 'active');
     expect(active.tactics.map((t) => t.id)).toEqual(['TA0001', 'TA0006']);
-    // Cells point at the columns that are left, not at the tactic's place in the full list.
+
     expect(active.cells.find((c) => c.techniqueId === 'T1110')!.tacticIndex).toBe(1);
 
     const all = buildAttackMatrix(tactics, TECHNIQUES, ALERTS, 'all');
@@ -196,7 +196,7 @@ describe('buildAttackMatrix', () => {
       { id: 'TA0043', shortname: 'reconnaissance', name: 'Reconnaissance' },
       { id: 'TA0001', shortname: 'initial-access', name: 'Initial Access' },
     ];
-    // 'all' keeps tactics with no techniques, which 'active' drops.
+
     const matrix = buildAttackMatrix(unorderedTactics, [], [], 'all');
     expect(matrix.tactics.map((t) => t.id)).toEqual(['TA0043', 'TA0001']);
     expect(matrix.tactics[0].shortName).toBe('reconnaissance');

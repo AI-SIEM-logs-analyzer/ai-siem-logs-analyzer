@@ -5,18 +5,6 @@ import com.siem.analyzer.domain.Severity;
 import dev.langchain4j.model.output.structured.Description;
 import java.util.List;
 
-/**
- * A model's reading of one alert, as {@link AlertSummarizer} returns it.
- *
- * <p>LangChain4j derives the JSON schema the model answers in from this record, the descriptions
- * included, and parses the answer back into it. Where the provider supports it (Anthropic with
- * {@code response-format: json}, OpenAI with {@code json_schema}, Ollama) the schema is enforced by
- * the provider itself; otherwise it is sent as instructions and the answer parsed all the same.
- *
- * <p>{@code evidence} comes first on purpose: a model writes its answer in schema order, so it
- * copies out the values it relies on before it draws conclusions from them, and {@link Grounding}
- * can then check every one of them against the alert.
- */
 public record AlertSummary(
         @Description(
                         "One to eight values copied character for character from the alert that the"

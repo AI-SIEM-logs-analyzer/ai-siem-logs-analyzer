@@ -36,13 +36,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/**
- * Covers the listing and detail at {@code /api/alerts}.
- *
- * <p>The rows are committed, since the request reads them in a transaction of its own, and removed
- * after each test: an event left behind would sit in the search backlog that {@code
- * EventIndexerTest} and {@code SearchBackfillJobTest} expect to find empty.
- */
 @QuarkusTest
 @TestSecurity(user = "triage", roles = "ANALYST")
 class AlertResourceTest {
@@ -117,7 +110,7 @@ class AlertResourceTest {
                             closed.setLogEvent(event);
                             closed.setTitle("model-" + suffix);
                             closed.setSeverity(Severity.WARNING);
-                            // No rule fired; the model read it as credential stuffing.
+
                             closed.recordAiSummary(
                                     Severity.WARNING,
                                     AttackType.CREDENTIAL_STUFFING,
@@ -153,7 +146,6 @@ class AlertResourceTest {
                 .body("page", equalTo(0))
                 .body("size", equalTo(5))
                 .body("total", greaterThanOrEqualTo(2))
-                // The later of the two seeded alerts was raised last.
                 .body("items[0].id", equalTo((int) warning));
     }
 

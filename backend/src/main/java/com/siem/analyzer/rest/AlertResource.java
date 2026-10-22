@@ -34,19 +34,11 @@ import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
-/**
- * The alerts raised by detection, for triage.
- *
- * <p>Readable by every signed-in role, like the event search: a viewer follows the queue even if
- * they cannot work it. Asking a model for a summary is triage work, and spends the provider's
- * quota, so it is for analysts and administrators only.
- */
 @Path("/api/alerts")
 @Produces(MediaType.APPLICATION_JSON)
 @Tag(name = "Alerts", description = "Alerts raised by detection rules and models")
 public class AlertResource {
 
-    /** The largest page the listing serves; a bigger request is clamped to it. */
     static final int MAX_SIZE = 100;
 
     private final AlertRepository alerts;
@@ -66,12 +58,6 @@ public class AlertResource {
         this.criteria = criteria;
     }
 
-    /**
-     * Lists alerts, newest first.
-     *
-     * @param size rows per page, clamped to 1..{@value #MAX_SIZE} rather than refused, as the
-     *     upload listing does
-     */
     @GET
     @RolesAllowed({"ADMIN", "ANALYST", "VIEWER"})
     @Operation(
@@ -192,10 +178,6 @@ public class AlertResource {
         return AlertResponse.from(alert, techniques.resolve(alert));
     }
 
-    /**
-     * Parses a repeated ATT&CK ID parameter: trimmed, upper-cased, then held to {@code format}. A
-     * malformed value is a 400 rather than a filter that silently matches nothing.
-     */
     private static Set<String> parseIds(List<String> values, Pattern format, String parameter) {
         Set<String> parsed = new TreeSet<>();
         if (values == null) {
@@ -211,7 +193,6 @@ public class AlertResource {
         return parsed;
     }
 
-    /** Parses a repeated enum parameter case-insensitively; an unknown value is a 400. */
     private static <E extends Enum<E>> Set<E> parseAll(
             List<String> values, Class<E> type, String parameter) {
         Set<E> parsed = EnumSet.noneOf(type);

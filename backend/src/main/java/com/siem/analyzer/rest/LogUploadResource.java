@@ -29,7 +29,6 @@ import java.util.List;
 import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
 
-/** Log ingestion upload endpoint under {@code /api/logs}. */
 @Path("/api/logs")
 @Produces(MediaType.APPLICATION_JSON)
 public class LogUploadResource {
@@ -41,10 +40,6 @@ public class LogUploadResource {
         this.uploadService = uploadService;
     }
 
-    /**
-     * Uploads a log file via multipart form-data, stores it, records its metadata, and publishes an
-     * ingestion event to Kafka {@code logs.ingest}.
-     */
     @RolesAllowed({"ADMIN", "ANALYST"})
     @POST
     @Path("/upload")
@@ -72,7 +67,6 @@ public class LogUploadResource {
                 .build();
     }
 
-    /** Retrieves the metadata of a previously uploaded log batch by ID. */
     @RolesAllowed({"ADMIN", "ANALYST", "VIEWER"})
     @GET
     @Path("/uploads/{id}")
@@ -83,15 +77,6 @@ public class LogUploadResource {
                 .orElseThrow(() -> notFound(id));
     }
 
-    /**
-     * Lists log uploads, newest first, filtered by any combination of the query parameters.
-     *
-     * <p>{@code from} and {@code to} are ISO-8601 instants, {@code from} inclusive and {@code to}
-     * exclusive, so consecutive windows cover the timeline exactly once.
-     *
-     * @param size rows per page, clamped to 1..100 rather than refused, so a client asking for more
-     *     gets the largest page the server will serve instead of an error
-     */
     @RolesAllowed({"ADMIN", "ANALYST", "VIEWER"})
     @GET
     @Path("/uploads")
@@ -124,13 +109,6 @@ public class LogUploadResource {
         return new PageResponse<>(items, page, boundedSize, uploadService.count(filter));
     }
 
-    /**
-     * Parses an ISO-8601 query parameter.
-     *
-     * <p>Done by hand because JAX-RS has no converter for {@link Instant}, and a missing converter
-     * would answer 404 for a malformed timestamp — the wrong answer for a request that reached the
-     * right resource with a bad argument.
-     */
     private static Instant parseInstant(String value, String parameterName) {
         if (value == null || value.isBlank()) {
             return null;

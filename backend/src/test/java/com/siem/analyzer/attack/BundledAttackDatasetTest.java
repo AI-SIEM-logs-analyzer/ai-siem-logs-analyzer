@@ -14,11 +14,6 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-/**
- * The release shipped in the jar. The suite boots on a small fixture instead, so this is the one
- * place the real file is parsed: it proves the file reads, and that every ID this application maps
- * is in it.
- */
 class BundledAttackDatasetTest {
 
     private static final String RESOURCE = "/mitre/enterprise-attack-19.2.json.gz";

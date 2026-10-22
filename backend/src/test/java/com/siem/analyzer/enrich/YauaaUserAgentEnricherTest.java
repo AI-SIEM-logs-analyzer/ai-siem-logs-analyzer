@@ -13,9 +13,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * Runs the real Yauaa rule set. Building it takes seconds, so the whole class shares one enricher.
- */
 class YauaaUserAgentEnricherTest {
 
     private static final String CHROME_WINDOWS =
@@ -68,8 +65,7 @@ class YauaaUserAgentEnricherTest {
 
     @Test
     void aValueYauaaDoesNotKnowIsLeftOutRatherThanWrittenAsAPlaceholder() {
-        // A reduced Chrome header no longer says which Windows release it runs on; Yauaa answers
-        // "??", which must not reach the index as though it were a version.
+
         assertNull(classify(CHROME_WINDOWS).osVersion());
     }
 
@@ -113,8 +109,7 @@ class YauaaUserAgentEnricherTest {
     @NullAndEmptySource
     @ValueSource(strings = {"   ", "-", " - "})
     void anAbsentHeaderIsNotClassified(String header) {
-        // Yauaa itself would call "-" and "" a Hacker; for an access log they only mean the
-        // client sent no header at all.
+
         assertTrue(enricher.classify(header).isEmpty());
     }
 

@@ -18,7 +18,6 @@ import { cn } from '@/lib/utils';
 
 const count = new Intl.NumberFormat();
 
-/** The events page showing `filters`. */
 function eventsLink(filters: EventFilters): string {
   return `/events?${eventFiltersToParams(filters)}`;
 }

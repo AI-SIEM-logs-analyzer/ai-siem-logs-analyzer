@@ -87,8 +87,6 @@ describe('attackMatrixOption', () => {
     expect(html).toContain('T1110.001');
   });
 
-  // ECharts refuses to render a cartesian heatmap without a visualMap ("Heatmap must use with
-  // visualMap"), so the matrix needs one, and it has to paint each cell its own fill.
   it('declares a visualMap that paints every cell its own fill', () => {
     const option = attackMatrixOption(MATRIX, false);
     const visualMap = option.visualMap as {

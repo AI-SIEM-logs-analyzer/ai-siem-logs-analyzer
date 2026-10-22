@@ -26,7 +26,6 @@ export type AttackDataset = components['schemas']['AttackDatasetResponse'] & {
 export type AlertTechnique = components['schemas']['AlertTechniqueResponse'];
 
 export interface AttackTechniquesFilter {
-  /** Sent as the backend's `inUse` query param: only techniques an alert can name. */
   inUseOnly?: boolean;
 }
 
@@ -59,8 +58,7 @@ export async function fetchAttackTechniques(
       signal,
     }),
   );
-  // The backend DTO carries neither `subTechnique` nor `inUse`: derive the first from the ID,
-  // and with `inUse=true` every technique returned is in use by definition.
+
   return (techniques ?? []).map((t) => ({
     ...t,
     subTechnique: isSubTechnique(t),

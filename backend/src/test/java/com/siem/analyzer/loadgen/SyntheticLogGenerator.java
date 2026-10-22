@@ -31,39 +31,8 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Writes synthetic, benign log files for exercising ingestion, indexing and search at scale.
- *
- * <p>Three streams are produced, one wire format each, because {@code LogFormatDetector} decides
- * the format of an upload from its first line and a mixed file would be read as one format only:
- *
- * <ul>
- *   <li>{@code access-NNNN.log} — nginx Combined Log Format: shoppers browsing pages, assets and
- *       API calls, plus search-engine crawlers;
- *   <li>{@code syslog-NNNN.log} — RFC 5424 syslog from a small server fleet: SSH key logins, cron,
- *       systemd units, sudo by administrators, PostgreSQL checkpoints;
- *   <li>{@code app-NNNN.ndjson} — ECS-style JSON application events with a unique {@code id}, so
- *       uploading the same file twice is deduplicated.
- * </ul>
- *
- * <p>Timestamps follow a day/night curve over the requested span and are written in order. Users,
- * their addresses and browsers are drawn once and reused, so per-user and per-address aggregations
- * look like real traffic rather than uniform noise. Output is fully determined by the options: the
- * same seed and start produce byte-identical files.
- *
- * <p>Generation streams line by line, so memory stays flat however many events are requested. A
- * stream rolls over to a new file before it passes {@code --max-file-bytes}, which defaults below
- * the 50 MiB upload limit so every file can be uploaded as it is.
- *
- * <p>The class depends on the JDK alone, so it runs without a build:
- *
- * <pre>
- * java backend/src/test/java/com/siem/analyzer/loadgen/SyntheticLogGenerator.java --events 250000
- * </pre>
- */
 public final class SyntheticLogGenerator {
 
-    /** One output stream: its file prefix, extension and share of the events. */
     public enum Stream {
         ACCESS("access", "log", 6),
         SYSLOG("syslog", "log", 2),
@@ -88,21 +57,6 @@ public final class SyntheticLogGenerator {
         }
     }
 
-    /**
-     * What to generate.
-     *
-     * @param events total number of lines across all streams
-     * @param outDir directory the files are written to; created when missing
-     * @param seed seed of the random generator
-     * @param start timestamp of the beginning of the span
-     * @param span how much time the events cover
-     * @param streams which streams to write
-     * @param maxFileBytes a file is rolled over before it grows past this size
-     * @param injectDir directory of log files to interleave with the generated traffic, or {@code
-     *     null} for none; see {@link Injector}
-     * @param injectRatio share of {@code events} the injected lines should make up, repeating the
-     *     files as often as needed; negative to inject every file exactly once
-     */
     public record Options(
             long events,
             Path outDir,
@@ -118,7 +72,6 @@ public final class SyntheticLogGenerator {
         public static final long DEFAULT_SEED = 42;
         public static final Duration DEFAULT_SPAN = Duration.ofDays(1);
 
-        /** 48 MiB: under the 50 MiB upload limit with room for a line that crosses it. */
         public static final long DEFAULT_MAX_FILE_BYTES = 48L * 1024 * 1024;
 
         public Options {
@@ -143,7 +96,6 @@ public final class SyntheticLogGenerator {
             streams = Set.copyOf(streams);
         }
 
-        /** Generated traffic only, nothing injected. */
         public Options(
                 long events,
                 Path outDir,
@@ -155,7 +107,6 @@ public final class SyntheticLogGenerator {
             this(events, outDir, seed, start, span, streams, maxFileBytes, null, -1);
         }
 
-        /** Defaults: 100k events over the last day, every stream, into {@code outDir}. */
         public static Options defaults(Path outDir) {
             Instant now = Instant.now().truncatedTo(ChronoUnit.MINUTES);
             return new Options(
@@ -226,27 +177,17 @@ public final class SyntheticLogGenerator {
         }
     }
 
-    /**
-     * What was written.
-     *
-     * @param events lines written across every file
-     * @param linesPerFile lines per file name, in the order the files were opened
-     * @param linesPerStream lines per stream
-     * @param injectedPerLabel injected lines per label, empty when nothing was injected
-     */
     public record Summary(
             long events,
             Map<String, Long> linesPerFile,
             Map<Stream, Long> linesPerStream,
             Map<String, Long> injectedPerLabel) {
 
-        /** Lines that came from {@code --inject} rather than from the generator. */
         public long injected() {
             return injectedPerLabel.values().stream().mapToLong(Long::longValue).sum();
         }
     }
 
-    /** Bad command line; a {@code null} message asks for the usage text alone. */
     static final class UsageException extends RuntimeException {
         private static final long serialVersionUID = 1L;
 
@@ -271,7 +212,6 @@ public final class SyntheticLogGenerator {
                                    the files as needed, e.g. 0.02 (default: each file once)
             """;
 
-    /** Relative traffic per hour of the day, UTC: a night trough and an afternoon peak. */
     private static final double[] HOURLY_WEIGHT = {
         0.20, 0.15, 0.12, 0.10, 0.10, 0.12, 0.20, 0.35, 0.55, 0.75, 0.85, 0.90,
         0.95, 1.00, 1.00, 0.95, 0.90, 0.85, 0.80, 0.75, 0.65, 0.50, 0.40, 0.30
@@ -379,7 +319,6 @@ public final class SyntheticLogGenerator {
 
     private static final String[] APP_SERVICES = {"storefront", "orders", "accounts"};
 
-    /** Syslog facility codes used below; priority is facility * 8 + severity. */
     private static final int KERN = 0;
 
     private static final int DAEMON = 3;
@@ -438,7 +377,6 @@ public final class SyntheticLogGenerator {
                 .forEach((file, lines) -> System.out.printf("  %-20s %,10d%n", file, lines));
     }
 
-    /** Writes the files and a {@code manifest.json} describing them. */
     public static Summary generate(Options options) throws IOException {
         Files.createDirectories(options.outDir());
         return new SyntheticLogGenerator(options).run();
@@ -457,7 +395,7 @@ public final class SyntheticLogGenerator {
                     stream, new RollingWriter(options.outDir(), stream, options.maxFileBytes()));
         }
         for (Injected line : injected) {
-            // An injected file may be in a format whose generated stream is switched off.
+
             writers.computeIfAbsent(
                     line.stream(),
                     stream -> new RollingWriter(options.outDir(), stream, options.maxFileBytes()));
@@ -484,7 +422,7 @@ public final class SyntheticLogGenerator {
                 truth.write("file,line,timestamp,label,instance,origin\n");
             }
             for (long m = 0; m < minutes; m++) {
-                // Largest-remainder rounding keeps the curve and hits the requested total exactly.
+
                 double exact = benign * weightOf(m) / totalWeight + carry;
                 long count = (long) exact;
                 carry = exact - count;
@@ -519,12 +457,6 @@ public final class SyntheticLogGenerator {
         return summary;
     }
 
-    /**
-     * Writes the injected lines due at or before {@code until}, in time order, and records where
-     * each one landed.
-     *
-     * @return the index of the first injected line not yet written
-     */
     private static int writeInjected(
             List<Injected> injected,
             int from,
@@ -584,8 +516,6 @@ public final class SyntheticLogGenerator {
             case JSON -> jsonLine(at);
         };
     }
-
-    // --- access log ---------------------------------------------------------------------------
 
     private String accessLine(Instant at) {
         boolean crawler = random.nextInt(100) < 6;
@@ -682,8 +612,6 @@ public final class SyntheticLogGenerator {
             default -> "/favicon.ico";
         };
     }
-
-    // --- syslog -------------------------------------------------------------------------------
 
     private String syslogLine(Instant at) {
         String host = pick(SERVER_HOSTS);
@@ -784,8 +712,6 @@ public final class SyntheticLogGenerator {
                 + msg;
     }
 
-    // --- JSON application events --------------------------------------------------------------
-
     private String jsonLine(Instant at) {
         Person person = pick(people);
         String action;
@@ -801,7 +727,7 @@ public final class SyntheticLogGenerator {
             method = "POST";
             path = "/api/v1/session";
             if (random.nextInt(100) < 4) {
-                // A mistyped password now and then; the next attempt usually succeeds.
+
                 status = 401;
                 outcome = "failure";
                 level = "warn";
@@ -891,8 +817,6 @@ public final class SyntheticLogGenerator {
                 + "\"}}";
     }
 
-    // --- shared helpers -----------------------------------------------------------------------
-
     private record Person(String userName, String ip, String userAgent) {}
 
     private Person newPerson(int index) {
@@ -900,10 +824,6 @@ public final class SyntheticLogGenerator {
         return new Person(name, publicIp(), pick(BROWSER_AGENTS));
     }
 
-    /**
-     * A unicast address outside the private, loopback, link-local, CGNAT, multicast and
-     * documentation ranges, so geo enrichment has something to resolve.
-     */
     private String publicIp() {
         while (true) {
             int a = 1 + random.nextInt(223);
@@ -924,7 +844,6 @@ public final class SyntheticLogGenerator {
         }
     }
 
-    /** Roughly log-normal around {@code median}, the usual shape of response sizes. */
     private long sizeAround(long median) {
         return Math.max(1, Math.round(median * Math.exp(0.6 * random.nextGaussian())));
     }
@@ -935,7 +854,6 @@ public final class SyntheticLogGenerator {
         return new UUID(most, least).toString();
     }
 
-    /** A stable, OpenSSH-shaped key fingerprint per user: 32 bytes, unpadded base64. */
     private static String fingerprint(String user) {
         byte[] digest = new byte[32];
         new SplittableRandom(user.hashCode()).nextBytes(digest);
@@ -1022,33 +940,11 @@ public final class SyntheticLogGenerator {
         Files.writeString(options.outDir().resolve("manifest.json"), manifest);
     }
 
-    /** Where a line was written: file name and 1-based line number. */
     private record Position(String file, long line) {}
 
-    /** One line taken from {@code --inject}, re-timed and ready to write. */
     private record Injected(
             Instant at, Stream stream, String line, String label, int instance, String origin) {}
 
-    /**
-     * Interleaves log files from {@code --inject} with the generated traffic.
-     *
-     * <p>Every file in the directory is one scenario, labelled with the file name minus its
-     * extension. Its lines keep their spacing relative to each other and the whole file is moved
-     * to a random point of the span, so the timestamps match the rest of the output. Each line is
-     * sorted into the stream of its own format, so one file may mix formats:
-     *
-     * <ul>
-     *   <li>a line starting with {@code {} is JSON; the first of {@code @timestamp}, {@code
-     *       timestamp}, {@code time} or {@code ts} is rewritten, or {@code @timestamp} is added;
-     *   <li>RFC 5424 syslog has its timestamp rewritten in place;
-     *   <li>BSD syslog gets an RFC 3339 timestamp, which carries the year its own format lacks,
-     *       and the {@code <13>} priority RFC 3164 tells a relay to add when a line has none;
-     *   <li>Common or Combined access-log lines have the bracketed date rewritten.
-     * </ul>
-     *
-     * <p>Lines in none of these shapes are skipped and counted in the manifest. A line whose
-     * timestamp cannot be read keeps the offset of the line before it.
-     */
     private static final class Injector {
 
         record Plan(List<Injected> lines, long skipped) {}
@@ -1109,8 +1005,6 @@ public final class SyntheticLogGenerator {
                 throw new IllegalArgumentException("no usable log lines in " + options.injectDir());
             }
 
-            // Separate from the generator's random source, so the traffic around the injected
-            // lines does not shift when the injected files change.
             SplittableRandom random = new SplittableRandom(options.seed() * 31 + 17);
             long spanMillis = options.span().toMillis();
             long target =
@@ -1178,8 +1072,6 @@ public final class SyntheticLogGenerator {
                 yearless.add(bsdTime[0]);
             }
 
-            // BSD syslog has no year. Take it from the file's first dated line, so a file mixing
-            // the two formats keeps its lines seconds apart rather than years apart.
             int year =
                     times.stream()
                             .filter(t -> t != null)
@@ -1217,7 +1109,6 @@ public final class SyntheticLogGenerator {
             return new Scenario(label, fileName, lines, length);
         }
 
-        /** Splits a line around its timestamp; {@code null} when the shape is not recognised. */
         private static Template template(
                 String line, int sourceLine, Instant[] time, String[] bsdTime) {
             if (line.startsWith("{")) {
@@ -1299,7 +1190,6 @@ public final class SyntheticLogGenerator {
         }
     }
 
-    /** Appends lines to {@code prefix-NNNN.ext}, opening the next file before one grows too big. */
     private static final class RollingWriter implements AutoCloseable {
 
         private final Path dir;
@@ -1319,7 +1209,7 @@ public final class SyntheticLogGenerator {
         }
 
         Position write(String line) {
-            // Every character written is ASCII, so the string length is the byte count.
+
             long size = line.length() + 1L;
             try {
                 if (out == null || currentBytes + size > maxBytes) {

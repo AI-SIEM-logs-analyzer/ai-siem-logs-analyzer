@@ -18,12 +18,6 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Sign-in, rotation and sign-out over real HTTP.
- *
- * <p>Each test creates its own account, because the counters and tokens involved are keyed on the
- * username and outlive a single request.
- */
 @QuarkusTest
 class AuthResourceTest {
 
@@ -115,7 +109,6 @@ class AuthResourceTest {
 
         refresh(stolen).then().statusCode(401);
 
-        // The second session was not the one replayed, and is gone all the same.
         refresh(otherSession).then().statusCode(401);
     }
 
@@ -134,7 +127,6 @@ class AuthResourceTest {
                 .then()
                 .statusCode(204);
 
-        // The access token has not expired, and is refused anyway.
         given().header("Authorization", "Bearer " + access)
                 .when()
                 .get("/api/auth/me")
@@ -155,7 +147,6 @@ class AuthResourceTest {
                 .statusCode(429)
                 .header("Retry-After", notNullValue());
 
-        // Still blocked with the right password: the limiter runs before the check.
         login(username, PASSWORD).then().statusCode(429);
     }
 

@@ -90,7 +90,6 @@ describe('route error boundary', () => {
   }
 
   beforeEach(() => {
-    // React logs the caught render error; the boundary is what this test is about.
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -109,7 +108,7 @@ describe('route error boundary', () => {
       'href',
       '/',
     );
-    // The raw message is kept for whoever looks into it, folded away.
+
     expect(screen.getByText('Cannot read properties of undefined')).not.toBeVisible();
   });
 

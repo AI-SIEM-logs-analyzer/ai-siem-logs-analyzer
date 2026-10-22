@@ -3,14 +3,6 @@ package com.siem.analyzer.detect.sigma;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * A Sigma string value: literal text interleaved with the wildcards {@code *} (any run of
- * characters) and {@code ?} (any one character).
- *
- * <p>A backslash escapes a wildcard or another backslash ({@code \*}, {@code \?}, {@code \\});
- * before anything else it is a literal backslash, so a Windows path needs no doubling. Instances
- * are immutable; adjacent literals are merged and runs of {@code *} collapse into one.
- */
 final class SigmaString {
 
     private sealed interface Part {}
@@ -42,7 +34,6 @@ final class SigmaString {
         this.parts = List.copyOf(normalized);
     }
 
-    /** Reads a value as Sigma writes it, wildcards and escapes included. */
     static SigmaString parse(String value) {
         List<Part> parts = new ArrayList<>();
         StringBuilder text = new StringBuilder();
@@ -62,12 +53,10 @@ final class SigmaString {
         return new SigmaString(parts);
     }
 
-    /** Plain text, with no wildcards in it whatever characters it holds. */
     static SigmaString literal(String value) {
         return new SigmaString(List.of(new Text(value)));
     }
 
-    /** This value with the implicit wildcards a match modifier adds. */
     SigmaString anchoredFor(SigmaConverter.Match match) {
         List<Part> anchored = new ArrayList<>(parts.size() + 2);
         if (match == SigmaConverter.Match.CONTAINS || match == SigmaConverter.Match.ENDS_WITH) {
@@ -88,7 +77,6 @@ final class SigmaString {
         return !parts.isEmpty() && parts.get(parts.size() - 1) == Wildcard.ANY;
     }
 
-    /** This value without a leading or trailing {@code *}. */
     SigmaString trimAny() {
         int from = startsWithAny() ? 1 : 0;
         int to = endsWithAny() && parts.size() > from ? parts.size() - 1 : parts.size();
@@ -99,12 +87,10 @@ final class SigmaString {
         return parts.isEmpty();
     }
 
-    /** Whether the value holds no wildcard, so {@link #literal()} is all of it. */
     boolean isLiteral() {
         return parts.stream().allMatch(Text.class::isInstance);
     }
 
-    /** The text of a value that {@link #isLiteral() is literal}; empty for an empty value. */
     String literal() {
         StringBuilder text = new StringBuilder();
         for (Part part : parts) {
@@ -116,7 +102,6 @@ final class SigmaString {
         return text.toString();
     }
 
-    /** An unanchored regular expression: literals escaped, {@code *} and {@code ?} as dots. */
     String toRegex() {
         StringBuilder regex = new StringBuilder();
         for (Part part : parts) {

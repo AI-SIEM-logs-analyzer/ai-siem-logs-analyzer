@@ -11,7 +11,7 @@ import { OfflineBanner } from './offline-banner';
 
 export function AppLayout() {
   const { data: user } = useCurrentUser();
-  // Until the roles are known, only the items every account may see.
+
   const visibleItems = navItems.filter(
     ({ permission }) => !permission || can(user?.roles, permission),
   );
@@ -73,7 +73,7 @@ function UserPanel() {
         disabled={signingOut}
         onClick={() => {
           setSigningOut(true);
-          // Ending the session is what leaves the page: RequireAuth redirects to /login.
+
           void signOut().finally(() => setSigningOut(false));
         }}
       >

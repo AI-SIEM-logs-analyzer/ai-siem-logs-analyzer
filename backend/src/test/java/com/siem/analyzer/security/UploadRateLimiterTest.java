@@ -11,14 +11,12 @@ import java.time.Duration;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** The counter that keeps one account from flooding the ingestion pipeline. */
 @QuarkusTest
 class UploadRateLimiterTest {
 
     @Inject UploadRateLimiter limiter;
     @Inject AppConfig config;
 
-    /** A username of its own per test: the counter is keyed on it and outlives the test. */
     private static String someone() {
         return "upload." + UUID.randomUUID();
     }
@@ -56,7 +54,6 @@ class UploadRateLimiterTest {
             limiter.consume(username);
         }
 
-        // One account spending its allowance must not stop everyone else from uploading.
         assertNull(limiter.consume(someone()));
     }
 }

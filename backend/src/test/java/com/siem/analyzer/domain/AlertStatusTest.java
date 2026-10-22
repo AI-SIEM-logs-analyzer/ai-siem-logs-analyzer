@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** The triage lifecycle: which moves {@link AlertStatus} allows and what a move records. */
 class AlertStatusTest {
 
     private static final Instant T0 = Instant.parse("2026-10-06T10:00:00Z");

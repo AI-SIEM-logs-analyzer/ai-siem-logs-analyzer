@@ -15,10 +15,6 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Every case filters on a per-test {@code uploadedBy}, so rows committed by other test classes
- * cannot drift into the assertions.
- */
 @QuarkusTest
 class LogUploadSearchTest {
 

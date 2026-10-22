@@ -11,24 +11,17 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 
-/** Queries over {@link AlertRule}. */
 @ApplicationScoped
 public class AlertRuleRepository implements PanacheRepositoryBase<AlertRule, Long> {
 
-    /** Looks a rule up by its unique name. */
     public Optional<AlertRule> findByName(String name) {
         return find("name", name).firstResultOptional();
     }
 
-    /** The rules a detection run should evaluate, ordered by name for a stable listing. */
     public List<AlertRule> listEnabled() {
         return find("enabled = true order by name").list();
     }
 
-    /**
-     * The technique IDs of each of {@code ruleIds}, in one query for a whole page of alerts. A rule
-     * that maps no technique is absent from the map.
-     */
     public Map<Long, Set<String>> techniqueIdsByRule(Collection<Long> ruleIds) {
         if (ruleIds.isEmpty()) {
             return Map.of();
@@ -47,7 +40,6 @@ public class AlertRuleRepository implements PanacheRepositoryBase<AlertRule, Lon
         return byRule;
     }
 
-    /** Every technique an enabled rule maps to: what an alert raised from now on can name. */
     public Set<String> techniqueIdsOfEnabledRules() {
         return new TreeSet<>(
                 getEntityManager()

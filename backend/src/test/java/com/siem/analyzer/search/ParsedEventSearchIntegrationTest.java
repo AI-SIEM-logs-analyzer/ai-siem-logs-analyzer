@@ -33,10 +33,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * End-to-end integration test verifying that parsed log events are indexed into the search store
- * and become searchable immediately after parsing.
- */
 @QuarkusTest
 class ParsedEventSearchIntegrationTest {
 
@@ -125,20 +121,16 @@ class ParsedEventSearchIntegrationTest {
                         "search-tester",
                         Instant.now());
 
-        // Parse file, persist events into PostgreSQL, and index into OpenSearch store
         parser.parse(ingestEvent);
 
-        // Verify upload reached INGESTED status
         LogUpload completed =
                 QuarkusTransaction.requiringNew().call(() -> uploadRepository.findById(uploadId));
         assertEquals(LogUploadStatus.INGESTED, completed.getStatus());
         assertEquals(2L, completed.getEventCount());
 
-        // Refresh the index so documents become visible to queries
         restClient.performRequest(
                 new Request("POST", "/" + appConfig.search().alias() + "/_refresh"));
 
-        // Query by fullText search on message
         SearchPage page = search.search(new EventQuery.Builder().fullText("dashboard").build());
 
         assertEquals(1, page.totalHits());
@@ -151,7 +143,6 @@ class ParsedEventSearchIntegrationTest {
         assertEquals("/admin/dashboard", hit.fields().get("path"));
         assertEquals(200, hit.fields().get("status"));
 
-        // Query by substring on raw
         SearchPage substringPage =
                 search.search(
                         new EventQuery.Builder().substring("sqlmap").withFacets(true).build());
@@ -163,16 +154,13 @@ class ParsedEventSearchIntegrationTest {
         assertEquals(500, evilHit.fields().get("status"));
         assertEquals("198.51.100.8", evilHit.fields().get("srcIp"));
 
-        // Verify facets are computed
         assertNotNull(substringPage.facets());
         assertEquals(1L, substringPage.facets().bySeverity().get("INFO"));
     }
 
     @Test
     void anEnrichedEventIsSearchableWithItsGeoFields() throws IOException {
-        // %test runs with app.geoip.enabled=false, so the real MaxMindGeoIpEnricher never runs;
-        // the stub stands in for it as the GeoIpEnricher CDI bean, same as RecordingEventSearch
-        // stands in for the real EventSearch.
+
         String clientIp = "203.0.113.15";
         stubGeoIpEnricher.answer(
                 clientIp,
@@ -219,8 +207,6 @@ class ParsedEventSearchIntegrationTest {
                         "search-tester",
                         Instant.now());
 
-        // Parse file, persist events into PostgreSQL (with the stub's geo enrichment applied to
-        // the payload), and index into OpenSearch store.
         parser.parse(ingestEvent);
 
         LogUpload completed =
@@ -228,7 +214,6 @@ class ParsedEventSearchIntegrationTest {
         assertEquals(LogUploadStatus.INGESTED, completed.getStatus());
         assertEquals(1L, completed.getEventCount());
 
-        // Refresh the index so the document becomes visible to queries
         restClient.performRequest(
                 new Request("POST", "/" + appConfig.search().alias() + "/_refresh"));
 
@@ -237,10 +222,7 @@ class ParsedEventSearchIntegrationTest {
         assertEquals(1, page.totalHits());
         EventHit hit = page.hits().get(0);
         assertEquals("203.0.113.15", hit.fields().get("srcIp"));
-        // Geo has no dedicated accessor on EventHit: like every other parsed field, it surfaces
-        // through the generic fields map, camelCase, matching the payload's own key names.
-        // geoAsn is indexed as OpenSearch `long`, but Jackson may hand back either an Integer or
-        // a Long for it, so compare numerically.
+
         assertEquals("US", hit.fields().get("geoCountryIso"));
         assertEquals(15169L, ((Number) hit.fields().get("geoAsn")).longValue());
     }

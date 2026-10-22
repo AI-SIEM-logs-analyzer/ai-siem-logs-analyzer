@@ -24,8 +24,6 @@ import { cn } from '@/lib/utils';
 const count = new Intl.NumberFormat();
 
 export function AlertsPage() {
-  // The filters and the page live in the URL, so the way back from an alert lands on the same
-  // slice of the list.
   const [params, setParams] = useSearchParams();
   const filters = useMemo(() => parseAlertFilters(params), [params]);
   const { data, error, isPending, isFetching, isPlaceholderData, refetch } = useAlertPage(filters);

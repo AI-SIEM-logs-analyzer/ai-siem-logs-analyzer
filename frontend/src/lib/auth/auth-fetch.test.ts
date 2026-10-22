@@ -5,7 +5,6 @@ import { getSession, getSessionEnd } from './session';
 
 const me = { id: 1, username: 'admin' };
 
-/** A /me that accepts only the given access token, as the backend would. */
 function meFor(accessToken: string) {
   return (request: Request) =>
     request.headers.get('Authorization') === `Bearer ${accessToken}`

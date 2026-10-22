@@ -13,13 +13,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
-/**
- * Sign-in, rotation and sign-out.
- *
- * <p>The only place that knows the order the pieces are used in: the rate limiter runs before the
- * password is checked, the audit trail is written whatever the outcome, and a refresh token is
- * exchanged exactly once. Everything it calls is testable on its own; this class is the sequence.
- */
 @ApplicationScoped
 public class AuthService {
 
@@ -49,18 +42,8 @@ public class AuthService {
         this.accessTtlSeconds = config.auth().accessTtl().toSeconds();
     }
 
-    /** A pair of tokens as the API hands them out. */
     public record Tokens(String accessToken, String refreshToken, long expiresInSeconds) {}
 
-    /**
-     * Exchanges credentials for a token pair.
-     *
-     * @throws RateLimitedException before the password is checked, when this pair has failed too
-     *     often — hashing a password is expensive by design, and an unthrottled endpoint would let
-     *     anyone spend that cost
-     * @throws InvalidCredentialsException for a wrong password, an unknown username or a disabled
-     *     account, indistinguishably
-     */
     public Tokens login(String username, String password, String clientIp) {
         Duration wait = rateLimiter.check(username, clientIp);
         if (wait != null) {
@@ -81,13 +64,6 @@ public class AuthService {
         return issuePair(user, RefreshTokenStore.newFamily());
     }
 
-    /**
-     * Exchanges a refresh token for a new pair.
-     *
-     * <p>A token presented twice is treated as stolen: the first presentation was either the
-     * legitimate holder or the thief, and there is no way to tell which, so every session of that
-     * account goes.
-     */
     public Tokens refresh(String refreshToken, String clientIp) {
         RefreshTokenStore.ConsumeResult consumed = refreshTokens.consume(refreshToken);
 
@@ -122,12 +98,6 @@ public class AuthService {
         }
     }
 
-    /**
-     * Ends a session.
-     *
-     * <p>Idempotent, and deliberately silent about what it found: a caller cannot learn whether a
-     * token was live from the fact that it is now gone.
-     */
     public void logout(
             String refreshToken,
             String jti,

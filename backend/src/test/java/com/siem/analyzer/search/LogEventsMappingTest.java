@@ -8,11 +8,6 @@ import java.io.InputStream;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/**
- * Verifies that all enrichment fields (geo and User-Agent) are mapped explicitly in the OpenSearch
- * index. The mapping is strict, so an unmapped enrichment field would be rejected or fall into
- * attributes.
- */
 class LogEventsMappingTest {
 
     private static final Map<String, String> GEO_FIELDS =

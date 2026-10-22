@@ -24,19 +24,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * Runs the parsers over real logs from Loghub, see {@code src/test/resources/loghub/README.md}.
- *
- * <p>The unit tests of each parser use lines written to exercise one rule at a time. These are
- * lines nobody wrote for us: odd tags, trailing blanks, a second space where one is expected, and
- * whole formats that look close to ours without being them.
- */
 class LoghubSamplesParseTest {
 
-    /**
-     * The samples carry no year. Read in late September 2026, June and July are this year's and
-     * OpenSSH's December is last year's.
-     */
     private static final Instant NOW = Instant.parse("2026-09-25T12:00:00Z");
 
     private final SyslogParser syslogParser =
@@ -74,7 +63,7 @@ class LoghubSamplesParseTest {
             assertNotNull(event.host(), line);
             assertTrue(event.host().matches(hostPattern), line);
             assertNotNull(event.message(), line);
-            // A file written by the local daemon has no <PRI>, so nothing says how severe it is.
+
             assertEquals(Severity.INFO, event.severity(), line);
             assertFalse(event.attributes().containsKey("facility"), line);
 
@@ -112,7 +101,6 @@ class LoghubSamplesParseTest {
         "Linux.log, SYSLOG",
         "OpenSSH.log, SYSLOG",
         "Mac.log, SYSLOG",
-        // An Apache error log is not an access log, whatever the server's name suggests.
         "Apache.log, PLAIN",
         "BGL.log, PLAIN",
         "HDFS.log, PLAIN",
@@ -170,13 +158,12 @@ class LoghubSamplesParseTest {
 
     @Test
     void lineWithoutATagKeepsEverythingInTheMessage() throws IOException {
-        // "syslogd 1.4.1" is followed by neither '[' nor ':', so it cannot be a tag.
+
         NormalizedEvent restart = parse("Linux.log", 214);
         assertEquals("combo", restart.host());
         assertEquals("syslogd 1.4.1: restart.", restart.message());
         assertEquals(Map.of(), restart.attributes());
 
-        // Two spaces after the host: the tag slot is empty, and nothing is dropped.
         NormalizedEvent login = parse("Linux.log", 399);
         assertEquals("combo", login.host());
         assertEquals("-- root[2421]: ROOT LOGIN ON tty2", login.message());
@@ -215,7 +202,6 @@ class LoghubSamplesParseTest {
         assertTrue(event.message().startsWith("IOThunderboltSwitch<0>(0x0)::listenerCallback"));
     }
 
-    /** Parses the line with the given 1-based number, as an editor would show it. */
     private NormalizedEvent parse(String file, int lineNumber) throws IOException {
         String line = sample(file).get(lineNumber - 1);
         return syslogParser

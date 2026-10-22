@@ -6,19 +6,15 @@ import { freshSession, refreshSession } from '@/lib/auth/auth-fetch';
 import { backendMessage, errorMessage } from '@/lib/errors';
 import type { Session } from '@/lib/auth/session';
 
-// /api/logs: submitting a log file and following it through parsing.
-
 export type LogUpload = components['schemas']['LogUploadResponse'];
 export type LogUploadStatus = components['schemas']['LogUploadStatus'];
 export type LogUploadPage = components['schemas']['PageResponseLogUploadResponse'];
 
-/** Mirrors app.upload in the backend's application.yaml; the backend has the final say. */
 export const UPLOAD_LIMITS = {
   maxFileSizeBytes: 50 * 1024 * 1024,
   extensions: ['log', 'txt', 'json', 'ndjson', 'csv'],
 } as const;
 
-/** How often an upload still being parsed is asked for again. */
 export const UPLOAD_POLL_MS = 2_000;
 
 export const uploadKeys = {
@@ -27,12 +23,10 @@ export const uploadKeys = {
   detail: (id: number) => ['uploads', 'detail', id] as const,
 };
 
-/** Whether the backend is done with an upload, one way or the other. */
 export function isSettled(status: LogUploadStatus | undefined): boolean {
   return status === 'INGESTED' || status === 'FAILED';
 }
 
-/** Why a file cannot be uploaded, checked before sending it; null when it may go. */
 export function checkFile(file: File): string | null {
   const extension = file.name.includes('.') ? file.name.split('.').pop()!.toLowerCase() : '';
   if (!(UPLOAD_LIMITS.extensions as readonly string[]).includes(extension)) {

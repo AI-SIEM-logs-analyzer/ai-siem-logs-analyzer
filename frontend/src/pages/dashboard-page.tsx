@@ -30,7 +30,6 @@ import {
 } from '@/lib/timeline';
 
 export function DashboardPage() {
-  // The range lives in the URL, so a reload or a shared link shows the same slice.
   const [params, setParams] = useSearchParams();
   const requested = params.get('range');
   const range = isTimelineRange(requested) ? requested : DEFAULT_TIMELINE_RANGE;
@@ -92,7 +91,6 @@ function RangePicker({
   );
 }
 
-// The spec leaves every field optional; a status the backend did not report reads as unknown.
 function StatusBadge({ status }: { status: HealthStatus | undefined }) {
   if (!status) return <Badge variant="outline">UNKNOWN</Badge>;
   return <Badge variant={status === 'UP' ? 'secondary' : 'destructive'}>{status}</Badge>;

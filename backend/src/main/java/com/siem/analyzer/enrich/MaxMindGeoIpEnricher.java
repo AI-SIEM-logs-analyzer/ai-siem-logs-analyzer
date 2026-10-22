@@ -17,13 +17,6 @@ import java.util.List;
 import java.util.Optional;
 import org.jboss.logging.Logger;
 
-/**
- * Looks addresses up in the bundled GeoLite2 databases.
- *
- * <p>The readers are built from a {@link File} rather than a classpath stream on purpose: a reader
- * built from a stream holds the whole database in the heap, which for GeoLite2-City is roughly 70
- * MB, while a reader built from a file memory-maps it.
- */
 @ApplicationScoped
 public class MaxMindGeoIpEnricher implements GeoIpEnricher {
 
@@ -49,10 +42,6 @@ public class MaxMindGeoIpEnricher implements GeoIpEnricher {
                 LaunchMode.current() == LaunchMode.NORMAL);
     }
 
-    // Used by tests: always non-fail-fast, so a missing database disables enrichment for the run
-    // instead of throwing. LaunchMode.current() is unreliable in a plain JUnit test that runs
-    // outside a Quarkus runtime, so fail-fast behaviour is taken as an explicit argument instead
-    // of being derived in here; the CDI constructor above is the only caller that derives it.
     MaxMindGeoIpEnricher(boolean enabled, String cityPath, String asnPath, List<String> skipped) {
         this(enabled, cityPath, asnPath, skipped, false);
     }
@@ -84,9 +73,7 @@ public class MaxMindGeoIpEnricher implements GeoIpEnricher {
         } catch (IOException e) {
             closeQuietly();
             if (failFast) {
-                // A packaged deployment that asked for enrichment and cannot read its databases is
-                // misconfigured. Fail loudly at boot rather than silently indexing events without
-                // geo.
+
                 throw new IllegalStateException("Cannot open the GeoIP databases", e);
             }
             LOG.warnf(e, "Cannot open the GeoIP databases; enrichment is off for this run");
@@ -136,10 +123,7 @@ public class MaxMindGeoIpEnricher implements GeoIpEnricher {
         try {
             return cityReader.tryCity(address);
         } catch (Exception e) {
-            // A lookup failure is never allowed to fail an ingestion batch. The event simply
-            // carries no geo fields. Logged by the address's literal form only: this class must
-            // never call getHostName or getCanonicalHostName on an InetAddress parsed from an
-            // untrusted log line, since either can trigger a reverse-DNS lookup.
+
             LOG.debugf(e, "City lookup failed for %s", address.getHostAddress());
             return Optional.empty();
         }

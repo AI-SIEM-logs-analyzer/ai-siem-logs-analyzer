@@ -20,12 +20,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-/**
- * A detection rule evaluated against incoming events.
- *
- * <p>The expression is stored as opaque text. Whatever evaluates rules owns its syntax; persistence
- * only has to hand it back unchanged.
- */
 @Entity
 @Table(name = "alert_rule")
 public class AlertRule {
@@ -50,13 +44,6 @@ public class AlertRule {
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;
 
-    /**
-     * The MITRE ATT&CK techniques the rule evidences, by ID ({@code T1110.001}).
-     *
-     * <p>IDs, not references to {@link AttackTechnique}: the ATT&CK dataset is reference data an
-     * import replaces wholesale, so a rule names a technique by value and outlives a release that
-     * retires it. An alert inherits these when it is read.
-     */
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "alert_rule_technique", joinColumns = @JoinColumn(name = "rule_id"))
     @Column(name = "technique_id", nullable = false)
@@ -130,10 +117,6 @@ public class AlertRule {
         return Collections.unmodifiableSet(techniqueIds);
     }
 
-    /**
-     * Replaces the rule's techniques. Clears and refills the collection rather than swapping it, so
-     * Hibernate keeps tracking it and writes only the difference.
-     */
     public void setTechniqueIds(Collection<String> ids) {
         techniqueIds.clear();
         techniqueIds.addAll(ids);

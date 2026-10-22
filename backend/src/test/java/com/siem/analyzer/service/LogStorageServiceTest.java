@@ -44,12 +44,10 @@ class LogStorageServiceTest {
         assertEquals("test-auth.log", stored.originalFileName());
         assertEquals("text/plain", stored.contentType());
 
-        // Verify SHA-256 matches
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         String expectedChecksum = HexFormat.of().formatHex(digest.digest(content));
         assertEquals(expectedChecksum, stored.checksum());
 
-        // Verify stored file content matches
         byte[] readBack = Files.readAllBytes(Path.of(stored.storagePath()));
         assertEquals(
                 new String(content, StandardCharsets.UTF_8),

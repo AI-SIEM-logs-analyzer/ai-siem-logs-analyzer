@@ -6,29 +6,12 @@ import dev.langchain4j.service.V;
 import io.quarkiverse.langchain4j.RegisterAiService;
 import jakarta.enterprise.context.ApplicationScoped;
 
-/**
- * Asks the configured LLM to read an alert and answer with an {@link AlertSummary}.
- *
- * <p>A declarative LangChain4j AI service: Quarkus generates the implementation, renders the
- * prompts below, adds the JSON schema of the return type and parses the answer into the record.
- *
- * <p>The two messages are kept apart on purpose. The system message is a constant: it holds every
- * instruction and no data, so nothing a log line says can reach it. The user message holds the
- * alert and nothing else, as a JSON document inside {@code <alert>} that {@link AlertPrompt} has
- * escaped so it cannot close the block. Instructions come only from the first, evidence only from
- * the second.
- *
- * <p>Every call stands alone. There is no chat memory, so one alert's evidence never leaks into the
- * next summary, and the service is application-scoped because it holds no per-request state. The
- * model comes from {@link ConfiguredChatModel}, which follows {@code app.ai.provider}.
- */
 @RegisterAiService(
         chatLanguageModelSupplier = ConfiguredChatModel.class,
         chatMemoryProviderSupplier = RegisterAiService.NoChatMemoryProviderSupplier.class)
 @ApplicationScoped
 public interface AlertSummarizer {
 
-    /** Every instruction the model gets; it carries no alert data, and no placeholder for any. */
     String SYSTEM_PROMPT =
             """
             You are a security analyst triaging alerts raised by a SIEM from web server, \
@@ -78,11 +61,6 @@ public interface AlertSummarizer {
             Be concrete and brief. Answer only with the JSON object the response schema \
             describes.""";
 
-    /**
-     * Summarises one alert.
-     *
-     * @param alert the alert and its evidence, as {@link AlertPrompt#text()} writes it
-     */
     @SystemMessage(SYSTEM_PROMPT)
     @UserMessage(
             """

@@ -7,7 +7,6 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 import java.util.Map;
 
-/** Turns a throttled upload into 429 with the wait the caller has to observe. */
 @Provider
 public class UploadRateLimitedExceptionMapper
         implements ExceptionMapper<UploadRateLimitedException> {

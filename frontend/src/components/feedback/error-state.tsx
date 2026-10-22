@@ -5,20 +5,19 @@ import { cn } from '@/lib/utils';
 
 interface ErrorStateProps {
   error: unknown;
-  /** Names what failed to load ("the users"), for the fallback explanation. */
+
   what?: string;
-  /** Replaces the explanation, for a screen with a more precise story for this failure. */
+
   message?: string;
-  /** Offered as "Try again" when trying again can help. */
+
   onRetry?: () => void;
-  /** A retry is in flight: the button spins and waits. */
+
   retrying?: boolean;
-  /** Announce as an alert; off where another element already announces the same failure. */
+
   announce?: boolean;
   className?: string;
 }
 
-/** Why something has nothing to show, in plain words, with a way to try again. */
 export function ErrorState({
   error,
   what,

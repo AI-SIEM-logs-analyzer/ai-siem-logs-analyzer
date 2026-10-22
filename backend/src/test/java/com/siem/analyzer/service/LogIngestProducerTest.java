@@ -20,11 +20,6 @@ import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/**
- * Proves the {@code logs.ingest} outgoing channel end to end, minus the broker: the emitter is the
- * production one, the payload is the production serialisation, and only the connector is swapped
- * for the in-memory sink the %test profile configures.
- */
 @QuarkusTest
 @TestSecurity(user = "ingest-tester", roles = "ANALYST")
 class LogIngestProducerTest {

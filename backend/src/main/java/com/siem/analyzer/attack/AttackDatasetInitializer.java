@@ -7,13 +7,6 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
-/**
- * Imports the bundled ATT&CK release at start-up when the stored one is missing or older.
- *
- * <p>A failure is logged, not thrown. The dataset only names techniques: alerts are raised and
- * listed without it, and show bare technique IDs until an import succeeds. An application that
- * refused to start over a reference table would stop ingesting logs for nothing.
- */
 @ApplicationScoped
 public class AttackDatasetInitializer {
 

@@ -20,12 +20,6 @@ interface AlertFilterBarProps {
   onChange: (filters: AlertFilters) => void;
 }
 
-/**
- * Severity, status and ATT&CK toggles above the alert list. Each applies as it is pressed,
- * combines with the other rows by AND and with its own row by OR; a change goes back to the first
- * page. The ATT&CK rows offer only the techniques an alert can name and the tactics those serve,
- * and stay hidden until the backend has said which those are.
- */
 export function AlertFilterBar({ filters, onChange }: AlertFilterBarProps) {
   const { data: techniques = [] } = useTechniquesInUse();
   const { data: tactics = [] } = useAttackTactics();
@@ -156,7 +150,7 @@ function Toggle({
   children,
 }: {
   on: boolean;
-  /** Something in the row is picked, so the rest step back. */
+
   dimmed: boolean;
   onClick: () => void;
   children: ReactNode;

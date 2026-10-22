@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/** Persistence behaviour of {@link Alert}, including alerts that have no rule behind them. */
 @QuarkusTest
 class AlertRepositoryTest {
 
@@ -78,7 +77,7 @@ class AlertRepositoryTest {
         assertEquals(rule.getId(), found.getRule().getId());
         assertEquals(event.getId(), found.getLogEvent().getId());
         assertEquals(Severity.CRITICAL, found.getSeverity());
-        // Newly raised alerts start in the triage queue.
+
         assertEquals(AlertStatus.NEW, found.getStatus());
         assertNotNull(found.getRaisedAt());
         assertEquals(found.getRaisedAt(), found.getStatusChangedAt());
@@ -88,7 +87,7 @@ class AlertRepositoryTest {
     @Test
     @TestTransaction
     void persistsAnAlertWithoutARule() {
-        // The case rule_id is nullable for: an alert raised by a model has no rule behind it.
+
         LogEvent event = persistedEvent("endpoint-b");
         Alert stored = alert(event, null);
 

@@ -20,9 +20,6 @@ import org.junit.jupiter.api.Test;
 @QuarkusTest
 class EventSearchResourceTest {
 
-    // RecordingEventSearch is a @Mock alternative, so injecting it here swaps the real engine
-    // out for the whole class. The engine's own behaviour is proven in the two
-    // OpenSearchEventSearch tests; what this class proves is the HTTP contract.
     @Inject RecordingEventSearch search;
 
     @AfterEach

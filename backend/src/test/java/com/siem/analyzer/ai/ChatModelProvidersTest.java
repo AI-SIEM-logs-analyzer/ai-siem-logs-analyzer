@@ -13,10 +13,6 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
-/**
- * The real provider models, as application.yaml configures them. Creating a model makes no request,
- * so this needs no network and no key beyond the test placeholder.
- */
 @QuarkusTest
 class ChatModelProvidersTest {
 
@@ -34,8 +30,7 @@ class ChatModelProvidersTest {
 
     @Test
     void everyProviderEnforcesTheSummarySchema() {
-        // Structured output is only as strict as the provider: with the capability LangChain4j
-        // sends the schema as the response format, without it merely as instructions.
+
         for (AiProvider provider : AiProvider.values()) {
             assertTrue(
                     model(provider)

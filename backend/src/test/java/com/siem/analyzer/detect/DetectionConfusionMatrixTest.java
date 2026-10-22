@@ -45,31 +45,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-/**
- * Scores the built-in rules on labelled attacks hidden in synthetic traffic: a confusion matrix (TP
- * / FP / TN / FN) per rule, counted per log line.
- *
- * <p>{@link SyntheticLogGenerator} writes 100k benign lines and injects every file of {@code
- * src/test/resources/detection-scenarios} once, at a random point of the day, listing each injected
- * line in {@code ground-truth.csv}. A scenario file is named after the rule its lines should raise
- * ({@code sql-injection.log}); any other name ({@code benign-lookalikes.log}) holds lines that look
- * like an attack but should raise nothing. Generated lines should raise nothing either.
- *
- * <p>Every line is parsed by the production parsers and the lines of all files are fed to one
- * {@link RuleEngine} in timestamp order, as a live feed would deliver them. A line counts as
- * flagged by a rule when
- *
- * <ul>
- *   <li>it triggered the rule, for a rule without a window, or
- *   <li>it matched the rule's condition and fell into a window that fired: same group, timestamp
- *       between the window's oldest and newest event. Every failed login of a brute force is then a
- *       hit, not only the fifth.
- * </ul>
- *
- * <p>The scenarios hold only what the rules document they catch, so a miss or a false alarm here is
- * a regression. Run the test alone to read the matrices: {@code ./mvnw test
- * -Dtest=DetectionConfusionMatrixTest}.
- */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DetectionConfusionMatrixTest {
 
@@ -77,10 +52,8 @@ class DetectionConfusionMatrixTest {
     private static final long EVENTS = 100_000;
     private static final long SEED = 42;
 
-    /** The label of a generated line, which is in no scenario. */
     private static final String GENERATED = "";
 
-    /** The scenario of lines that look like attacks but are not. */
     private static final String LOOKALIKES = "benign-lookalikes";
 
     private static final List<DetectionRule> RULES =
@@ -90,14 +63,6 @@ class DetectionConfusionMatrixTest {
                     PathTraversalRule.rule(),
                     ScannerUserAgentRule.rule());
 
-    /**
-     * One cell of the matrix per outcome.
-     *
-     * @param tp attack lines the rule flagged
-     * @param fp lines the rule flagged that are not its attacks
-     * @param tn lines the rule left alone that are not its attacks
-     * @param fn attack lines the rule missed
-     */
     record Confusion(long tp, long fp, long tn, long fn) {
 
         long total() {
@@ -127,7 +92,6 @@ class DetectionConfusionMatrixTest {
         }
     }
 
-    /** One parsed line, where it was written and the scenario it came from. */
     private record Line(String file, long number, String label, NormalizedEvent event) {}
 
     private Path dir;
@@ -234,9 +198,6 @@ class DetectionConfusionMatrixTest {
         assertEquals(summary.injected() - summary.injectedPerLabel().get(LOOKALIKES), anyRule.tp());
     }
 
-    // --- the pipeline ---------------------------------------------------------------------------
-
-    /** {@code file:line} of every injected line, mapped to its scenario label. */
     private Map<String, String> groundTruth() throws IOException {
         List<String> rows = Files.readAllLines(dir.resolve("ground-truth.csv"));
         assertEquals("file,line,timestamp,label,instance,origin", rows.getFirst());
@@ -248,7 +209,6 @@ class DetectionConfusionMatrixTest {
         return labels;
     }
 
-    /** Every written line through the production parsers, oldest first across all files. */
     private List<Line> parse(Map<String, String> labels) throws IOException {
         AccessLogParser access = new AccessLogParser();
         SyslogParser syslog = new SyslogParser();
@@ -276,12 +236,11 @@ class DetectionConfusionMatrixTest {
                 parsed.add(new Line(file, number, label, event));
             }
         }
-        // Stable: lines with the same timestamp keep their order within a file.
+
         parsed.sort(Comparator.comparing(line -> line.event().timestamp()));
         return parsed;
     }
 
-    /** The lines each rule flagged, by rule name. */
     private Map<String, Set<Line>> detect() {
         RuleEngine engine = new RuleEngine(RULES);
         Map<NormalizedEvent, Line> byEvent = new IdentityHashMap<>();
@@ -317,7 +276,6 @@ class DetectionConfusionMatrixTest {
         return result;
     }
 
-    /** The lines matching a windowed rule's condition, by the group they aggregate into. */
     private Map<Map<String, Object>, List<Line>> matchingByGroup(DetectionRule rule) {
         WindowSpec window = rule.expression().window();
         Map<Map<String, Object>, List<Line>> groups = new HashMap<>();
@@ -357,8 +315,6 @@ class DetectionConfusionMatrixTest {
     private static Set<Line> identitySet() {
         return Collections.newSetFromMap(new IdentityHashMap<>());
     }
-
-    // --- reporting ------------------------------------------------------------------------------
 
     private String misses(String rule) {
         return describe(

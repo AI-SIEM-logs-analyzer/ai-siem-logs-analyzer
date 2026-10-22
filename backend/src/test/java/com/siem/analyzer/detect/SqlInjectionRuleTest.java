@@ -12,13 +12,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** The built-in SQL injection rule, fed request lines through the production access-log parser. */
 class SqlInjectionRuleTest {
 
     private final AccessLogParser accessLogs = new AccessLogParser();
     private final RuleEngine engine = new RuleEngine(List.of(SqlInjectionRule.rule()));
 
-    /** An access-log line for {@code GET target}, as the server would log it. */
     private NormalizedEvent get(String target) {
         String line =
                 "203.0.113.9 - - [14/Sep/2026:10:15:30 +0000] \"GET %s HTTP/1.1\" 200 512"
@@ -51,7 +49,6 @@ class SqlInjectionRuleTest {
     @ParameterizedTest
     @ValueSource(
             strings = {
-                // Tautologies, as typed and as encoded.
                 "/login?user=admin'+OR+1=1--&pass=x",
                 "/login?user=admin%27%20or%20%27a%27%3D%27a",
                 "/login?user=%22%20or%20%22%22%3D%22",
@@ -60,28 +57,22 @@ class SqlInjectionRuleTest {
                 "/items?id=1+OR+1=1",
                 "/items?id=5%20and%201%3D2",
                 "/users/7%27%20OR%20%271%27%3D%271",
-                // Double encoding and inline comments in place of spaces.
                 "/items?id=1%2527%2520OR%25201%253D1",
                 "/items?id=1'/**/OR/**/1=1",
-                // UNION-based.
                 "/items?id=-1+UNION+SELECT+username,password+FROM+users",
                 "/items?id=-1%20union%20all%20select%20null,null--",
                 "/items?id=-1/**/UNION/**/SELECT/**/1,2",
                 "/items?id=-1+union(select+1)",
-                // Comments that cut the query off, and column counting.
                 "/login?user=admin'--",
                 "/login?user=admin%27%23",
                 "/items?id=1'+ORDER+BY+3--+",
                 "/items?id=1%27%20group%20by%201",
-                // Stacked statements.
                 "/items?id=1;DROP+TABLE+users",
                 "/items?id=1;%20exec%20xp_cmdshell('dir')",
-                // Time-based blind.
                 "/items?id=1+AND+SLEEP(5)",
                 "/items?id=1;SELECT+pg_sleep(10)",
                 "/items?id=1+and+benchmark(5000000,md5(1))",
                 "/items?id=1;WAITFOR+DELAY+'0:0:5'--",
-                // Subqueries, error- and file-based functions, catalogue names.
                 "/items?id=1+AND+(SELECT+1+FROM+users)",
                 "/items?id=1+and+extractvalue(1,concat(0x7e,version()))",
                 "/items?id=1+UNION+SELECT+load_file('/etc/passwd')",
@@ -126,8 +117,7 @@ class SqlInjectionRuleTest {
 
     @Test
     void hostileRequestsStayFast() {
-        // Each pads a near-match with what the gaps and word runs consume, so a pattern that
-        // backtracked would take quadratic time or worse.
+
         List<String> targets =
                 List.of(
                         "/a?q='" + "%20".repeat(100_000) + "x",

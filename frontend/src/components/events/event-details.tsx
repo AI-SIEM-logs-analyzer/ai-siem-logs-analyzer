@@ -15,21 +15,15 @@ import { hasFilterValue, type DrillField, type EventFilters } from '@/lib/event-
 import { cn } from '@/lib/utils';
 
 interface EventDetailsProps {
-  /** The event shown; null keeps the panel closed. */
   hit: EventHit | null;
   filters: EventFilters;
   onClose: () => void;
   onDrill: (field: DrillField, value: string | number) => void;
-  /** Step to the row above or below in the table; undefined at either end of the page. */
+
   onPrevious?: () => void;
   onNext?: () => void;
 }
 
-/**
- * Everything one event carries, in a panel beside the table: when it happened and was
- * ingested, its message, every parsed field in groups and the raw line as it arrived. Values
- * the search can filter on narrow the table from here too.
- */
 export function EventDetails({
   hit,
   filters,

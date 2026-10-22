@@ -6,27 +6,6 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-/**
- * A validated search request.
- *
- * <p>Validated on construction rather than at the engine: every bound here is a limit on what one
- * caller can make the cluster do, and a limit enforced after the request has been built is a limit
- * that was not enforced. Built through {@link #builder()} because most of the fields are optional
- * and a constructor of twelve arguments reads as nothing at the call site.
- *
- * @param from earliest event time, inclusive; {@code null} for unbounded
- * @param to latest event time, exclusive; {@code null} for unbounded
- * @param sourceIds restrict to these sources; empty for all
- * @param severities restrict to these severities; empty for all
- * @param srcIps restrict to source addresses matching any of these; empty for all
- * @param statuses restrict to HTTP statuses within any of these ranges; empty for all
- * @param fullText ranked full-text over the message; {@code null} for none
- * @param substring literal substring of the raw line; {@code null} for none
- * @param size hits per page
- * @param order direction of the event-time sort
- * @param cursor where to resume; {@code null} for the first page; only valid with the same order
- * @param withFacets whether to compute aggregations, which cost a second pass
- */
 public record EventQuery(
         Instant from,
         Instant to,
@@ -41,28 +20,12 @@ public record EventQuery(
         SearchCursor cursor,
         boolean withFacets) {
 
-    /** Hits per page when the caller does not say. */
     public static final int DEFAULT_SIZE = 50;
 
-    /** The largest page a caller may ask for. */
     public static final int MAX_SIZE = 1000;
 
-    /**
-     * The longest substring a caller may search for.
-     *
-     * <p>A denial-of-service bound. The {@code wildcard} field indexes substrings of length three
-     * or less, so a longer pattern is answered by verifying candidates, and an unbounded one by
-     * scanning. This constant is the sole, absolute bound the type enforces; there is no
-     * corresponding configuration property.
-     */
     public static final int MAX_SUBSTRING_LENGTH = 256;
 
-    /**
-     * The most values a caller may give one address or status filter.
-     *
-     * <p>Each value is a clause the engine evaluates per document, so the count is a cost bound
-     * like the page size.
-     */
     public static final int MAX_FILTER_VALUES = 50;
 
     public EventQuery {
@@ -111,7 +74,6 @@ public record EventQuery(
         return source == null ? Set.of() : Collections.unmodifiableSet(new LinkedHashSet<>(source));
     }
 
-    /** Collects the optional parts of a query before validating them together. */
     public static final class Builder {
 
         private Instant from;

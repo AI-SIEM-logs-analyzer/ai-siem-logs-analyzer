@@ -15,7 +15,6 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
-/** Metadata record for an uploaded log batch file. */
 @Entity
 @Table(name = "log_upload")
 public class LogUpload {
@@ -47,7 +46,6 @@ public class LogUpload {
     @Column(name = "status", nullable = false)
     private LogUploadStatus status = LogUploadStatus.PENDING;
 
-    /** Format detected from the file content. Null on rows written before detection existed. */
     @Enumerated(EnumType.STRING)
     @Column(name = "detected_format")
     private LogFormat detectedFormat;
@@ -55,12 +53,6 @@ public class LogUpload {
     @Column(name = "uploaded_by")
     private String uploadedBy;
 
-    /**
-     * The account behind {@link #uploadedBy}, when one is still there.
-     *
-     * <p>Deleting an account nulls this column but leaves the username text, so an audit of who
-     * uploaded what survives the account it points at.
-     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uploaded_by_id")
     private User uploadedByUser;
@@ -71,7 +63,6 @@ public class LogUpload {
     @Column(name = "processed_at")
     private Instant processedAt;
 
-    /** Events parsed out of the file, set when ingestion completes. */
     @Column(name = "event_count")
     private Long eventCount;
 

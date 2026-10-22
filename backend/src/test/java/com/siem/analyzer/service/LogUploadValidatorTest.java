@@ -139,8 +139,7 @@ class LogUploadValidatorTest {
 
     @Test
     void ignoresBinaryContentBeyondTheSniffWindow() throws IOException {
-        // Only the first sniffBytes are read, so a NUL past that window is not seen. The test
-        // pins that boundary so a change to the window size is a deliberate one.
+
         byte[] content = new byte[SNIFF_BYTES + 8];
         java.util.Arrays.fill(content, 0, SNIFF_BYTES, (byte) 'a');
         content[SNIFF_BYTES + 1] = 0x00;

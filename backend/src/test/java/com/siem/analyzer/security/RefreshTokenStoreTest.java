@@ -14,7 +14,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 
-/** Rotation, reuse detection and revocation, against a real Redis. */
 @QuarkusTest
 class RefreshTokenStoreTest {
 
@@ -29,7 +28,6 @@ class RefreshTokenStoreTest {
 
         String token = store.issue(USER_ID, family);
 
-        // 32 random bytes, base64url without padding.
         assertEquals(43, token.length());
         assertNotEquals(token, store.issue(USER_ID, family));
 
@@ -78,7 +76,7 @@ class RefreshTokenStoreTest {
         RefreshTokenStore.ConsumeResult replay = store.consume(token);
 
         assertEquals(RefreshTokenStore.Status.REUSED, replay.status());
-        // The tombstone carries the family, which is what lets the caller revoke the rest.
+
         assertEquals(family, replay.record().family());
     }
 
@@ -96,8 +94,6 @@ class RefreshTokenStoreTest {
 
         store.revokeAllForUser(USER_ID);
 
-        // The live token is gone, and so is the tombstone of the consumed one: after a theft,
-        // replaying either must look like nothing rather than like a second alarm.
         assertEquals(RefreshTokenStore.Status.UNKNOWN, store.consume(second).status());
         assertEquals(RefreshTokenStore.Status.UNKNOWN, store.consume(first).status());
     }

@@ -22,20 +22,6 @@ import java.util.UUID;
 import org.eclipse.microprofile.jwt.Claims;
 import org.junit.jupiter.api.Test;
 
-/**
- * The upload endpoint as a caller actually reaches it: sign in over HTTP, then carry the issued
- * access token into the multipart upload.
- *
- * <p>{@link LogUploadResourceSecurityTest} and {@link LogUploadValidationTest} cover the same rules
- * with an injected identity ({@code @TestSecurity}) and a synthetic request. What is only provable
- * here is that the two halves agree: the token the login endpoint mints verifies at the upload
- * endpoint, its {@code upn} becomes the stored {@code uploadedBy}, and its {@code groups} decide
- * whether the request is refused. A token minted with the wrong issuer, or a role claim the
- * verifier reads under a different name, would pass both of those tests and fail every one here.
- *
- * <p>Each test signs in as its own freshly created account, because the login and upload counters
- * are keyed on the username and outlive a single test.
- */
 @QuarkusTest
 class AuthUploadFlowTest {
 
@@ -49,12 +35,10 @@ class AuthUploadFlowTest {
 
     @Inject AppConfig config;
 
-    /** A username nothing else in the suite will collide with. */
     private static String aUsername() {
         return "flow." + UUID.randomUUID().toString().substring(0, 8);
     }
 
-    /** Creates an account with the given role and returns its username. */
     private String anAccount(Role role) {
         String username = aUsername();
         users.create(username, null, PASSWORD, Set.of(role));
@@ -68,7 +52,6 @@ class AuthUploadFlowTest {
                 .post("/api/auth/login");
     }
 
-    /** Creates an account with the given role, signs in as it, and returns the access token. */
     private String signInAs(Role role) {
         return login(anAccount(role)).then().statusCode(200).extract().path("accessToken");
     }
@@ -77,13 +60,6 @@ class AuthUploadFlowTest {
         return given().header("Authorization", "Bearer " + token);
     }
 
-    /**
-     * Mints an access token that expired an hour ago.
-     *
-     * <p>Signed with the same key and stamped with the same issuer as a real one, so the only
-     * reason the verifier can refuse it is {@code exp}. Waiting out the configured 15-minute TTL is
-     * the alternative, and it is not one.
-     */
     private String anExpiredToken(String username, Role role) {
         Instant issuedAt = Instant.now().minus(2, ChronoUnit.HOURS);
 
@@ -101,7 +77,6 @@ class AuthUploadFlowTest {
         return given().multiPart("file", fileName, content, mimeType);
     }
 
-    /** How many uploads the listing holds under a file name. */
     private static int storedCountFor(String adminToken, String fileName) {
         return as(adminToken)
                 .when()
@@ -129,8 +104,6 @@ class AuthUploadFlowTest {
                         .body("fileName", equalTo("flow-happy.log"))
                         .body("fileSize", equalTo(LOG_CONTENT.length))
                         .body("status", equalTo("PENDING"))
-                        // The upload is attributed to the account that signed in, not to whatever
-                        // the request body claimed: the name comes off the token's upn claim.
                         .body("uploadedBy", equalTo(username))
                         .body("checksum", notNullValue())
                         .header("Location", notNullValue())
@@ -139,7 +112,6 @@ class AuthUploadFlowTest {
 
         int id = accepted.path("id");
 
-        // The same token reads the metadata back.
         as(token)
                 .when()
                 .get("/api/logs/uploads/" + id)
@@ -149,7 +121,6 @@ class AuthUploadFlowTest {
                 .body("fileName", equalTo("flow-happy.log"))
                 .body("uploadedBy", equalTo(username));
 
-        // And the upload is findable by the uploader, which is the filter an operator uses.
         as(token)
                 .when()
                 .get("/api/logs/uploads?uploadedBy=" + username)
@@ -171,8 +142,6 @@ class AuthUploadFlowTest {
                 .then()
                 .statusCode(401);
 
-        // A fresh sign-in for the same account is accepted, so the refusal was the age of the
-        // token and nothing about the account.
         String fresh = login(username).then().statusCode(200).extract().path("accessToken");
         as(fresh)
                 .multiPart("file", "flow-expired.log", LOG_CONTENT, "text/plain")
@@ -201,10 +170,8 @@ class AuthUploadFlowTest {
                 .then()
                 .statusCode(403);
 
-        // Reading is what the role is for, and it still works.
         as(token).when().get("/api/logs/uploads").then().statusCode(200);
 
-        // 403 is a refusal, not a partial write: nothing was stored under that name.
         String admin = signInAs(Role.ADMIN);
         org.junit.jupiter.api.Assertions.assertEquals(
                 0, storedCountFor(admin, "flow-viewer.log"), "a refused upload was stored");
@@ -214,7 +181,6 @@ class AuthUploadFlowTest {
     void refusesAnInvalidFileFromAValidToken() {
         String token = signInAs(Role.ANALYST);
 
-        // Wrong extension.
         as(token)
                 .multiPart("file", "flow-payload.exe", LOG_CONTENT, "text/plain")
                 .when()
@@ -223,7 +189,6 @@ class AuthUploadFlowTest {
                 .statusCode(415)
                 .body("error", equalTo("unsupported_log_file"));
 
-        // A log file name over a binary body.
         byte[] gzip = {0x1f, (byte) 0x8b, 0x08, 0x00, 0x01, 0x02, 0x03, 0x04};
         as(token)
                 .multiPart("file", "flow-archive.log", gzip, "text/plain")
@@ -233,7 +198,6 @@ class AuthUploadFlowTest {
                 .statusCode(415)
                 .body("error", equalTo("unsupported_log_file"));
 
-        // Nothing at all.
         as(token)
                 .multiPart("file", "flow-empty.log", new byte[0], "text/plain")
                 .when()
@@ -241,7 +205,6 @@ class AuthUploadFlowTest {
                 .then()
                 .statusCode(400);
 
-        // The token survives the refusals: a valid file from the same session is accepted.
         as(token)
                 .multiPart("file", "flow-valid.log", LOG_CONTENT, "text/plain")
                 .when()
@@ -265,7 +228,6 @@ class AuthUploadFlowTest {
                 .then()
                 .statusCode(204);
 
-        // The token has not expired; the deny list is what refuses it.
         as(token)
                 .multiPart("file", "flow-logged-out.log", LOG_CONTENT, "text/plain")
                 .when()
@@ -282,7 +244,6 @@ class AuthUploadFlowTest {
                 .then()
                 .statusCode(401);
 
-        // Well-formed, signed by nobody this deployment trusts.
         as("not.a.token")
                 .multiPart("file", "flow-forged.log", LOG_CONTENT, "text/plain")
                 .when()

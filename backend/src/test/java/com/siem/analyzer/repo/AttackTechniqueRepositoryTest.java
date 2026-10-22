@@ -12,10 +12,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
-/**
- * The dataset queries. Each test empties the tables inside its own transaction first, which rolls
- * back, so whatever the start-up import loaded is back for the next class.
- */
 @QuarkusTest
 class AttackTechniqueRepositoryTest {
 

@@ -4,7 +4,6 @@ const HOUR = 60 * 60 * 1000;
 const at = (iso: string) => Date.parse(iso);
 
 describe('timelineWindow', () => {
-  // Offsets come from the machine running the tests, so the expectations are built from it too.
   const offset = (now: number) => Math.round(-new Date(now).getTimezoneOffset() / 60) * HOUR;
 
   it('ends at the hour after now and spans the range', () => {

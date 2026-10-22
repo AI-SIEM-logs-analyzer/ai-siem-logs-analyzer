@@ -6,16 +6,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
-/**
- * Drains the events PostgreSQL holds and the index does not.
- *
- * <p>This schedule is the guarantee that an event becomes searchable. Everything else — the
- * after-commit hook, a future parser calling the indexer directly — only shortens the wait.
- *
- * <p>Concurrent execution is skipped rather than queued: a run that is still working owns the same
- * head of the backlog the next one would read, and overlapping runs would index the same events
- * twice for no gain.
- */
 @ApplicationScoped
 public class SearchBackfillJob {
 
@@ -44,8 +34,7 @@ public class SearchBackfillJob {
                 LOG.infof("Backfilled %d events into the search index", indexed);
             }
         } catch (RuntimeException e) {
-            // Never propagate: an exception out of a scheduled method is the one way to stop
-            // the schedule, and the schedule is what recovers from an outage.
+
             LOG.errorf(e, "Search backfill run failed; the next run will retry");
         }
     }

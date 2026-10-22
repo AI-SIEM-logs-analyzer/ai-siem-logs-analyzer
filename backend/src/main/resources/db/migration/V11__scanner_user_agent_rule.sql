@@ -1,16 +1,3 @@
--- The built-in scanner User-Agent rule: a request whose User-Agent names an attack tool (sqlmap,
--- Nikto, Nmap, masscan, Nuclei, gobuster, ...), carries an attack payload (Shellshock, Log4Shell,
--- <script, UNION SELECT, ...), or is a command-line client (curl, Wget, python-requests, ...)
--- the server answered with a 4xx or 5xx.
---
--- Same contract as V1-V10: Flyway owns this DDL, Hibernate validates against it.
---
--- Seeded as data so it can be tuned or disabled like any other rule. The expression must stay
--- identical to ScannerUserAgentRule.EXPRESSION, which documents each pattern;
--- FlywayMigrationTest checks that it does. Flyway reads a dollar sign followed by an opening
--- brace as a placeholder and refuses to migrate, so neither literal may contain that pair; the
--- regex escapes both characters, which keeps them apart. A later change to the rule is a new
--- migration, because this one has already run wherever it was deployed.
 INSERT INTO alert_rule (name, description, severity, expression)
 VALUES (
     'scanner-user-agent',

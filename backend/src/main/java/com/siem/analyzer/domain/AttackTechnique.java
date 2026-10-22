@@ -13,12 +13,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-/**
- * A MITRE ATT&CK Enterprise technique or sub-technique ({@code T1110}, {@code T1110.001}).
- *
- * <p>Reference data, replaced wholesale on an import. Rules name techniques by ID rather than
- * through this entity, so a release that retires a technique never breaks a rule.
- */
 @Entity
 @Table(name = "attack_technique")
 public class AttackTechnique {
@@ -30,7 +24,6 @@ public class AttackTechnique {
     @Column(name = "name", nullable = false)
     private String name;
 
-    /** The base technique of a sub-technique; {@code null} on a base technique. */
     @Column(name = "parent_id")
     private String parentId;
 
@@ -44,9 +37,7 @@ public class AttackTechnique {
             inverseJoinColumns = @JoinColumn(name = "tactic_id"))
     private Set<AttackTactic> tactics = new HashSet<>();
 
-    protected AttackTechnique() {
-        // for JPA
-    }
+    protected AttackTechnique() {}
 
     public AttackTechnique(
             String id, String name, String parentId, String url, Collection<AttackTactic> tactics) {

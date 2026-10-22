@@ -166,7 +166,7 @@ class IndexableEventTest {
 
     @Test
     void anAbsentBotFlagStaysNullRatherThanFalse() {
-        // Null means "not classified"; false would claim the agent was examined and found human.
+
         assertNull(indexable(Map.of("uaBrowser", "Chrome")).uaBot());
     }
 

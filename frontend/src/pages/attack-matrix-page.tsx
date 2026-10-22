@@ -35,7 +35,6 @@ import {
 import { SEVERITIES } from '@/lib/event-filters';
 import { formatLevel } from '@/lib/heatmap';
 
-// Narrowest a tactic column gets before its two-line label and cell names stop fitting.
 const MATRIX_COLUMN_MIN_WIDTH = 116;
 
 const SEVERITY_LABELS: Record<Severity, string> = {

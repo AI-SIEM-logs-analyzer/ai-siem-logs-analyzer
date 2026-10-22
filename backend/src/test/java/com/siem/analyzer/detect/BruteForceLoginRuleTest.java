@@ -11,15 +11,13 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/** The built-in brute-force rule, fed lines through the production parsers. */
 class BruteForceLoginRuleTest {
 
     private final AccessLogParser accessLogs = new AccessLogParser();
-    // Only the spacing between lines matters here, so the year sshd leaves out does not.
+
     private final SyslogParser syslog = new SyslogParser();
     private final RuleEngine engine = new RuleEngine(List.of(BruteForceLoginRule.rule()));
 
-    /** An access-log line at 10:{@code minute}:{@code second}. */
     private NormalizedEvent http(String ip, String request, int status, int minute, int second) {
         String line =
                 "%s - - [14/Sep/2026:10:%02d:%02d +0000] \"%s HTTP/1.1\" %d 512"
@@ -27,7 +25,6 @@ class BruteForceLoginRuleTest {
         return accessLogs.parse(line).orElseThrow(() -> new AssertionError(line));
     }
 
-    /** An auth.log line from sshd at 10:{@code minute}:{@code second}. */
     private NormalizedEvent sshd(String message, int minute, int second) {
         String line =
                 "Sep 14 10:%02d:%02d web-01 sshd[4242]: %s".formatted(minute, second, message);
@@ -78,7 +75,7 @@ class BruteForceLoginRuleTest {
 
     @Test
     void fiveFailuresSpreadOverMoreThanAMinuteDoNotFire() {
-        // One every 15 seconds: the fifth is a full minute after the first.
+
         List<NormalizedEvent> events = new ArrayList<>();
         for (int seconds = 0; seconds <= 60; seconds += 15) {
             events.add(failedPassword("203.0.113.9", seconds / 60, seconds % 60));
@@ -100,7 +97,7 @@ class BruteForceLoginRuleTest {
 
     @Test
     void invalidUserLinesAreNotCountedTwice() {
-        // Each attempt on an unknown account logs both lines; four attempts are four failures.
+
         List<NormalizedEvent> events = new ArrayList<>();
         for (int i = 0; i < 4; i++) {
             events.add(sshd("Invalid user admin from 203.0.113.9 port 50000", 0, i));
@@ -165,7 +162,7 @@ class BruteForceLoginRuleTest {
     void otherRejectionsAndSuccessfulLoginsDoNotCount() {
         List<NormalizedEvent> events = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
-            // A 401 outside a login path, a successful login, and "login" only in the query.
+
             events.add(http("203.0.113.9", "GET /api/events", 401, 0, i));
             events.add(http("203.0.113.9", "POST /login", 200, 0, i));
             events.add(http("203.0.113.9", "GET /reports?next=/login", 403, 0, i));

@@ -10,15 +10,10 @@ function subscribe(onChange: () => void) {
   };
 }
 
-/** Whether the browser believes it has a network connection. */
 function useOnline(): boolean {
   return useSyncExternalStore(subscribe, () => navigator.onLine);
 }
 
-/**
- * Says so while the browser is offline, once for the whole app, so each failed card does not
- * have to. TanStack Query pauses its requests meanwhile and resumes them on reconnect.
- */
 export function OfflineBanner() {
   if (useOnline()) return null;
   return (

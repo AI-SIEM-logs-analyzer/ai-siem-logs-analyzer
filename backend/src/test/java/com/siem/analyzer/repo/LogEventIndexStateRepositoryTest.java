@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** Persistence behaviour of {@link LogEventIndexStateRepository} and the backlog it defines. */
 @QuarkusTest
 class LogEventIndexStateRepositoryTest {
 

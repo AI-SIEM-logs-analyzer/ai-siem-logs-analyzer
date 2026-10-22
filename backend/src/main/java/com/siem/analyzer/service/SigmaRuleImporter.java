@@ -2,7 +2,6 @@ package com.siem.analyzer.service;
 
 import com.siem.analyzer.detect.sigma.ConvertedRule;
 import com.siem.analyzer.detect.sigma.SigmaConverter;
-import com.siem.analyzer.detect.sigma.SigmaException;
 import com.siem.analyzer.detect.sigma.SigmaImport;
 import com.siem.analyzer.domain.AlertRule;
 import com.siem.analyzer.repo.AlertRuleRepository;
@@ -13,17 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Stores Sigma rules as {@code alert_rule} rows.
- *
- * <p>Conversion is {@link SigmaConverter}'s; this class only decides what happens to each row. A
- * rule is matched to its row by name, which the converter derives from the Sigma title and id, so
- * importing the same file again changes nothing and importing a newer revision of a rule updates
- * its row in place. An update leaves {@code enabled} alone: switching a noisy rule off is an
- * operator's decision that a re-import must not undo.
- *
- * <p>Rules that do not convert are reported, not stored, and do not stop the rest.
- */
 @ApplicationScoped
 public class SigmaRuleImporter {
 
@@ -36,14 +24,6 @@ public class SigmaRuleImporter {
         this.converter = SigmaConverter.withDefaults();
     }
 
-    /**
-     * What an import did, by rule name.
-     *
-     * @param created rules stored for the first time, enabled
-     * @param updated rules whose stored row differed and was rewritten
-     * @param unchanged rules already stored exactly as converted
-     * @param skipped Sigma documents that did not convert, with the reason
-     */
     public record Result(
             List<String> created,
             List<String> updated,
@@ -58,12 +38,6 @@ public class SigmaRuleImporter {
         }
     }
 
-    /**
-     * Converts and stores every rule in a YAML stream of one or more Sigma documents.
-     *
-     * @throws SigmaException the text is not YAML, or a document in it is not a mapping; nothing is
-     *     stored
-     */
     @Transactional
     public Result importRules(String yaml) {
         SigmaImport converted = converter.convert(yaml);

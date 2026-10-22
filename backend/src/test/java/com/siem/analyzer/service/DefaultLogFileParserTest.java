@@ -226,12 +226,12 @@ class DefaultLogFileParserTest {
         assertEquals("Robot", bot.get("uaDeviceClass"));
         assertEquals("Robot", bot.get("uaAgentClass"));
         assertEquals(Boolean.TRUE, bot.get("uaBot"));
-        // The classifier had no OS version for it, so no key rather than a null or a placeholder.
+
         assertFalse(bot.containsKey("uaOsVersion"));
 
         Map<String, Object> human = payloadWithUserAgent(events, "Mozilla/5.0");
         assertEquals("Firefox", human.get("uaBrowser"));
-        // false is a finding of its own, so it is written, unlike an absent value.
+
         assertEquals(Boolean.FALSE, human.get("uaBot"));
 
         IndexableEvent indexedBot =
@@ -381,10 +381,6 @@ class DefaultLogFileParserTest {
         assertEquals(4, search.indexed().size());
     }
 
-    /**
-     * A first line that once overflowed the stack in the access-log grammar, which both the format
-     * detector and the plain-text fallback try on every line.
-     */
     @Test
     void lineThatIsAllDotsAndLabelsDoesNotStopThePlainTextFallback() throws IOException {
         String hostile = "a.".repeat(50_000) + "a - - [14/Sep/2026:10:15:30 +0000] \"GET /\" 200 1";
@@ -454,11 +450,6 @@ class DefaultLogFileParserTest {
         return events.stream().filter(e -> raw.equals(e.getRaw())).findFirst().orElseThrow();
     }
 
-    /**
-     * The Kafka consumer calls the parser on a worker thread with neither a transaction nor a CDI
-     * request context. A test method has a request context of its own, which hides the case, so
-     * this one runs the parse on a plain thread the way the consumer does.
-     */
     @Test
     void parsesOnAThreadWithNoRequestContext() throws Exception {
         String content =
@@ -580,7 +571,7 @@ class DefaultLogFileParserTest {
                             List<Alert> found =
                                     alertRepository.list(
                                             "logEvent.source.id = ?1 order by id", sourceId);
-                            // Touch what the assertions read while the session is still open.
+
                             found.forEach(
                                     a -> {
                                         a.getLogEvent().getRaw();

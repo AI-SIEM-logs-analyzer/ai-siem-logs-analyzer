@@ -11,7 +11,6 @@ import java.time.Duration;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** The counter that keeps the sign-in endpoint from being a free guessing oracle. */
 @QuarkusTest
 class LoginRateLimiterTest {
 
@@ -20,7 +19,6 @@ class LoginRateLimiterTest {
     @Inject LoginRateLimiter limiter;
     @Inject AppConfig config;
 
-    /** A username of its own per test: the counter is keyed on it and outlives the test. */
     private static String someone() {
         return "rate." + UUID.randomUUID();
     }
@@ -71,7 +69,6 @@ class LoginRateLimiterTest {
             limiter.recordFailure(username, IP);
         }
 
-        // A blocked account must not become a way to lock everyone else out from elsewhere.
         assertNull(limiter.check(username, "198.51.100.4"));
     }
 }

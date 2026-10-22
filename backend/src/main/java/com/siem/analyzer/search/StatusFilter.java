@@ -3,21 +3,10 @@ package com.siem.analyzer.search;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-/**
- * One HTTP status filter, as an inclusive range of codes.
- *
- * <p>An exact code and a whole class ({@code 5xx}) are both ranges, so the engine sees one shape of
- * clause whatever the caller typed.
- *
- * @param from lowest matching code, inclusive
- * @param to highest matching code, inclusive
- */
 public record StatusFilter(int from, int to) {
 
-    /** The lowest status code HTTP defines. */
     public static final int MIN_CODE = 100;
 
-    /** The highest status code HTTP defines. */
     public static final int MAX_CODE = 599;
 
     private static final Pattern CODE = Pattern.compile("\\d{3}");
@@ -30,10 +19,6 @@ public record StatusFilter(int from, int to) {
         }
     }
 
-    /**
-     * Parses one {@code status} parameter value: a code such as {@code 404} or a class such as
-     * {@code 5xx}.
-     */
     public static StatusFilter parse(String raw) {
         String candidate = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
         if (CLASS.matcher(candidate).matches()) {

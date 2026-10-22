@@ -1,11 +1,9 @@
-/** What a fake XHR answers: the response, or 'error' for a network failure. */
 export interface XhrReply {
   status: number;
   body?: unknown;
   headers?: Record<string, string>;
 }
 
-/** The requests a FakeXhr received, in order. */
 export interface XhrCall {
   method: string;
   url: string;
@@ -15,10 +13,6 @@ export interface XhrCall {
 
 type Responder = (call: XhrCall, xhr: FakeXhr) => XhrReply | 'error' | 'hang';
 
-/**
- * Replaces `XMLHttpRequest`, which jsdom would send over the network, with one answered by
- * `respond`. Each send reports upload progress at half and all of `progressTotal` bytes first.
- */
 export function stubXhr(respond: Responder, progressTotal = 1000) {
   const calls: XhrCall[] = [];
   const instances: FakeXhr[] = [];

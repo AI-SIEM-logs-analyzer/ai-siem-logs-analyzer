@@ -22,7 +22,6 @@ import org.eclipse.microprofile.jwt.Claims;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.junit.jupiter.api.Test;
 
-/** The claims an access token carries, and the signature that makes it one. */
 @QuarkusTest
 class TokenServiceTest {
 
@@ -30,7 +29,6 @@ class TokenServiceTest {
     @Inject JWTParser parser;
     @Inject AppConfig config;
 
-    /** Not persisted: the service reads three getters and never touches the database. */
     private static User account() {
         User user = new User();
         user.setUsername("token.subject");
@@ -57,8 +55,7 @@ class TokenServiceTest {
 
         JsonWebToken parsed = parser.parse(issued.value());
         Duration life = Duration.between(before, Instant.ofEpochSecond(parsed.getExpirationTime()));
-        // A second of slack: the claim is stored with second precision and the clock moves
-        // between the sample above and the call.
+
         assertTrue(life.minus(config.auth().accessTtl()).abs().getSeconds() <= 1, life.toString());
         assertEquals(issued.expiresAt().getEpochSecond(), parsed.getExpirationTime());
     }
@@ -70,10 +67,7 @@ class TokenServiceTest {
 
     @Test
     void rejectsATokenSignedWithAnotherKey() throws NoSuchAlgorithmException {
-        // Same claims, different signer: verification has to fail on the signature alone.
-        // io.smallrye.jwt.util.KeyUtils.generateKeyPair(2048) would be the natural choice here,
-        // but this version's signature throws a checked NoSuchAlgorithmException the brief's
-        // code did not declare, so a plain KeyPairGenerator stands in — same forged-signer intent.
+
         KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
         generator.initialize(2048);
 

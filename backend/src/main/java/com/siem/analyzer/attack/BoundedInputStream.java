@@ -4,15 +4,8 @@ import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- * Lets at most {@code limit} bytes through, then fails the read.
- *
- * <p>Sits after decompression. A gzip of a few megabytes can expand to gigabytes, and the parser
- * would read every one of them before finding the bundle invalid.
- */
 final class BoundedInputStream extends FilterInputStream {
 
-    /** The stream went past its limit. */
     static final class TooLarge extends IOException {
 
         private static final long serialVersionUID = 1L;

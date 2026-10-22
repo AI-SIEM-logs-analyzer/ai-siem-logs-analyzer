@@ -14,18 +14,6 @@ import java.time.Instant;
 import java.util.List;
 import org.jboss.logging.Logger;
 
-/**
- * Moves events from PostgreSQL into the derived index and records that it did.
- *
- * <p>Two entry points, and the difference between them matters. {@link #drainBacklog(int)} is the
- * guarantee: it reads what PostgreSQL has and the index does not, so an event is eventually
- * searchable no matter what happened on the way in. {@link #indexAfterCommit(List)} is latency only
- * — it shortens the wait for events that have just landed, and dropping one of its writes costs
- * nothing, because the drain will pick the event up.
- *
- * <p>No method here propagates a failure of the engine. The index is derived; an ingestion path
- * that failed because search was unavailable would trade a stale read for lost data.
- */
 @ApplicationScoped
 public class EventIndexer {
 
@@ -48,11 +36,6 @@ public class EventIndexer {
         this.entityManager = entityManager;
     }
 
-    /**
-     * Indexes these events and records them as indexed.
-     *
-     * @return how many reached the index; zero when the engine refused
-     */
     @Transactional(Transactional.TxType.REQUIRED)
     public int indexNow(List<LogEvent> events) {
         if (events.isEmpty()) {
@@ -74,14 +57,6 @@ public class EventIndexer {
         return documents.size();
     }
 
-    /**
-     * Indexes these events once the current transaction commits.
-     *
-     * <p>For the file parser to call as it persists a batch. Before the commit the rows are not
-     * visible to anyone else, and a rollback would leave the index holding events PostgreSQL never
-     * kept — the same ordering {@link com.siem.analyzer.service.LogIngestProducer} keeps for the
-     * Kafka channel, and for the same reason.
-     */
     public void indexAfterCommit(List<LogEvent> events) {
         if (events.isEmpty()) {
             return;
@@ -102,9 +77,7 @@ public class EventIndexer {
         transactionRegistry.registerInterposedSynchronization(
                 new Synchronization() {
                     @Override
-                    public void beforeCompletion() {
-                        // Nothing to do: the write belongs after the commit, not before it.
-                    }
+                    public void beforeCompletion() {}
 
                     @Override
                     public void afterCompletion(int completionStatus) {
@@ -118,22 +91,11 @@ public class EventIndexer {
                 });
     }
 
-    /**
-     * Indexes as much of the backlog as the limit allows.
-     *
-     * @return how many events reached the index
-     */
     @Transactional(Transactional.TxType.REQUIRED)
     public int drainBacklog(int limit) {
         return indexNow(indexState.listUnindexed(limit));
     }
 
-    /**
-     * Re-reads the events by identifier, in a transaction of its own.
-     *
-     * <p>Called after the caller's transaction has completed, so its persistence context is gone
-     * and the entities it held cannot be read from here.
-     */
     void indexByIds(List<Long> ids) {
         try {
             QuarkusTransaction.requiringNew()

@@ -19,11 +19,6 @@ class MaxMindGeoIpEnricherTest {
             Path.of("src/test/resources/geoip/GeoLite2-ASN-Test.mmdb").toString();
     private static final List<String> PRIVATE = List.of("10.0.0.0/8", "127.0.0.0/8");
 
-    // Addresses drawn from maxmind/MaxMind-DB's source-data fixtures (source-data/GeoIP2-City-
-    // Test.json and source-data/GeoLite2-ASN-Test.json), and verified against the .mmdb files
-    // downloaded into src/test/resources/geoip. 81.2.69.142 sits in the City fixture's
-    // "81.2.69.142/27" London, GB entry; 1.0.0.1 sits in the ASN fixture's "1.0.0.0/24" Google
-    // entry.
     private static final String FIXTURE_CITY_IP = "81.2.69.142";
     private static final String FIXTURE_ASN_IP = "1.0.0.1";
 

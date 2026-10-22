@@ -5,17 +5,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-/**
- * A test applied to one event — the part of a rule before the {@code |}.
- *
- * <p>Conditions are immutable and hold no state, so one instance may be tested from any number of
- * threads. Comparison semantics are those of {@link Operator}.
- */
 public sealed interface Condition {
 
     boolean test(NormalizedEvent event);
 
-    /** Matches every event: {@code true}, for rules that only count. */
     record Always() implements Condition {
         @Override
         public boolean test(NormalizedEvent event) {
@@ -23,7 +16,6 @@ public sealed interface Condition {
         }
     }
 
-    /** {@code field <op> literal}, the literal being a {@link String} or a number. */
     record Compare(EventField field, Operator operator, Object operand) implements Condition {
         public Compare {
             Objects.requireNonNull(field, "field");
@@ -37,7 +29,6 @@ public sealed interface Condition {
         }
     }
 
-    /** {@code field in (a, b, …)}: equal, in the sense of {@link Operator#EQ}, to any literal. */
     record In(EventField field, List<Object> operands) implements Condition {
         public In {
             Objects.requireNonNull(field, "field");
@@ -59,7 +50,6 @@ public sealed interface Condition {
         }
     }
 
-    /** {@code field exists}: the event carries a value for the field. */
     record Exists(EventField field) implements Condition {
         public Exists {
             Objects.requireNonNull(field, "field");
@@ -71,11 +61,6 @@ public sealed interface Condition {
         }
     }
 
-    /**
-     * {@code field matches "regex"}: the pattern is found anywhere in the value, as grep would.
-     *
-     * <p>Anchor with {@code ^…$} for a whole-value match; prefix {@code (?i)} to ignore case.
-     */
     record Matches(EventField field, Pattern pattern) implements Condition {
         public Matches {
             Objects.requireNonNull(field, "field");

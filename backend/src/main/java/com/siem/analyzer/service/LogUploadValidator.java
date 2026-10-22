@@ -13,30 +13,18 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Decides whether an uploaded file may be stored at all.
- *
- * <p>Runs before {@link LogStorageService}, so a rejected upload never reaches the storage
- * directory, never gets a row in {@code log_uploads} and never produces a Kafka ingest event.
- *
- * <p>Three checks, in increasing cost: size (a stat call), name and declared type (string work),
- * then a sniff of the leading bytes. The first two are cheap filters; the sniff is the one that
- * actually holds, because both the file name and the multipart {@code Content-Type} are written by
- * the client and a binary renamed to {@code .log} passes them both.
- */
 @ApplicationScoped
 public class LogUploadValidator {
 
-    /** Leading byte sequences of container and executable formats a log file never starts with. */
     private static final byte[][] BINARY_MAGIC = {
-        {0x1f, (byte) 0x8b}, // gzip
-        {0x50, 0x4b, 0x03, 0x04}, // zip / jar
-        {0x7f, 0x45, 0x4c, 0x46}, // ELF
-        {0x4d, 0x5a}, // PE (MZ)
-        {(byte) 0xfd, 0x37, 0x7a, 0x58, 0x5a}, // xz
-        {0x42, 0x5a, 0x68}, // bzip2
-        {0x28, (byte) 0xb5, 0x2f, (byte) 0xfd}, // zstd
-        {0x25, 0x50, 0x44, 0x46}, // PDF
+        {0x1f, (byte) 0x8b},
+        {0x50, 0x4b, 0x03, 0x04},
+        {0x7f, 0x45, 0x4c, 0x46},
+        {0x4d, 0x5a},
+        {(byte) 0xfd, 0x37, 0x7a, 0x58, 0x5a},
+        {0x42, 0x5a, 0x68},
+        {0x28, (byte) 0xb5, 0x2f, (byte) 0xfd},
+        {0x25, 0x50, 0x44, 0x46},
     };
 
     private final long maxSizeBytes;
@@ -64,16 +52,6 @@ public class LogUploadValidator {
         this.sniffBytes = sniffBytes;
     }
 
-    /**
-     * Validates one uploaded file.
-     *
-     * @param filePath where the multipart body was spooled
-     * @param fileName the name the client gave the part
-     * @param contentType the type the client declared for the part
-     * @throws BadRequestException the file is missing or empty
-     * @throws PayloadTooLargeException the file is over the configured limit
-     * @throws UnsupportedLogFileException the extension, declared type or content is not a log file
-     */
     public void validate(Path filePath, String fileName, String contentType) {
         if (filePath == null || !Files.exists(filePath)) {
             throw new BadRequestException("file part is required");
@@ -107,12 +85,6 @@ public class LogUploadValidator {
         sniff(filePath);
     }
 
-    /**
-     * Reads the leading bytes and refuses anything that is not plain text.
-     *
-     * <p>Only the head is read: a log file that starts as text stays text, and reading the whole
-     * body to prove it would cost as much as the ingestion itself.
-     */
     private void sniff(Path filePath) {
         byte[] head = new byte[sniffBytes];
         int read;
@@ -135,16 +107,11 @@ public class LogUploadValidator {
         }
     }
 
-    /**
-     * Control characters a text log never contains. Tab, newline, form feed and carriage return are
-     * the four that legitimately appear; everything else below the printable range, plus DEL, marks
-     * the content as binary.
-     */
     private static boolean isBinaryByte(byte b) {
         if (b == 0x09 || b == 0x0a || b == 0x0c || b == 0x0d) {
             return false;
         }
-        // Bytes above 0x7f are the continuation bytes of UTF-8, so they stay allowed.
+
         return (b >= 0 && b < 0x20) || b == 0x7f;
     }
 
@@ -173,9 +140,6 @@ public class LogUploadValidator {
         return base.substring(dot + 1).toLowerCase(Locale.ROOT);
     }
 
-    /**
-     * Strips the parameters, so {@code text/plain; charset=UTF-8} is matched as {@code text/plain}.
-     */
     private static String baseContentType(String contentType) {
         if (contentType == null) {
             return "";

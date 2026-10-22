@@ -19,16 +19,6 @@ import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Set;
 
-/**
- * An account that can sign in to the analyzer.
- *
- * <p>As with the other entities, column names are spelled out rather than left to the naming
- * strategy so that this file and {@code db/migration/V2__users.sql} can be read side by side.
- *
- * <p>The entity never sees a plaintext password: {@link #passwordHash} is written from {@code
- * com.siem.analyzer.service.PasswordService} and is the only form of the credential that exists
- * anywhere in the application.
- */
 @Entity
 @Table(name = "app_user")
 public class User {
@@ -55,13 +45,6 @@ public class User {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    /**
-     * Roles held by this account.
-     *
-     * <p>Fetched eagerly: the set is small, bounded by the number of constants in {@link Role}, and
-     * every authorisation decision needs it, so a lazy collection would only trade one query for
-     * two.
-     */
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
             name = "user_role",
@@ -73,13 +56,6 @@ public class User {
     @Column(name = "role", nullable = false)
     private Set<Role> roles = EnumSet.noneOf(Role.class);
 
-    /**
-     * Fills in the timestamps.
-     *
-     * <p>Both columns carry a {@code DEFAULT now()} for inserts made outside the application, but
-     * Hibernate sends every mapped column on insert, so leaving the fields null would write nulls
-     * over those defaults rather than fall back to them.
-     */
     @PrePersist
     void onPersist() {
         Instant now = Instant.now();
@@ -142,19 +118,11 @@ public class User {
         return roles;
     }
 
-    /**
-     * Replaces the whole role set.
-     *
-     * <p>The argument is copied rather than kept: Hibernate manages the collection instance it
-     * handed out, and swapping in a caller-owned set would either detach it from that management or
-     * leave the caller able to mutate persistent state from outside.
-     */
     public void setRoles(Set<Role> roles) {
         this.roles.clear();
         this.roles.addAll(roles);
     }
 
-    /** Whether this account holds the given role. */
     public boolean hasRole(Role role) {
         return roles.contains(role);
     }

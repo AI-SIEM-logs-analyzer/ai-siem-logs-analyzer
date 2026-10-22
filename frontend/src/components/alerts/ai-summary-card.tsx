@@ -27,7 +27,6 @@ const ATTACK_TYPE_LABELS: Record<AttackType, string> = {
   OTHER: 'Other',
 };
 
-/** Why the summary could not be had; the backend's own sentence when the provider failed. */
 function failure(error: unknown): string {
   if (error instanceof ApiError && error.status === 502) {
     return backendMessage(error.body) ?? 'The AI provider could not summarise this alert.';
@@ -35,10 +34,6 @@ function failure(error: unknown): string {
   return errorMessage(error);
 }
 
-/**
- * The model's reading of the alert, and, for whoever may triage, the button that asks for one.
- * The model's severity is shown beside the rule's, never in its place.
- */
 export function AiSummaryCard({ id, alert }: { id: number; alert: Alert }) {
   const summarize = useSummarizeAlert(id);
   const summary = alert.aiSummary;

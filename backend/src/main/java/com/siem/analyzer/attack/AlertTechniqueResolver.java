@@ -15,27 +15,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * The ATT&CK techniques each alert evidences, named from the loaded dataset.
- *
- * <p>An alert raised by a rule has that rule's techniques. An alert without one has those its
- * model-assigned attack type maps to, marked {@link TechniqueSource#AI}. Techniques are resolved
- * when an alert is read, not copied onto it, so mapping a rule changes every alert it raised. A
- * whole page costs two queries, whatever its size: the rules' technique IDs, then the techniques.
- */
 @ApplicationScoped
 public class AlertTechniqueResolver {
 
-    /** A tactic as an alert's technique names it. */
     public record TacticRef(String id, String name) {}
 
-    /**
-     * One technique an alert evidences.
-     *
-     * @param name {@code null} when the loaded dataset does not know the ID
-     * @param url {@code null} likewise, or when the dataset gave no attack.mitre.org link
-     * @param tactics in matrix order; empty when the dataset does not know the ID
-     */
     public record ResolvedTechnique(
             String id, String name, String url, List<TacticRef> tactics, TechniqueSource source) {
 
@@ -55,7 +39,6 @@ public class AlertTechniqueResolver {
         this.techniques = techniques;
     }
 
-    /** Each alert's techniques by alert ID, sorted by technique ID. */
     public Map<Long, List<ResolvedTechnique>> resolve(Collection<Alert> alerts) {
         Set<Long> ruleIds = new HashSet<>();
         for (Alert alert : alerts) {
@@ -95,7 +78,6 @@ public class AlertTechniqueResolver {
         return resolved;
     }
 
-    /** One alert's techniques, sorted by technique ID. */
     public List<ResolvedTechnique> resolve(Alert alert) {
         return resolve(List.of(alert)).getOrDefault(alert.getId(), List.of());
     }

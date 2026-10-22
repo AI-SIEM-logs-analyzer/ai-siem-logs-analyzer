@@ -2,11 +2,6 @@ import { chartColors, count, formatEvents } from '@/components/charts/chart-them
 import type { EChartOption } from '@/components/charts/echart';
 import { formatBucket, peakBucket, type TimelineBucket, type TimelineWindow } from '@/lib/timeline';
 
-/**
- * A column per bucket on a time axis spanning the whole window, so an empty stretch reads as
- * quiet rather than as missing. Only the peak carries a value label; the axis, the tooltip and
- * the table view carry the rest.
- */
 export function eventTimelineOption(
   buckets: readonly TimelineBucket[],
   window: TimelineWindow,
@@ -47,7 +42,7 @@ export function eventTimelineOption(
       backgroundColor: colors.surface,
       borderColor: colors.grid,
       textStyle: { color: colors.ink, fontSize: 12 },
-      // Built from numbers and dates only, so the HTML carries nothing from the backend.
+
       formatter: (params) => {
         const item = Array.isArray(params) ? params[0] : params;
         const bucket = buckets[item?.dataIndex ?? -1];

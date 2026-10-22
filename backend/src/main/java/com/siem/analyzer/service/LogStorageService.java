@@ -16,10 +16,6 @@ import java.util.HexFormat;
 import java.util.UUID;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
 
-/**
- * Persists uploaded log files to the configured storage directory and computes their SHA-256
- * checksum.
- */
 @ApplicationScoped
 public class LogStorageService {
 
@@ -39,7 +35,6 @@ public class LogStorageService {
         }
     }
 
-    /** Stores an uploaded file from a {@link FileUpload}. */
     public StoredFile store(FileUpload fileUpload) {
         if (fileUpload == null || fileUpload.filePath() == null) {
             throw new IllegalArgumentException("FileUpload is null or has no file path");
@@ -61,7 +56,6 @@ public class LogStorageService {
         }
     }
 
-    /** Stores an uploaded file from an {@link InputStream}. */
     public StoredFile store(InputStream in, String originalFileName, String contentType) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -103,7 +97,6 @@ public class LogStorageService {
         return name.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
-    /** Record describing a stored file and its metadata. */
     public record StoredFile(
             String storagePath,
             long size,

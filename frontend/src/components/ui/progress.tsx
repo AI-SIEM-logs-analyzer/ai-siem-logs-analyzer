@@ -2,7 +2,6 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 interface ProgressProps extends Omit<React.ComponentProps<'div'>, 'children'> {
-  /** 0–100; leave undefined for an indeterminate bar. */
   value?: number;
 }
 

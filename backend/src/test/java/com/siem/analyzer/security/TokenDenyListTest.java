@@ -11,7 +11,6 @@ import java.time.Duration;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** The list that makes a logout take effect before the access token expires. */
 @QuarkusTest
 class TokenDenyListTest {
 
@@ -42,8 +41,6 @@ class TokenDenyListTest {
     void stillListsATokenThatIsAboutToExpire() {
         String jti = UUID.randomUUID().toString();
 
-        // A token with no life left is still denied for a second: rounding must not produce a
-        // logout that quietly does nothing.
         denyList.deny(jti, Duration.ZERO);
 
         assertTrue(denyList.isDenied(jti));

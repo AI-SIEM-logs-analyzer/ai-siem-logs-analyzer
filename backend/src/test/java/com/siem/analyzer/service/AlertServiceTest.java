@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/** Detections stored as alerts, and alerts moved through triage. */
 @QuarkusTest
 class AlertServiceTest {
 

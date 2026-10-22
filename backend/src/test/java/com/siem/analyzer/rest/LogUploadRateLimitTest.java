@@ -12,10 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/**
- * The allowance one account gets on the upload endpoints. Lowered to two uploads for the run, so
- * the limit is reached in three requests rather than twenty-one.
- */
 @QuarkusTest
 @TestProfile(LogUploadRateLimitTest.TightLimitProfile.class)
 @TestSecurity(user = "flooder", roles = "ADMIN")

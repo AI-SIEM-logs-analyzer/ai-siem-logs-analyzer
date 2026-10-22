@@ -17,12 +17,6 @@ import jakarta.persistence.PersistenceException;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/**
- * Verifies that Flyway owns the schema and that the initial migration ran.
- *
- * <p>These assertions go through the database rather than through entities on purpose: they have to
- * keep working even if every entity mapping is later changed.
- */
 @QuarkusTest
 class FlywayMigrationTest {
 
@@ -173,7 +167,6 @@ class FlywayMigrationTest {
         assertEquals(8L, count);
     }
 
-    /** Inserts a log event through SQL alone and returns its id. */
     private Long insertedLogEvent() {
         Number sourceId =
                 (Number)
@@ -287,8 +280,7 @@ class FlywayMigrationTest {
     @Test
     @TestTransaction
     void theAttackTypeConstraintListsEveryAttackType() {
-        // AttackType and ck_alert_ai_attack_type have to name the same values; a constant the
-        // constraint does not know would fail the first summary that uses it, in production.
+
         Long eventId = insertedLogEvent();
 
         for (AttackType type : AttackType.values()) {

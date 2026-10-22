@@ -29,8 +29,6 @@ class SearchBackfillJobTest {
 
         job.run();
 
-        // The scheduler must keep firing. A job that propagates is a job that stops being
-        // scheduled once the engine has an outage — exactly when the backlog needs draining.
         assertFalse(search.available());
     }
 }

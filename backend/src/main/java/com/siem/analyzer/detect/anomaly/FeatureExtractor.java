@@ -8,24 +8,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.PriorityQueue;
 
-/**
- * Turns a stream of events into {@link EventFeatures}, counting each source address's requests over
- * a sliding window.
- *
- * <p>Only events with a status code and a source address are scored: the status is one of the
- * features, and the request rate is counted per address. Everything else (syslog lines, JSON events
- * without a status) yields {@code null}.
- *
- * <p><b>Time.</b> The window runs on event time, like the rule engine's: an address's rate is how
- * many of its requests fall within {@code (latest - window, latest]}, {@code latest} being the
- * newest timestamp it has sent. Events should arrive roughly in order; one older than its address's
- * window still gets features but does not raise that address's rate.
- *
- * <p><b>Memory.</b> Every {@value #SWEEP_INTERVAL} events, addresses that have gone quiet for
- * longer than a window are dropped.
- *
- * <p>Not thread-safe.
- */
 public final class FeatureExtractor {
 
     static final int SWEEP_INTERVAL = 1024;
@@ -43,7 +25,6 @@ public final class FeatureExtractor {
         this.rateWindow = rateWindow;
     }
 
-    /** Reads the event's features; {@code null} when it has no status code or no source address. */
     public EventFeatures extract(NormalizedEvent event) {
         Objects.requireNonNull(event, "event");
         if (event.status() == null || event.srcIp() == null) {
@@ -61,7 +42,6 @@ public final class FeatureExtractor {
         return new EventFeatures(event, rate, bytes, event.status());
     }
 
-    /** How many source addresses are being tracked; for metrics and tests. */
     public int trackedSources() {
         return sources.size();
     }
@@ -72,13 +52,11 @@ public final class FeatureExtractor {
         sources.values().removeIf(source -> !source.latest.isAfter(horizon));
     }
 
-    /** The recent requests of one address, oldest first. */
     private final class SourceWindow {
 
         private final PriorityQueue<Instant> seen = new PriorityQueue<>();
         private Instant latest;
 
-        /** Records a request and returns how many the window now holds. */
         int add(Instant at) {
             if (latest == null || at.isAfter(latest)) {
                 latest = at;

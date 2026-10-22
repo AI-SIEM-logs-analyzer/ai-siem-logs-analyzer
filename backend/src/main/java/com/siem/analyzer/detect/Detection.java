@@ -10,18 +10,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-/**
- * A rule fired.
- *
- * @param rule the rule that fired
- * @param group the group-by fields and their values, in group-by order; empty for an ungrouped or
- *     per-event rule
- * @param value the aggregate that crossed the threshold; 1 for a per-event rule
- * @param eventCount how many events the window held when it fired
- * @param windowStart the timestamp of the oldest event in the window
- * @param windowEnd the timestamp of the newest event in the window
- * @param trigger the event whose arrival made the rule fire
- */
 public record Detection(
         DetectionRule rule,
         Map<String, Object> group,
@@ -45,10 +33,6 @@ public record Detection(
                 rule, Map.of(), BigDecimal.ONE, 1, event.timestamp(), event.timestamp(), event);
     }
 
-    /**
-     * One line for an alert's detail, for example {@code count = 12 (>= 10) within 5m for
-     * srcIp=10.0.0.7}.
-     */
     public String summary() {
         WindowSpec window = rule.expression().window();
         if (window == null) {

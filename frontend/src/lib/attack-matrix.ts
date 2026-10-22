@@ -98,7 +98,6 @@ export function isAlertStatus(value: string): value is AlertStatus {
   return (ALERT_STATUSES as readonly string[]).includes(value);
 }
 
-/** Whether `t` is a sub-technique; the backend DTO carries only `parentId`, not `subTechnique`. */
 export function isSubTechnique(
   t: Pick<AttackTechnique, 'id' | 'parentId' | 'subTechnique'>,
 ): boolean {
@@ -142,8 +141,6 @@ export function buildAttackMatrix(
   scope: MatrixScope = 'active',
   inUseIds?: ReadonlySet<string>,
 ): AttackMatrix {
-  // The backend lists tactics already in matrix order and without `matrixOrder`: sort only
-  // when both sides carry one, otherwise keep the input order (Array#sort is stable).
   const orderedTactics = [...tactics].sort((a, b) =>
     a.matrixOrder !== undefined && b.matrixOrder !== undefined ? a.matrixOrder - b.matrixOrder : 0,
   );
@@ -167,7 +164,6 @@ export function buildAttackMatrix(
     }
   }
 
-  // Track alert hits per (tacticId, parentId) and per (tacticId, subId)
   interface HitAccumulator {
     alertIds: Set<string>;
     highestSeverity: Severity | null;

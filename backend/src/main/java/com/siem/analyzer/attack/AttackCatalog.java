@@ -14,15 +14,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 
-/** The loaded ATT&CK tactics and techniques, for the alert filters and the read endpoints. */
 @ApplicationScoped
 public class AttackCatalog {
 
-    /**
-     * A technique as the catalogue lists it.
-     *
-     * @param technique empty when the loaded dataset does not know {@code id}
-     */
     public record Entry(String id, Optional<AttackTechnique> technique) {}
 
     private final AttackTacticRepository tactics;
@@ -39,23 +33,16 @@ public class AttackCatalog {
         this.rules = rules;
     }
 
-    /** Every tactic in matrix order. */
     public List<AttackTactic> tactics() {
         return tactics.listInMatrixOrder();
     }
 
-    /** Every technique in the loaded dataset, by ID. */
     public List<Entry> techniques() {
         return techniques.listAllWithTactics().stream()
                 .map(technique -> new Entry(technique.getId(), Optional.of(technique)))
                 .toList();
     }
 
-    /**
-     * The techniques an alert can name: those enabled rules map, and those the attack-type fallback
-     * names. Six hundred techniques would make a useless filter; this is the dozen or so that can
-     * match anything. An ID the dataset does not know is listed bare.
-     */
     public List<Entry> techniquesInUse() {
         Set<String> ids = new TreeSet<>(rules.techniqueIdsOfEnabledRules());
         ids.addAll(AttackTypeTechniques.allTechniqueIds());

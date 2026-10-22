@@ -10,16 +10,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Predicate;
 
-/**
- * The ATT&CK techniques an alert without a rule evidences, from the attack type a model gave it.
- *
- * <p>Every {@link AttackType} has an explicit entry, so a constant added there fails {@code
- * AttackTypeTechniquesTest} until someone decides what it maps to. A type the model uses when it
- * cannot name an attack ({@code ANOMALOUS_BEHAVIOUR}, {@code OTHER}) or finds none ({@code
- * BENIGN}), or one with no single technique behind it ({@code MALWARE}), maps to nothing rather
- * than to a guess. Base techniques where the type does not say which sub-technique: a model's
- * "brute force" is {@code T1110}, not a particular way of guessing.
- */
 public final class AttackTypeTechniques {
 
     private static final Map<AttackType, List<String>> BY_TYPE = byType();
@@ -46,7 +36,6 @@ public final class AttackTypeTechniques {
         return Collections.unmodifiableMap(byType);
     }
 
-    /** The techniques of {@code type}, by ID; empty for a type that names no technique. */
     public static List<String> of(AttackType type) {
         List<String> ids = BY_TYPE.get(type);
         if (ids == null) {
@@ -55,14 +44,12 @@ public final class AttackTypeTechniques {
         return ids;
     }
 
-    /** Every technique some attack type maps to. */
     public static Set<String> allTechniqueIds() {
         Set<String> ids = new TreeSet<>();
         BY_TYPE.values().forEach(ids::addAll);
         return ids;
     }
 
-    /** The attack types with at least one technique {@code accepts} takes. */
     public static Set<AttackType> matching(Predicate<String> accepts) {
         Set<AttackType> types = EnumSet.noneOf(AttackType.class);
         BY_TYPE.forEach(

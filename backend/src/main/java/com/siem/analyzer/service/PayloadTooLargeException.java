@@ -1,6 +1,5 @@
 package com.siem.analyzer.service;
 
-/** An upload larger than the configured limit; carries the limit so the caller can be told it. */
 public class PayloadTooLargeException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;

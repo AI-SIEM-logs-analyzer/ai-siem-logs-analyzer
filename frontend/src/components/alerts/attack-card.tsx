@@ -3,7 +3,6 @@ import type { AlertTechnique } from '@/api/attack';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-/** Where the alert's techniques come from, in a sentence. */
 function provenance(techniques: readonly AlertTechnique[]): string {
   if (techniques.length === 0) return 'No technique is mapped to this alert.';
   if (techniques.some((technique) => technique.source === 'AI')) {
@@ -12,10 +11,6 @@ function provenance(techniques: readonly AlertTechnique[]): string {
   return 'The techniques the rule that fired is mapped to.';
 }
 
-/**
- * The MITRE ATT&CK techniques an alert evidences, each with its tactics and a link to its page on
- * attack.mitre.org. A technique the loaded dataset does not know shows its ID alone.
- */
 export function AttackCard({ techniques }: { techniques: readonly AlertTechnique[] }) {
   return (
     <Card>

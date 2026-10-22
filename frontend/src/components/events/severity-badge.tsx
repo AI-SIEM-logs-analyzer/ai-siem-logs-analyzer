@@ -1,8 +1,6 @@
 import type { Severity } from '@/lib/event-filters';
 import { cn } from '@/lib/utils';
 
-// Colour carries the level at a glance, the text carries it for everyone; the dot keeps the
-// badge distinguishable without colour.
 const SEVERITY_STYLES: Record<Severity, string> = {
   CRITICAL: 'border-red-600/40 bg-red-600/15 text-red-700 dark:text-red-300',
   ERROR: 'border-orange-500/40 bg-orange-500/15 text-orange-700 dark:text-orange-300',

@@ -28,12 +28,10 @@ import {
   type TimelineWindow,
 } from '@/lib/timeline';
 
-/** Widest an address label gets: a whole IPv4 address in monospace; IPv6 is cut. */
 const LABEL_WIDTH = 112;
-/** Narrowest a column gets before the chart scrolls sideways inside its card. */
+
 const MIN_COLUMN_PX = 7;
 
-/** The events page, narrowed to `ip` between `from` and `to`. */
 function eventsLink(ip: string, from: number, to: number): string {
   const params = eventFiltersToParams({
     ...NO_FILTERS,

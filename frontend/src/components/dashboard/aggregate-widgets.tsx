@@ -19,20 +19,16 @@ import {
 } from '@/lib/facets';
 import { TIMELINE_RANGES, type TimelineRange } from '@/lib/timeline';
 
-// The aggregate widgets under the timeline. Each reads its facet from the shared overview;
-// the chart, its tooltip and the table view show the same numbers.
-
 function rangeLabel(range: TimelineRange): string {
   return TIMELINE_RANGES[range].label.toLowerCase();
 }
 
-/** The width of the element `ref` points at, followed as it resizes; `fallback` until measured. */
 function useWidth(ref: RefObject<HTMLElement | null>, fallback: number): number {
   const [width, setWidth] = useState(fallback);
   useEffect(() => {
     const element = ref.current;
     if (!element || typeof ResizeObserver === 'undefined') return;
-    // Rounded down to 8 px, so a resize redraws the chart in steps rather than every pixel.
+
     const measure = () => setWidth(Math.floor(element.clientWidth / 8) * 8 || fallback);
     measure();
     const observer = new ResizeObserver(measure);
@@ -42,10 +38,6 @@ function useWidth(ref: RefObject<HTMLElement | null>, fallback: number): number 
   return width;
 }
 
-/**
- * A ranked bar chart sized to its rows, loaded with ECharts. Labels sit beside the bars, cut
- * at `labelWidth`, or with `labelsAbove` on a line of their own as wide as the chart.
- */
 function RankedChart({
   entries,
   label,
@@ -60,7 +52,7 @@ function RankedChart({
   mono?: boolean;
 }) {
   const container = useRef<HTMLDivElement>(null);
-  // Above its bar, a label may run as far as the count at the end of the longest one.
+
   const width = useWidth(container, 320) - 64;
   const labels = labelsAbove ? Math.max(width, 120) : labelWidth;
   const option = useMemo(
@@ -77,7 +69,6 @@ function RankedChart({
   );
 }
 
-/** The source addresses behind the most events: scanners, brute force, a noisy client. */
 export function TopIpsCard({ range }: { range: TimelineRange }) {
   return (
     <AggregateCard

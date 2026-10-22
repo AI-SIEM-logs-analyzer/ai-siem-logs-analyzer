@@ -20,7 +20,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatBucket, peakBucket, TIMELINE_RANGES, type TimelineRange } from '@/lib/timeline';
 import { cn } from '@/lib/utils';
 
-/** Events over time across every source, for the range picked above the dashboard. */
 export function EventTimelineCard({ range }: { range: TimelineRange }) {
   const { data, error, isPending, isFetching, isPlaceholderData, refetch } =
     useEventOverview(range);
@@ -61,7 +60,6 @@ export function EventTimelineCard({ range }: { range: TimelineRange }) {
             No events in the {label.toLowerCase()}. They appear here once log files are ingested.
           </p>
         ) : (
-          // A different range keeps the previous chart, dimmed, until its counts arrive.
           <div
             className={cn('space-y-4 transition-opacity', isPlaceholderData && 'opacity-60')}
             aria-busy={isPlaceholderData}

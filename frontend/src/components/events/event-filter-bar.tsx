@@ -25,12 +25,6 @@ interface EventFilterBarProps {
   onChange: (filters: EventFilters) => void;
 }
 
-/**
- * The filters above the events table. The time range and the severities apply as they are
- * picked; the text boxes apply together, on Enter or "Apply". The boxes are uncontrolled and
- * remounted whenever the applied filters change, so a drill-down or the back button shows up in
- * them without a draft state to keep in step.
- */
 export function EventFilterBar({ filters, onChange }: EventFilterBarProps) {
   return (
     <Card className="gap-0 py-0">
@@ -47,7 +41,6 @@ export function EventFilterBar({ filters, onChange }: EventFilterBarProps) {
   );
 }
 
-/** "2026-09-30T14:25" in local time, as a datetime-local input shows an ISO instant. */
 function toLocalInput(iso: string | undefined): string {
   if (!iso) return '';
   const date = new Date(iso);
@@ -56,7 +49,6 @@ function toLocalInput(iso: string | undefined): string {
   return local.toISOString().slice(0, 16);
 }
 
-/** The ISO instant a datetime-local value names, or undefined for an empty box. */
 function fromLocalInput(value: FormDataEntryValue | null): string | undefined {
   if (typeof value !== 'string' || !value) return undefined;
   const date = new Date(value);

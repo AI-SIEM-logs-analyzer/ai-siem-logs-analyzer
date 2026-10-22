@@ -9,12 +9,6 @@ import java.util.List;
 import java.util.Map;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
-/**
- * One page of search results, as the API returns it.
- *
- * <p>The cursor is flattened into two scalars so a caller can hand them straight back as query
- * parameters without decoding anything.
- */
 @Schema(name = "EventSearchResponse", description = "One page of matching events")
 public record EventSearchResponse(
         List<Hit> hits,
@@ -43,7 +37,6 @@ public record EventSearchResponse(
                 page.facets());
     }
 
-    /** One matching event. {@code eventId} is the key into PostgreSQL for the full row. */
     @Schema(name = "EventHit", description = "One matching event")
     public record Hit(
             long eventId,

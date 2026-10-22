@@ -61,8 +61,7 @@ class OpenApiEndpointTest {
 
     @Test
     void documentsTheGeoFieldsOnASearchHit() {
-        // The geo fields surface generically through EventHit.fields, so this checks the
-        // Schema description on that map property rather than a set of typed properties.
+
         given().accept("application/json")
                 .when()
                 .get("/q/openapi")

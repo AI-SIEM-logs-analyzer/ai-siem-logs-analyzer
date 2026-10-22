@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** An alert's techniques: its rule's, or the model's attack type's when no rule fired. */
 @QuarkusTest
 class AlertTechniqueResolverTest {
 

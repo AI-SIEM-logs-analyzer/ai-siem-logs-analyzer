@@ -1,6 +1,3 @@
-// The dashboard timeline's time arithmetic: which window a range covers, and how the backend's
-// hourly counts fold into the buckets drawn. Kept free of React and ECharts so it is tested alone.
-
 const HOUR_MS = 60 * 60 * 1000;
 
 export const TIMELINE_RANGES = {
@@ -27,7 +24,6 @@ export function isTimelineRange(value: string | null | undefined): value is Time
   return value != null && Object.hasOwn(TIMELINE_RANGES, value);
 }
 
-/** A half-open interval [from, to) in epoch milliseconds, cut into buckets of `bucketMs`. */
 export interface TimelineWindow {
   from: number;
   to: number;
@@ -35,20 +31,10 @@ export interface TimelineWindow {
 }
 
 export interface TimelineBucket {
-  /** Epoch milliseconds; the bucket covers [start, start + bucketMs). */
   start: number;
   count: number;
 }
 
-/**
- * The window `range` covers at `now`: it ends at the bucket boundary after `now`, so the last
- * bucket is the one still filling, and starts one range earlier.
- *
- * Boundaries fall on the hours the backend counts by (UTC hours) and on multiples of the
- * bucket in local time, so 12-hour buckets start at midnight and noon rather than wherever the
- * UTC offset puts them. A half-hour offset is rounded to the hour: a bucket must never split
- * one of the backend's.
- */
 export function timelineWindow(range: TimelineRange, now: number): TimelineWindow {
   const { durationMs, bucketMs } = TIMELINE_RANGES[range];
   const offset = Math.round(-new Date(now).getTimezoneOffset() / 60) * HOUR_MS;
@@ -56,10 +42,6 @@ export function timelineWindow(range: TimelineRange, now: number): TimelineWindo
   return { from: to - durationMs, to, bucketMs };
 }
 
-/**
- * Folds hourly counts into the window's buckets, with a zero for every bucket nothing fell in
- * (the backend sends only the hours that have events). Counts outside the window are dropped.
- */
 export function timelineBuckets(
   hourly: readonly { start?: string; count?: number }[],
   { from, to, bucketMs }: TimelineWindow,
@@ -84,12 +66,10 @@ const bucketFormat = new Intl.DateTimeFormat(undefined, {
   minute: '2-digit',
 });
 
-/** "Tue, 30 Sep, 14:00 – 15:00", in the reader's locale and time zone. */
 export function formatBucket(start: number, bucketMs: number): string {
   return bucketFormat.formatRange(start, start + bucketMs);
 }
 
-/** The bucket with the most events, the earliest on a tie; undefined when all are empty. */
 export function peakBucket(buckets: readonly TimelineBucket[]): TimelineBucket | undefined {
   let peak: TimelineBucket | undefined;
   for (const bucket of buckets) {

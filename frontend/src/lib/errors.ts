@@ -1,22 +1,11 @@
 import { ApiError } from '@/lib/api-client';
 
-// What a failure means to the person looking at the screen. Raw messages ("/api/users failed
-// with 500", "Failed to fetch") name the plumbing; these name what happened and what to do.
-// A screen with a more precise story for one status (a 503 from the search index, a 413 on
-// upload) checks for it first and falls back to `errorMessage` for everything else.
-
-/** A failure explained: a short headline, a sentence of detail, and whether trying again can help. */
 export interface ErrorDescription {
   title: string;
   message: string;
   retryable: boolean;
 }
 
-/**
- * The request never got an answer: offline, DNS, CORS, the backend down behind the proxy.
- * `fetch` rejects with a `TypeError` whose wording each browser picks; a `TypeError` from a bug
- * ("Cannot read properties of undefined") is not one of these.
- */
 export function isNetworkError(error: unknown): boolean {
   if (error instanceof DOMException) return error.name === 'NetworkError';
   return (
@@ -28,11 +17,6 @@ export function isNetworkError(error: unknown): boolean {
   );
 }
 
-/**
- * A lazily loaded chunk that no longer exists, almost always because a new version was
- * deployed while this tab was open. Browsers word it differently; these cover Chromium,
- * Firefox, Safari and Vite's own preload error.
- */
 export function isChunkLoadError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return /dynamically imported module|module script failed|importing a module script|error loading dynamically|preload css|unable to preload/i.test(
@@ -40,7 +24,6 @@ export function isChunkLoadError(error: unknown): boolean {
   );
 }
 
-/** The `message` a backend error body carries, or its text when it was not JSON. */
 export function backendMessage(body: unknown): string | null {
   if (typeof body === 'string') return body.trim() || null;
   if (body && typeof body === 'object' && 'message' in body && typeof body.message === 'string') {
@@ -49,7 +32,6 @@ export function backendMessage(body: unknown): string | null {
   return null;
 }
 
-/** How long a 429 or 503 asks to wait, from `Retry-After` in seconds; `null` without one. */
 export function retryAfterSeconds(error: ApiError): number | null {
   const seconds = Number(error.headers.get('Retry-After'));
   return Number.isFinite(seconds) && seconds > 0 ? seconds : null;

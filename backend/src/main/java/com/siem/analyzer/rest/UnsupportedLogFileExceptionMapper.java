@@ -7,12 +7,6 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 import java.util.Map;
 
-/**
- * Turns a file that is not an accepted log file into 415.
- *
- * <p>A mapper of its own rather than letting the framework answer: the exception carries what the
- * endpoint accepts, and a caller that guessed wrong should be told, not handed an empty body.
- */
 @Provider
 public class UnsupportedLogFileExceptionMapper
         implements ExceptionMapper<UnsupportedLogFileException> {

@@ -18,27 +18,11 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
-/**
- * Stands in for {@link ConfiguredChatModel} in every {@code @QuarkusTest}, so the suite never calls
- * a real provider.
- *
- * <p>Only the model is replaced: {@link AlertSummarizer} is the generated AI service, so a test
- * runs the real prompt rendering, the JSON schema LangChain4j derives from {@link AlertSummary} and
- * the parsing of the answer. The scripted model claims JSON-schema support, as the configured
- * providers do, so requests carry the schema the way they would in production.
- *
- * <p>{@code @Singleton} rather than application-scoped: a client proxy would need a no-args
- * constructor, which a subclass of a constructor-injected bean cannot have.
- */
 @Alternative
 @Priority(1)
 @Singleton
 public class ScriptedChatModel extends ConfiguredChatModel {
 
-    /**
-     * An answer that parses into a complete summary, grounded in an alert about failed logins from
-     * 10.0.0.7.
-     */
     public static final String VALID_ANSWER =
             """
             {
@@ -86,18 +70,15 @@ public class ScriptedChatModel extends ConfiguredChatModel {
         return model;
     }
 
-    /** Answers every request with whatever {@code answer} returns, or throws. */
     public void script(Function<ChatRequest, String> answer) {
         script.set(answer);
     }
 
-    /** Back to {@link #VALID_ANSWER}, with no request recorded. */
     public void reset() {
         script.set(request -> VALID_ANSWER);
         lastRequest.set(null);
     }
 
-    /** The last request the model received, or {@code null}. */
     public ChatRequest lastRequest() {
         return lastRequest.get();
     }

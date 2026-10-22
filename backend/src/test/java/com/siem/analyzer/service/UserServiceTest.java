@@ -14,7 +14,6 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** Account rules owned by {@link UserService}. */
 @QuarkusTest
 class UserServiceTest {
 
@@ -67,7 +66,6 @@ class UserServiceTest {
         User created =
                 service.create("keeps.email", "own@example.test", PASSWORD, Set.of(Role.VIEWER));
 
-        // Writing the same address back is not a collision with itself.
         User updated =
                 service.update(created.getId(), "own@example.test", Set.of(Role.ANALYST), true)
                         .orElseThrow();
@@ -105,7 +103,7 @@ class UserServiceTest {
     @Test
     @TestTransaction
     void refusesToSignInAsTheSeededAdministrator() {
-        // The seeded row carries the locked marker, so no password matches it until one is set.
+
         assertTrue(service.authenticate("admin", "admin").isEmpty());
         assertTrue(service.authenticate("admin", "!").isEmpty());
 

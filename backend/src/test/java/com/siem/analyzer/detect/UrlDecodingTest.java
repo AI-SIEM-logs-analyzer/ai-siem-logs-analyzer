@@ -32,7 +32,7 @@ class UrlDecodingTest {
     @Test
     void malformedEscapesAreKept() {
         assertEquals("100% %zz %4", UrlDecoding.decode("100% %zz %4"));
-        // Arabic-Indic digits are digits to Character.digit, but not hex to a URL.
+
         assertEquals("%١٢", UrlDecoding.decode("%١٢"));
     }
 

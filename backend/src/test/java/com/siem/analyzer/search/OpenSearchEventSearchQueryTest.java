@@ -248,7 +248,7 @@ class OpenSearchEventSearchQueryTest {
                 Map.of("failed login for admin", 1L, "disk failure", 1L),
                 page.facets().topErrors());
         assertFalse(page.facets().overTime().isEmpty());
-        // Both events of an address fall in T0's hour, which is the only hour it reports.
+
         assertEquals(page.facets().bySrcIp().keySet(), page.facets().srcIpOverTime().keySet());
         assertEquals(
                 List.of(new EventFacets.TimeBucket(T0, 1L)),
@@ -331,7 +331,7 @@ class OpenSearchEventSearchQueryTest {
         EventHit hit = page.hits().get(0);
         assertEquals("Googlebot", hit.fields().get("uaBrowser"));
         assertEquals("Robot", hit.fields().get("uaDeviceClass"));
-        // A boolean in the index comes back as a boolean, not as the string "true".
+
         assertEquals(Boolean.TRUE, hit.fields().get("uaBot"));
     }
 

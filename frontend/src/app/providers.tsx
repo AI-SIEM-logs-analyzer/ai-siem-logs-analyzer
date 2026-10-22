@@ -9,7 +9,6 @@ interface ProvidersProps {
 }
 
 export function Providers({ queryClient, children }: ProvidersProps) {
-  // Cached responses belong to whoever was signed in; the next account must not see them.
   useEffect(
     () =>
       subscribeSession(() => {
@@ -21,7 +20,7 @@ export function Providers({ queryClient, children }: ProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      {/* Renders nothing in production builds. */}
+
       <ReactQueryDevtools buttonPosition="bottom-left" />
     </QueryClientProvider>
   );

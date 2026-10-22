@@ -16,7 +16,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
-/** The STIX bundle reader, on the hand-written fixture and on what it must refuse. */
 class AttackStixReaderTest {
 
     private static final long NO_LIMIT = Long.MAX_VALUE;

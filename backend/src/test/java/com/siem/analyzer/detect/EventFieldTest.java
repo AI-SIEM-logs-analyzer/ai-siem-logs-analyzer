@@ -8,7 +8,6 @@ import java.time.Instant;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-/** The fields {@link EventField} derives rather than reads. */
 class EventFieldTest {
 
     private static NormalizedEvent requestFor(String path) {
